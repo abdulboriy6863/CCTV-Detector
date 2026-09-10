@@ -1,0 +1,56 @@
+# Environment & Sensitive Credentials
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# AI Models & Large Binaries
+models/*
+!models/.gitkeep
+models/easyocr/*
+!models/easyocr/.gitkeep
+*.pt
+*.pth
+*.onnx
+*.bin
+*.weights
+
+# Local Storage & Snapshots
+storage/snapshots/*
+!storage/snapshots/.gitkeep
+storage/temp/*
+!storage/temp/.gitkeep
+
+# Logs & Databases
+*.log
+*.sqlite3
+*.db
+
+# macOS & OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

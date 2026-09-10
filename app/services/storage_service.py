@@ -1,0 +1,66 @@
+"""File storage service for CCTV snapshots."""
+import os
+import uuid
+import zipfile
+import aiofiles
+import logging
+from io import BytesIO
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, List, Tuple
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class StorageService:
+    """Local file storage for CCTV snapshots — organized by date."""
+
+    def __init__(self, base_storage_dir: Optional[str] = None):
+        self.base_dir = Path(base_storage_dir or settings.STORAGE_DIR)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    def generate_relative_path(
+        self, cs_id: str, cp_id: str,
+        plate_number: Optional[str] = None, extension: str = "jpg"
+    ) -> str:
+        now = datetime.now()
+        date_folder = now.strftime("%Y/%m/%d")
+        timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+        clean_plate = (plate_number or "UNKNOWN").replace(" ", "_").upper()
+        clean_cs = cs_id.replace("/", "_").replace("\\", "_")
+        clean_cp = cp_id.replace("/", "_").replace("\\", "_")
+        short_id = uuid.uuid4().hex[:6]
+        filename = f"{clean_cs}_{clean_cp}_{clean_plate}_{timestamp_str}_{short_id}.{extension}"
+        return f"{date_folder}/{filename}"
+
+    def get_absolute_path(self, relative_path: str) -> Path:
+        return (self.base_dir / relative_path).resolve()
+
+    async def save_image(self, image_bytes: bytes, relative_path: str) -> str:
+        abs_path = self.get_absolute_path(relative_path)
+        abs_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(abs_path, "wb") as f:
+            await f.write(image_bytes)
+        logger.info(f"Saved: {abs_path} ({len(image_bytes)} bytes)")
+        return relative_path
+
+    async def read_image(self, relative_path: str) -> Optional[bytes]:
+        abs_path = self.get_absolute_path(relative_path)
+        if not abs_path.exists():
+            return None
+        async with aiofiles.open(abs_path, "rb") as f:
+            return await f.read()
+
+    def create_zip_archive(self, file_records: List[Tuple[str, str]]) -> BytesIO:
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for rel_path, zip_name in file_records:
+                abs_path = self.get_absolute_path(rel_path)
+                if abs_path.exists():
+                    zf.write(abs_path, arcname=zip_name)
+        zip_buffer.seek(0)
+        return zip_buffer
+
+
+storage_service = StorageService()

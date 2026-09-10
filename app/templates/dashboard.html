@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ko" x-data="appData()" :class="{ 'dark': isDark }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV EV Detector | Blue Networks</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#2563EB',
+                        ev: '#0284C7',
+                        alert: '#DC2626',
+                        success: '#16A34A',
+                        darkcard: '#1E293B',
+                        darkbg: '#0F172A'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(0.99); }
+        }
+        .animate-alert {
+            animation: pulse-slow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-darkbg dark:text-slate-100 transition-colors duration-200 min-h-screen">
+
+    <!-- Top Navbar -->
+    <nav class="bg-white/90 dark:bg-darkcard/90 backdrop-blur-md shadow-sm border-b border-slate-200 dark:border-slate-700/80 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo & Brand -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                        <i class="fa-solid fa-bolt-lightning text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">CCTV EV Detector</span>
+                            <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">v1.0</span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400" x-text="t('app_subtitle')"></p>
+                    </div>
+                </div>
+
+                <!-- Right Menu: Status, Theme, Settings, Language Switcher -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- CCTV Status Badge -->
+                    <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                        <span class="w-2 h-2 rounded-full" :class="cameras.length > 0 ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'"></span>
+                        <span class="text-slate-600 dark:text-slate-300" x-text="cameras.length + ' ' + t('cameras_connected')"></span>
+                    </div>
+
+                    <!-- Theme Toggle -->
+                    <button @click="toggleTheme()" class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" :title="isDark ? t('theme_light') : t('theme_dark')">
+                        <i class="fa-solid" :class="isDark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
+                    </button>
+
+                    <!-- Settings Dropdown -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" @click.outside="open = false" class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" :title="t('settings_title')">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+
+                        <div x-show="open" x-cloak class="absolute right-0 mt-2 w-80 bg-white dark:bg-darkcard rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-4 z-50 text-sm">
+                            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+                                <h3 class="font-bold text-slate-900 dark:text-white flex items-center">
+                                    <i class="fa-solid fa-sliders mr-2 text-brand"></i> <span x-text="t('settings_title')"></span>
+                                </h3>
+                                <button @click="open = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <div class="py-3 space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('auto_monitor_label')"></label>
+                                    <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <span class="text-xs text-slate-600 dark:text-slate-400" x-text="t('auto_monitor_desc')"></span>
+                                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" x-text="t('monitor_active')"></span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('ev_blue_threshold')"></label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="range" min="15" max="50" value="30" class="w-full accent-blue-600">
+                                        <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">30%</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-1" x-text="t('ev_threshold_desc')"></p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('alert_sound_label')"></label>
+                                    <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="text-xs text-slate-700 dark:text-slate-300" x-text="t('alert_visual_toggle')"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+                                <button @click="open = false" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition" x-text="t('btn_save_settings')">
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Language Switcher (UZ / KO) -->
+                    <div class="relative" x-data="{ langOpen: false }">
+                        <button @click="langOpen = !langOpen" @click.outside="langOpen = false" class="h-9 px-2.5 flex items-center space-x-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition" :title="t('lang_title')">
+                            <span x-text="currentLang === 'uz' ? '🇺🇿 UZ' : '🇰🇷 KO'"></span>
+                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                        </button>
+
+                        <div x-show="langOpen" x-cloak class="absolute right-0 mt-2 w-36 bg-white dark:bg-darkcard rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1 z-50 text-xs">
+                            <button @click="setLanguage('uz'); langOpen = false" class="w-full px-3 py-2 text-left flex items-center space-x-2 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition" :class="currentLang === 'uz' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300'">
+                                <span>🇺🇿</span>
+                                <span>O'zbekcha</span>
+                            </button>
+                            <button @click="setLanguage('ko'); langOpen = false" class="w-full px-3 py-2 text-left flex items-center space-x-2 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition" :class="currentLang === 'ko' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300'">
+                                <span>🇰🇷</span>
+                                <span>한국어</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Top Statistics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Detections -->
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="t('stat_total')"></p>
+                    <h3 class="text-2xl font-black mt-1 text-slate-900 dark:text-white" x-text="stats.total_detections">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_detections"></p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-camera"></i>
+                </div>
+            </div>
+
+            <!-- EV Detections -->
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400" x-text="t('stat_ev')"></p>
+                    <h3 class="text-2xl font-black mt-1 text-sky-600 dark:text-sky-400" x-text="stats.ev_count">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_ev"></p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+            </div>
+
+            <!-- Regular Detections -->
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="t('stat_regular')"></p>
+                    <h3 class="text-2xl font-black mt-1 text-slate-700 dark:text-slate-200" x-text="stats.regular_count">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_regular"></p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-gas-pump"></i>
+                </div>
+            </div>
+
+            <!-- Today Alerts -->
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between" :class="stats.today_alerts > 0 ? 'border-red-300 dark:border-red-900/50 bg-red-50/20' : ''">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400" x-text="t('stat_alerts')"></p>
+                    <h3 class="text-2xl font-black mt-1 text-red-600 dark:text-red-400" x-text="stats.today_alerts">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_alert_desc')"></p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace 2-Column Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT COLUMN (5 cols): Test Upload & Recognition Box -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- Upload Card -->
+                <div class="bg-white dark:bg-darkcard p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center">
+                            <i class="fa-solid fa-file-arrow-up mr-2 text-blue-600"></i> <span x-text="t('test_title')"></span>
+                        </h2>
+                        <span class="text-xs text-slate-400" x-text="t('korean_plates_support')"></span>
+                    </div>
+
+                    <!-- Drag & Drop Box -->
+                    <div 
+                        class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer relative"
+                        @dragover.prevent="dragOver = true"
+                        @dragleave.prevent="dragOver = false"
+                        @drop.prevent="handleDrop($event)"
+                        :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
+                        @click="$refs.fileInput.click()"
+                    >
+                        <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect($event)">
+                        
+                        <div x-show="!isUploading">
+                            <div class="w-14 h-14 mx-auto rounded-2xl bg-blue-50 dark:bg-slate-800 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-3 text-2xl">
+                                <i class="fa-regular fa-image"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
+                            <p class="text-xs text-slate-400 mt-1" x-text="t('dropzone_formats')"></p>
+                        </div>
+                        
+                        <div x-show="isUploading" class="py-6 flex flex-col items-center justify-center space-y-3">
+                            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600"></i>
+                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
+                            <p class="text-xs text-slate-400" x-text="t('analyzing_desc')"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detection Live Result Card -->
+                <div x-show="uploadResult" x-cloak class="bg-white dark:bg-darkcard p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center">
+                            <i class="fa-solid fa-circle-check mr-2 text-emerald-500"></i> <span x-text="t('result_title')"></span>
+                        </h3>
+                        <span class="text-xs font-mono text-slate-400" x-text="uploadResult ? (uploadResult.processing_time_ms + ' ms') : ''"></span>
+                    </div>
+
+                    <!-- SUCCESS RESULT -->
+                    <template x-if="uploadResult && uploadResult.success && uploadResult.data">
+                        <div class="space-y-4">
+                            <!-- Non-EV ALERT BANNER -->
+                            <template x-if="uploadResult.data.alert">
+                                <div class="animate-alert bg-red-500 text-white p-4 rounded-xl shadow-lg shadow-red-500/20 flex items-start space-x-3">
+                                    <i class="fa-solid fa-triangle-exclamation text-2xl shrink-0 mt-0.5"></i>
+                                    <div>
+                                        <h4 class="font-bold text-sm" x-text="t('alert_banner_title')"></h4>
+                                        <p class="text-xs text-red-100 mt-0.5" x-text="t('alert_banner_desc')"></p>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- EV BADGE BANNER -->
+                            <template x-if="uploadResult.data.is_ev">
+                                <div class="bg-gradient-to-r from-sky-500 to-blue-600 text-white p-4 rounded-xl shadow-lg shadow-sky-500/20 flex items-center justify-between">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fa-solid fa-circle-check text-2xl shrink-0"></i>
+                                        <div>
+                                            <h4 class="font-bold text-sm" x-text="t('ev_banner_title')"></h4>
+                                            <p class="text-xs text-sky-100" x-text="t('ev_banner_desc')"></p>
+                                        </div>
+                                    </div>
+                                    <span class="px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-lg text-xs font-bold" x-text="t('ev_allowed_tag')"></span>
+                                </div>
+                            </template>
+
+                            <!-- License Plate Display Box -->
+                            <div class="p-4 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-4"
+                                :class="uploadResult.data.is_ev ? 'bg-sky-50/50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'">
+                                <div>
+                                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider" x-text="t('recognized_plate_label')"></span>
+                                    <div class="text-2xl font-black tracking-wider text-slate-900 dark:text-white mt-0.5" x-text="uploadResult.data.plate_number"></div>
+                                </div>
+
+                                <div class="text-right">
+                                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider" x-text="t('vehicle_type_label')"></span>
+                                    <div class="mt-0.5">
+                                        <template x-if="uploadResult.data.is_ev">
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">
+                                                <i class="fa-solid fa-bolt mr-1"></i> <span x-text="t('type_ev')"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!uploadResult.data.is_ev">
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                                                <i class="fa-solid fa-car mr-1"></i> <span x-text="t('type_regular')"></span>
+                                            </span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cropped Plate Preview -->
+                            <template x-if="uploadResult.data.plate_region_base64">
+                                <div>
+                                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1.5" x-text="t('plate_crop_label')"></span>
+                                    <img :src="'data:image/jpeg;base64,' + uploadResult.data.plate_region_base64" class="w-full h-auto max-h-36 object-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-black/5 p-1 shadow-inner" alt="Plate Crop">
+                                </div>
+                            </template>
+
+                            <!-- AI Confidence Grid -->
+                            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <span class="text-slate-400 block" x-text="t('ai_confidence_label')"></span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200" x-text="(uploadResult.data.confidence * 100).toFixed(1) + '%'"></span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block" x-text="t('plate_color_label')"></span>
+                                    <span class="font-bold uppercase" :class="uploadResult.data.plate_color === 'blue' ? 'text-sky-500' : 'text-slate-700 dark:text-slate-300'" x-text="uploadResult.data.plate_color"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- ERROR RESULT -->
+                    <template x-if="uploadResult && !uploadResult.success">
+                        <div class="py-8 text-center space-y-2">
+                            <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xl mx-auto">
+                                <i class="fa-solid fa-circle-question"></i>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200" x-text="t('recognition_fail_title')"></h4>
+                            <p class="text-xs text-slate-400 max-w-xs mx-auto" x-text="uploadResult.message || t('recognition_fail_desc')"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN (7 cols): Camera Management & Vehicle History Table -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Camera Configuration Card -->
+                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 p-6" x-data="{ addCamOpen: false }">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-video text-blue-600"></i>
+                            <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('camera_mgmt_title')"></h2>
+                        </div>
+                        <button @click="addCamOpen = !addCamOpen" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                            <i class="fa-solid" :class="addCamOpen ? 'fa-xmark' : 'fa-plus'"></i>
+                            <span x-text="addCamOpen ? t('btn_close') : t('btn_add_camera')"></span>
+                        </button>
+                    </div>
+
+                    <!-- Add Camera Form (Collapsible) -->
+                    <div x-show="addCamOpen" x-cloak class="mb-5 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500" x-text="t('add_camera_header')"></h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_name_label')"></label>
+                                <input type="text" x-model="newCam.camera_name" :placeholder="t('cam_name_ph')" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_protocol_label')"></label>
+                                <select x-model="newCam.camera_type" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                                    <option value="RTSP">RTSP Stream</option>
+                                    <option value="HTTP_SNAPSHOT">HTTP Snapshot (Hikvision/Dahua)</option>
+                                    <option value="ONVIF">ONVIF Protocol</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_url_label')"></label>
+                                <input type="text" x-model="newCam.stream_url" placeholder="rtsp://192.168.1.100:554/live/ch0 yoki HTTP URL" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_ip_port_label')"></label>
+                                <div class="flex space-x-2">
+                                    <input type="text" x-model="newCam.ip_address" placeholder="192.168.1.100" class="w-2/3 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                                    <input type="number" x-model.number="newCam.port" placeholder="554" class="w-1/3 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_auth_label')"></label>
+                                <div class="flex space-x-2">
+                                    <input type="text" x-model="newCam.username" placeholder="admin" class="w-1/2 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                                    <input type="password" x-model="newCam.password" placeholder="••••••" class="w-1/2 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end pt-2">
+                            <button @click="createCamera()" :disabled="!newCam.stream_url" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition" x-text="t('btn_save_camera')">
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Camera List Cards -->
+                    <div class="space-y-2.5">
+                        <template x-for="cam in cameras" :key="cam.id">
+                            <div class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-9 h-9 rounded-xl flex items-center justify-center text-sm" :class="cam.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-slate-200 text-slate-500'">
+                                        <i class="fa-solid fa-video"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-xs font-bold text-slate-900 dark:text-white" x-text="cam.camera_name || t('unnamed_camera')"></span>
+                                            <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300" x-text="cam.camera_type"></span>
+                                        </div>
+                                        <p class="text-[11px] font-mono text-slate-400 truncate max-w-xs" x-text="cam.stream_url"></p>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                                    <!-- Test Connection Button -->
+                                    <button @click="testCamera(cam.id)" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center space-x-1">
+                                        <i class="fa-solid fa-play text-[10px] text-emerald-500"></i>
+                                        <span x-text="t('btn_test')"></span>
+                                    </button>
+                                    <!-- Delete Button -->
+                                    <button @click="deleteCamera(cam.id)" class="p-1.5 text-slate-400 hover:text-red-500 transition" :title="t('btn_delete')">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="cameras.length === 0">
+                            <div class="text-center py-6 text-slate-400 text-xs" x-text="t('no_cameras_msg')"></div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Vehicles History Table Card -->
+                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 overflow-hidden">
+                    <div class="p-5 border-b border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-list-check text-blue-600"></i>
+                            <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 w-full sm:w-auto">
+                            <select x-model="filters.type" @change="fetchVehicles()" class="text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                                <option value="" x-text="t('filter_all')"></option>
+                                <option value="EV" x-text="t('filter_ev_only')"></option>
+                                <option value="REGULAR" x-text="t('filter_regular_only')"></option>
+                            </select>
+                            <button @click="fetchVehicles()" class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition" :title="t('btn_refresh')">
+                                <i class="fa-solid fa-rotate-right text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700/80 font-semibold">
+                                <tr>
+                                    <th class="px-5 py-3" x-text="t('th_time')"></th>
+                                    <th class="px-5 py-3" x-text="t('th_plate')"></th>
+                                    <th class="px-5 py-3" x-text="t('th_type')"></th>
+                                    <th class="px-5 py-3" x-text="t('th_confidence')"></th>
+                                    <th class="px-5 py-3 text-right" x-text="t('th_actions')"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <template x-for="item in vehicles" :key="item.id">
+                                    <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                                        <td class="px-5 py-3.5 text-slate-500 font-mono" x-text="formatDate(item.created_at)"></td>
+                                        <td class="px-5 py-3.5 font-bold tracking-wider text-slate-900 dark:text-white text-sm" x-text="item.plate_number || t('unrecognized')"></td>
+                                        <td class="px-5 py-3.5">
+                                            <template x-if="item.is_ev">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">
+                                                    <i class="fa-solid fa-bolt mr-1"></i> EV
+                                                </span>
+                                            </template>
+                                            <template x-if="!item.is_ev">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-300" x-text="t('type_regular')">
+                                                </span>
+                                            </template>
+                                            <template x-if="item.alert_sent">
+                                                <span class="ml-1 text-red-500 text-xs" :title="t('alert_sent_tooltip')"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                                            </template>
+                                        </td>
+                                        <td class="px-5 py-3.5 text-slate-500" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></td>
+                                        <td class="px-5 py-3.5 text-right space-x-2">
+                                            <button @click="openImageModal(item.image_url)" class="p-1.5 text-blue-600 hover:text-blue-800 dark:text-blue-400" :title="t('view_image')">
+                                                <i class="fa-solid fa-image"></i>
+                                            </button>
+                                            <button @click="deleteVehicle(item.id)" class="p-1.5 text-slate-400 hover:text-red-500" :title="t('btn_delete')">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="vehicles.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="px-5 py-10 text-center text-slate-400" x-text="t('no_history_msg')"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination Controls -->
+                    <div class="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
+                        <button @click="prevPage()" :disabled="page === 1" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 font-medium" x-text="t('btn_prev')"></button>
+                        <span class="text-slate-500 font-mono"><span x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
+                        <button @click="nextPage()" :disabled="page === totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 font-medium" x-text="t('btn_next')"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Camera Live Snapshot Test Modal -->
+    <div x-show="testModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-slate-900 dark:text-white flex items-center">
+                    <i class="fa-solid fa-camera mr-2 text-blue-600"></i> <span x-text="t('modal_test_title')"></span>
+                </h3>
+                <button @click="testModal.open = false" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="rounded-xl overflow-hidden bg-black/10 border border-slate-200 dark:border-slate-700 min-h-48 flex items-center justify-center">
+                <template x-if="testModal.loading">
+                    <div class="py-12 text-center text-slate-400">
+                        <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-2 text-blue-600"></i>
+                        <p class="text-xs" x-text="t('capturing_stream_msg')"></p>
+                    </div>
+                </template>
+                <template x-if="!testModal.loading && testModal.image">
+                    <img :src="'data:image/jpeg;base64,' + testModal.image" class="w-full h-auto object-cover" alt="Captured Frame">
+                </template>
+                <template x-if="!testModal.loading && !testModal.image">
+                    <div class="py-12 text-center text-red-500 px-4">
+                        <i class="fa-solid fa-triangle-exclamation text-3xl mb-2"></i>
+                        <p class="text-xs font-semibold" x-text="testModal.message"></p>
+                    </div>
+                </template>
+            </div>
+
+            <div class="flex justify-end">
+                <button @click="testModal.open = false" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold" x-text="t('btn_close')"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Fullscreen Preview Modal -->
+    <div x-show="previewImage.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="relative max-w-4xl w-full">
+            <button @click="previewImage.open = false" class="absolute -top-10 right-0 text-white text-2xl hover:text-slate-300">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <img :src="previewImage.url" class="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10" alt="Full Image Preview">
+        </div>
+    </div>
+
+    <!-- Alpine App Logic & Localization -->
+    <script>
+        const translations = {
+            uz: {
+                app_subtitle: "Elektr avtomobil zaryadlash hududi aqlli CCTV monitoring tizimi",
+                cameras_connected: "ta kamera ulangan",
+                theme_light: "Yorug' rejimga o'tish",
+                theme_dark: "Qorong'i rejimga o'tish",
+                settings_title: "Tizim sozlamalari",
+                auto_monitor_label: "CCTV Avtomatik Monitoring",
+                auto_monitor_desc: "Davriy kadr olish va tahlil",
+                monitor_active: "Faol (15 soniya)",
+                ev_blue_threshold: "EV Ko'k Raqam Sezgirligi",
+                ev_threshold_desc: "Raqam fonida 30% dan ko'p ko'k rang bo'lsa EV deb tasniflanadi",
+                alert_sound_label: "Non-EV Ogohlantirish Signali",
+                alert_visual_toggle: "Aniqlanganda ekranda qizil ogohlantirish ko'rsatish",
+                btn_save_settings: "Sozlamalarni saqlash",
+                lang_title: "Tilni tanlash",
+                stat_total: "Jami aniqlangan",
+                stat_ev: "Elektr avtomobil (EV)",
+                stat_regular: "Oddiy avtomobil (Benzin/Dizel)",
+                stat_alerts: "Noto'g'ri to'xtash ogohlantirishlari",
+                stat_today: "Bugun",
+                stat_alert_desc: "EV zaryadlash joyiga qo'yilgan oddiy mashinalar",
+                test_title: "Avtomobil rasmini test qilish & aniqlash",
+                korean_plates_support: "Koreya davlat raqamlari qo'llab-quvvatlanadi",
+                dropzone_prompt: "Avtomobil rasmini bu yerga tashlang yoki tanlang",
+                dropzone_formats: "JPG, PNG formatlar (EV va oddiy raqamlar avtomatik ajratiladi)",
+                analyzing_title: "AI orqali raqam o'qilmoqda va EV tahlil qilinmoqda...",
+                analyzing_desc: "YOLOv8 + OCR + HSV rang tahlili jarayonda",
+                result_title: "Aniqlash va tasniflash natijasi",
+                alert_banner_title: "OGOHLANTIRISH: Oddiy avtomobil (Non-EV) aniqlandi!",
+                alert_banner_desc: "Bu joy faqat elektr avtomobillar (EV) zaryadlash uchun ajratilgan. Jarima qo'llanilishi mumkin.",
+                ev_banner_title: "Elektr avtomobil (EV) tasdiqlandi",
+                ev_banner_desc: "Koreya ko'k rangli zaryadlash raqami muvaffaqiyatli aniqlandi",
+                ev_allowed_tag: "Zaryadlash ruxsat etilgan",
+                recognized_plate_label: "Aniqlangan davlat raqami",
+                vehicle_type_label: "Avtomobil turi",
+                type_ev: "Elektr avtomobil (EV)",
+                type_regular: "Oddiy avtomobil",
+                plate_crop_label: "Aniqlangan raqam qismi (AI Crop)",
+                ai_confidence_label: "AI Ishonch darajasi",
+                plate_color_label: "Raqam foni rangi",
+                recognition_fail_title: "Raqam aniqlanmadi",
+                recognition_fail_desc: "Rasmda Koreya davlat raqami topilmadi.",
+                camera_mgmt_title: "CCTV Kameralarni boshqarish",
+                btn_add_camera: "Kamera qo'shish",
+                btn_close: "Yopish",
+                add_camera_header: "Yangi CCTV Kamera qo'shish",
+                cam_name_label: "Kamera nomi",
+                cam_name_ph: "Masalan: 1-ustun old kamera",
+                cam_protocol_label: "Protokol turi",
+                cam_url_label: "Stream / Snapshot URL",
+                cam_ip_port_label: "IP Manzil / Port",
+                cam_auth_label: "Kirish hisobi (Login / Parol)",
+                btn_save_camera: "Kamerani saqlash va faollashtirish",
+                unnamed_camera: "Nomsiz kamera",
+                btn_test: "Test",
+                btn_delete: "O'chirish",
+                no_cameras_msg: "Hozircha CCTV kamera qo'shilmagan. Yuqoridagi 'Kamera qo'shish' tugmasidan foydalaning.",
+                history_title: "Aniqlangan mashinalar jurnali",
+                filter_all: "Barcha mashinalar",
+                filter_ev_only: "Faqat Elektr (EV)",
+                filter_regular_only: "Faqat Oddiy mashinalar",
+                btn_refresh: "Yangilash",
+                th_time: "Vaqt",
+                th_plate: "Davlat raqami",
+                th_type: "Turi",
+                th_confidence: "Ishonch",
+                th_actions: "Amallar",
+                unrecognized: "Noma'lum",
+                alert_sent_tooltip: "Ogohlantirish yuborildi",
+                view_image: "Rasmni ko'rish",
+                no_history_msg: "Hozircha avtomobil ma'lumotlari mavjud emas.",
+                btn_prev: "Oldingi",
+                btn_next: "Keyingi",
+                page_label: "sahifa",
+                modal_test_title: "Kamera jonli kadrini test qilish",
+                capturing_stream_msg: "Kamera oqimidan kadr olinmoqda...",
+                confirm_delete_vehicle: "Haqiqatan ham ushbu yozuvni o'chirmoqchimisiz?",
+                confirm_delete_cam: "Haqiqatan ham ushbu kamerani o'chirmoqchimisiz?",
+                upload_img_only: "Faqat rasm fayllari yuklanishi mumkin."
+            },
+            ko: {
+                app_subtitle: "전기차 충전구역 스마트 차량 감지 시스템",
+                cameras_connected: "개 카메라 연결됨",
+                theme_light: "라이트 모드로 전환",
+                theme_dark: "다크 모드로 전환",
+                settings_title: "시스템 환경 설정",
+                auto_monitor_label: "CCTV 자동 모니터링",
+                auto_monitor_desc: "주기적 캡처 & 감지",
+                monitor_active: "활성화됨 (15초)",
+                ev_blue_threshold: "EV 파란색 번호판 감지 기준",
+                ev_threshold_desc: "번호판 내 하늘색 비율이 30% 이상 시 EV로 판별",
+                alert_sound_label: "비-EV(일반차) 경고음/알림",
+                alert_visual_toggle: "감지 시 화면 시각 경고 표시",
+                btn_save_settings: "설정 적용",
+                lang_title: "언어 변경",
+                stat_total: "총 감지 차량",
+                stat_ev: "전기차 (EV) 감지",
+                stat_regular: "일반 차량 (내연기관)",
+                stat_alerts: "일반차 주차 경고",
+                stat_today: "오늘",
+                stat_alert_desc: "EV 구역 무단 주차 알림",
+                test_title: "차량 사진 테스트 & 인식",
+                korean_plates_support: "한국 번호판 지원",
+                dropzone_prompt: "차량 이미지를 드래그하거나 클릭하여 업로드",
+                dropzone_formats: "JPG, PNG 파일 지원 (한국 EV 및 일반 번호판 자동 판별)",
+                analyzing_title: "AI 번호판 인식 및 EV 분류 중...",
+                analyzing_desc: "YOLOv8 + OCR + HSV 색상 분석 수행 중",
+                result_title: "인식 및 분류 결과",
+                alert_banner_title: "경고: 일반 차량(내연기관) 감지됨!",
+                alert_banner_desc: "본 구역은 전기차 충전 전용 주차구역입니다. 주차 방해 시 과태료가 부과될 수 있습니다.",
+                ev_banner_title: "전기차 (EV) 확인 완료",
+                ev_banner_desc: "파란색 전용 번호판 인식 성공",
+                ev_allowed_tag: "충전 가능",
+                recognized_plate_label: "인식된 번호판",
+                vehicle_type_label: "차량 유형",
+                type_ev: "전기차 (EV)",
+                type_regular: "일반 차량",
+                plate_crop_label: "검출된 번호판 영역 (AI Crop)",
+                ai_confidence_label: "AI 신뢰도",
+                plate_color_label: "번호판 배경 색상",
+                recognition_fail_title: "번호판 인식 실패",
+                recognition_fail_desc: "이미지에서 한국 번호판을 찾을 수 없습니다.",
+                camera_mgmt_title: "CCTV 카메라 연결 관리",
+                btn_add_camera: "카메라 추가",
+                btn_close: "닫기",
+                add_camera_header: "새 CCTV 카메라 등록",
+                cam_name_label: "카메라 이름",
+                cam_name_ph: "예: 1번 베이 전면 카메라",
+                cam_protocol_label: "프로토콜 유형",
+                cam_url_label: "스트림 / 스냅샷 URL",
+                cam_ip_port_label: "IP 주소 / 포트",
+                cam_auth_label: "접속 계정 (아이디/비번)",
+                btn_save_camera: "카메라 저장 및 활성화",
+                unnamed_camera: "이름 없음",
+                btn_test: "테스트",
+                btn_delete: "삭제",
+                no_cameras_msg: "등록된 CCTV 카메라가 없습니다. 상단 '카메라 추가' 버튼을 눌러 등록하세요.",
+                history_title: "감지 이력 목록",
+                filter_all: "전체 차량",
+                filter_ev_only: "전기차 (EV) 만",
+                filter_regular_only: "일반 차량 (내연기관)",
+                btn_refresh: "새로고침",
+                th_time: "시간",
+                th_plate: "차량 번호판",
+                th_type: "유형",
+                th_confidence: "신뢰도",
+                th_actions: "작업",
+                unrecognized: "미인식",
+                alert_sent_tooltip: "경고 발송됨",
+                view_image: "사진 보기",
+                no_history_msg: "기록된 차량 감지 데이터가 없습니다.",
+                btn_prev: "이전",
+                btn_next: "다음",
+                page_label: "페이지",
+                modal_test_title: "카메라 실시간 캡처 테스트",
+                capturing_stream_msg: "카메라 스트림에서 프레임 캡처 중...",
+                confirm_delete_vehicle: "이 감지 기록을 삭제하시겠습니까?",
+                confirm_delete_cam: "정말 이 카메라를 삭제하시겠습니까?",
+                upload_img_only: "이미지 파일만 업로드 가능합니다."
+            }
+        };
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('appData', () => ({
+                isDark: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
+                currentLang: localStorage.getItem('app_lang') || 'uz',
+                
+                stats: { total_detections: 0, ev_count: 0, regular_count: 0, today_detections: 0, today_ev: 0, today_regular: 0, today_alerts: 0 },
+                
+                dragOver: false,
+                isUploading: false,
+                uploadResult: null,
+                
+                vehicles: [],
+                totalVehicles: 0,
+                page: 1,
+                pageSize: 10,
+                filters: { type: '' },
+                
+                cameras: [],
+                newCam: {
+                    cs_id: 'CS_TASHKENT_01',
+                    cp_id: 'CP01',
+                    camera_name: '',
+                    camera_type: 'RTSP',
+                    stream_url: '',
+                    ip_address: '',
+                    port: 554,
+                    username: '',
+                    password: '',
+                    is_active: true
+                },
+
+                testModal: { open: false, loading: false, image: null, message: '' },
+                previewImage: { open: false, url: '' },
+                
+                init() {
+                    this.$watch('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
+                    this.fetchStats();
+                    this.fetchVehicles();
+                    this.fetchCameras();
+                    
+                    // Auto-refresh stats & log every 15s
+                    setInterval(() => {
+                        this.fetchStats();
+                        if (this.page === 1) this.fetchVehicles();
+                    }, 15000);
+                },
+
+                t(key) {
+                    const dict = translations[this.currentLang] || translations.uz;
+                    return dict[key] || key;
+                },
+
+                setLanguage(lang) {
+                    this.currentLang = lang;
+                    localStorage.setItem('app_lang', lang);
+                },
+                
+                toggleTheme() {
+                    this.isDark = !this.isDark;
+                },
+                
+                async fetchStats() {
+                    try {
+                        const res = await fetch('/api/v1/stats/summary');
+                        if (res.ok) this.stats = await res.json();
+                    } catch (e) { console.error("Stats fetch error:", e); }
+                },
+                
+                async fetchVehicles() {
+                    try {
+                        let url = `/api/v1/vehicles?page=${this.page}&page_size=${this.pageSize}`;
+                        if (this.filters.type === 'EV') url += '&is_ev=true';
+                        else if (this.filters.type === 'REGULAR') url += '&vehicle_type=REGULAR';
+                        
+                        const res = await fetch(url);
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.vehicles = data.items;
+                            this.totalVehicles = data.total;
+                        }
+                    } catch (e) { console.error("Vehicles fetch error:", e); }
+                },
+                
+                async fetchCameras() {
+                    try {
+                        const res = await fetch('/api/v1/cameras');
+                        if (res.ok) this.cameras = await res.json();
+                    } catch (e) { console.error("Cameras fetch error:", e); }
+                },
+
+                async createCamera() {
+                    try {
+                        const res = await fetch('/api/v1/cameras', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newCam)
+                        });
+                        if (res.ok) {
+                            this.fetchCameras();
+                            this.newCam = {
+                                cs_id: 'CS_TASHKENT_01', cp_id: 'CP01',
+                                camera_name: '', camera_type: 'RTSP', stream_url: '',
+                                ip_address: '', port: 554, username: '', password: '', is_active: true
+                            };
+                        }
+                    } catch (e) { console.error("Create camera error:", e); }
+                },
+
+                async testCamera(cameraId) {
+                    this.testModal = { open: true, loading: true, image: null, message: '' };
+                    try {
+                        const res = await fetch(`/api/v1/cameras/${cameraId}/test`, { method: 'POST' });
+                        const data = await res.json();
+                        this.testModal.loading = false;
+                        if (data.success && data.image_base64) {
+                            this.testModal.image = data.image_base64;
+                        } else {
+                            this.testModal.message = data.message || 'Connection failed';
+                        }
+                    } catch (e) {
+                        this.testModal.loading = false;
+                        this.testModal.message = 'Communication error';
+                    }
+                },
+
+                async deleteCamera(id) {
+                    if (!confirm(this.t('confirm_delete_cam'))) return;
+                    try {
+                        await fetch(`/api/v1/cameras/${id}`, { method: 'DELETE' });
+                        this.fetchCameras();
+                    } catch (e) { console.error(e); }
+                },
+                
+                get totalPages() {
+                    return Math.ceil(this.totalVehicles / this.pageSize) || 1;
+                },
+                
+                prevPage() {
+                    if (this.page > 1) { this.page--; this.fetchVehicles(); }
+                },
+                
+                nextPage() {
+                    if (this.page < this.totalPages) { this.page++; this.fetchVehicles(); }
+                },
+                
+                async deleteVehicle(id) {
+                    if (!confirm(this.t('confirm_delete_vehicle'))) return;
+                    try {
+                        await fetch(`/api/v1/vehicles/${id}`, { method: 'DELETE' });
+                        this.fetchVehicles();
+                        this.fetchStats();
+                    } catch (e) { console.error(e); }
+                },
+                
+                handleFileSelect(e) {
+                    if (e.target.files.length) this.uploadImage(e.target.files[0]);
+                },
+                
+                handleDrop(e) {
+                    this.dragOver = false;
+                    if (e.dataTransfer.files.length) this.uploadImage(e.dataTransfer.files[0]);
+                },
+                
+                async uploadImage(file) {
+                    if (!file.type.startsWith('image/')) {
+                        alert(this.t('upload_img_only'));
+                        return;
+                    }
+                    
+                    this.isUploading = true;
+                    this.uploadResult = null;
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('cs_id', 'CS_TASHKENT_01');
+                    formData.append('cp_id', 'CP01');
+                    
+                    try {
+                        const res = await fetch('/api/v1/detect/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        this.uploadResult = await res.json();
+                        
+                        this.fetchStats();
+                        this.fetchVehicles();
+                    } catch (e) {
+                        this.uploadResult = { success: false, message: 'Server communication error' };
+                        console.error(e);
+                    } finally {
+                        this.isUploading = false;
+                    }
+                },
+
+                openImageModal(url) {
+                    if (!url) return;
+                    this.previewImage = { open: true, url: url };
+                },
+                
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const d = new Date(dateStr);
+                    return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

@@ -367,7 +367,7 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_url_label')"></label>
-                                <input type="text" x-model="newCam.stream_url" placeholder="rtsp://192.168.1.100:554/live/ch0 yoki HTTP URL" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                                <input type="text" x-model="newCam.stream_url" :placeholder="newCam.camera_type === 'RTSP' ? 'rtsp://192.168.0.10:554/stream1' : 'http://192.168.0.10/api/snapshot'" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                             </div>
                             <div>
                                 <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_ip_port_label')"></label>
@@ -811,6 +811,17 @@
 
                 async createCamera() {
                     try {
+                        if (!this.newCam.stream_url && this.newCam.ip_address) {
+                            if (this.newCam.camera_type === 'RTSP') {
+                                this.newCam.stream_url = `rtsp://${this.newCam.ip_address}:${this.newCam.port || 554}/stream1`;
+                            } else {
+                                const portPart = (this.newCam.port && this.newCam.port !== 80) ? `:${this.newCam.port}` : '';
+                                this.newCam.stream_url = `http://${this.newCam.ip_address}${portPart}/api/snapshot`;
+                            }
+                        }
+                        if (!this.newCam.port) {
+                            this.newCam.port = this.newCam.camera_type === 'RTSP' ? 554 : 80;
+                        }
                         const res = await fetch('/api/v1/cameras', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },

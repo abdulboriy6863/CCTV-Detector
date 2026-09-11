@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, BigInteger, Integer, String, Float, DateTime,
-    Enum, Text, Index, Boolean,
+    Enum, Text, Index, Boolean, UniqueConstraint,
 )
 from app.core.database import Base
 
@@ -87,6 +87,7 @@ class CCTVCamera(Base):
 
     __table_args__ = (
         Index("idx_camera_cs_cp", "cs_id", "cp_id"),
+        UniqueConstraint("cs_id", "cp_id", name="uq_camera_cs_cp"),
         {"extend_existing": True}
     )
 

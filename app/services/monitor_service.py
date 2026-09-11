@@ -1,10 +1,10 @@
-"""Background CCTV monitor — periodic plate detection."""
+"""Background CCTV monitor — periodic plate detection and parking session management."""
 import asyncio
 import logging
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_, not_, select
+from sqlalchemy import desc
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -72,16 +72,15 @@ def format_duration(duration_seconds: int) -> str:
 
 class AutoMonitorService:
     """
-    Periodic CCTV Monitor with robust session management:
+    Periodic CCTV Monitor with deterministic, lock-protected Parking Sessions:
     - Captures frames from registered cameras
     - Runs detection pipeline (plate detection + EV classification)
     - Manages Parking Sessions:
-        * On startup: Restores unclosed sessions from DB
-        * On Arrival: Records START event (idempotent — checks DB first)
-        * While Parked: Tracks active state with fuzzy OCR matching
-        * On Plate Change: Requires transition debounce (2 cycles) to confirm
-        * On Departure: Records END event with precise duration
-    - Uses per-camera asyncio locks to prevent race conditions
+        * On Startup: Restores unclosed sessions from DB into active_sessions
+        * Scenario 1: No plate recognized -> After exit_threshold_cycles (3), logs ONE END event
+        * Scenario 2: Same plate recognized -> Updates last_seen_at (zero DB writes, no duplicates)
+        * Scenario 3: Different plate recognized -> Debounced transition (2 cycles), closes old (ONE END), opens new (ONE START)
+        * Scenario 4: Slot was empty -> Logs ONE START event
     """
 
     def __init__(
@@ -95,8 +94,17 @@ class AutoMonitorService:
         self.transition_threshold_cycles = transition_threshold_cycles
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
-        self.last_seen_state: Dict[str, Dict] = {}
+        self.active_sessions: Dict[str, Dict] = {}
         self._camera_locks: Dict[str, asyncio.Lock] = {}
+
+    @property
+    def last_seen_state(self) -> Dict[str, Dict]:
+        """Backward compatibility alias for tests and external inspection."""
+        return self.active_sessions
+
+    @last_seen_state.setter
+    def last_seen_state(self, value: Dict[str, Dict]):
+        self.active_sessions = value
 
     def _get_lock(self, camera_key: str) -> asyncio.Lock:
         """Get or create an asyncio lock for a specific camera."""
@@ -106,96 +114,70 @@ class AutoMonitorService:
 
     def _restore_sessions_from_db(self):
         """
-        On startup, load unclosed parking sessions from DB into last_seen_state.
-        An unclosed session = a START record with no matching END for the same session_id.
-        This prevents duplicate START events after server restart.
+        On startup, load unclosed parking sessions from DB into active_sessions.
+        An unclosed session = a START record that has no END record with the same session_id.
         """
         db: Session = SessionLocal()
         try:
-            # Find all START records that have no corresponding END
-            ended_session_ids = (
-                select(CCTVSnapshot.session_id)
+            # 1. Collect all session_ids that already have an END event
+            ended_rows = (
+                db.query(CCTVSnapshot.session_id)
                 .filter(CCTVSnapshot.event_type == EventTypeEnum.END.value)
                 .filter(CCTVSnapshot.session_id.isnot(None))
+                .all()
             )
+            ended_session_ids = {r[0] for r in ended_rows if r[0]}
 
-            unclosed_starts = (
+            # 2. Get all START events
+            start_snapshots = (
                 db.query(CCTVSnapshot)
                 .filter(CCTVSnapshot.event_type == EventTypeEnum.START.value)
                 .filter(CCTVSnapshot.detection_source == "CCTV_AUTO")
                 .filter(CCTVSnapshot.session_id.isnot(None))
-                .filter(~CCTVSnapshot.session_id.in_(ended_session_ids))
                 .order_by(desc(CCTVSnapshot.created_at))
                 .all()
             )
 
             restored_count = 0
             seen_camera_keys = set()
-            for snap in unclosed_starts:
+            for snap in start_snapshots:
                 camera_key = f"{snap.cs_id}_{snap.cp_id or 'CP01'}"
-                # Only restore the most recent unclosed session per camera
                 if camera_key in seen_camera_keys:
                     continue
                 seen_camera_keys.add(camera_key)
 
-                self.last_seen_state[camera_key] = {
-                    "plate": snap.plate_number,
-                    "session_id": snap.session_id,
-                    "entry_at": snap.created_at,
-                    "last_seen_at": snap.created_at,
-                    "missed_cycles": 0,
-                    "pending_new_plate": None,
-                    "pending_cycles": 0,
-                    "vehicle_type": snap.vehicle_type,
-                    "is_ev": snap.is_ev,
-                    "plate_color": snap.plate_color,
-                    "confidence": snap.ai_confidence or 0.0,
-                    "image_path": snap.image_path or "",
-                    "plate_region_path": snap.plate_region_image,
-                    "raw_ocr_text": snap.raw_ocr_text,
-                }
-                restored_count += 1
-                logger.info(
-                    f"🔄 Sessiya tiklandi: [{camera_key}] {snap.plate_number} "
-                    f"(Session: {snap.session_id}, Kirish: {snap.created_at})"
-                )
+                # Only restore if this session was never closed
+                if snap.session_id not in ended_session_ids:
+                    self.active_sessions[camera_key] = {
+                        "session_id": snap.session_id,
+                        "plate": snap.plate_number,
+                        "entry_at": snap.created_at,
+                        "last_seen_at": snap.created_at,
+                        "missed_cycles": 0,
+                        "pending_new_plate": None,
+                        "pending_cycles": 0,
+                        "vehicle_type": snap.vehicle_type,
+                        "is_ev": snap.is_ev,
+                        "plate_color": snap.plate_color,
+                        "confidence": snap.ai_confidence or 0.0,
+                        "image_path": snap.image_path or "",
+                        "plate_region_path": snap.plate_region_image,
+                        "raw_ocr_text": snap.raw_ocr_text,
+                    }
+                    restored_count += 1
+                    logger.info(
+                        f"🔄 Sessiya tiklandi: [{camera_key}] {snap.plate_number} "
+                        f"(Session: {snap.session_id}, Kirish: {snap.created_at})"
+                    )
 
             if restored_count:
-                logger.info(f"🔄 Jami {restored_count} ta yopilmagan sessiya DB dan tiklandi.")
+                logger.info(f"🔄 Jami {restored_count} ta faol sessiya DB dan tiklandi.")
             else:
-                logger.info("✅ Yopilmagan sessiya yo'q — toza holatda boshlanmoqda.")
+                logger.info("✅ Ochiq sessiya yo'q — monitoring toza holatda boshlanmoqda.")
         except Exception as e:
             logger.error(f"Sessiyalarni tiklashda xatolik: {e}")
         finally:
             db.close()
-
-    def _find_open_session_in_db(self, cs_id: str, cp_id: str, db: Session) -> Optional[CCTVSnapshot]:
-        """
-        Check DB for an open session (START without matching END) for this camera.
-        Returns the open START snapshot or None.
-        """
-        try:
-            ended_session_ids = (
-                select(CCTVSnapshot.session_id)
-                .filter(CCTVSnapshot.event_type == EventTypeEnum.END.value)
-                .filter(CCTVSnapshot.session_id.isnot(None))
-            )
-
-            open_start = (
-                db.query(CCTVSnapshot)
-                .filter(CCTVSnapshot.cs_id == cs_id)
-                .filter(CCTVSnapshot.cp_id == cp_id)
-                .filter(CCTVSnapshot.event_type == EventTypeEnum.START.value)
-                .filter(CCTVSnapshot.detection_source == "CCTV_AUTO")
-                .filter(CCTVSnapshot.session_id.isnot(None))
-                .filter(~CCTVSnapshot.session_id.in_(ended_session_ids))
-                .order_by(desc(CCTVSnapshot.created_at))
-                .first()
-            )
-            return open_start
-        except Exception as e:
-            logger.error(f"DB open session check error: {e}")
-            return None
 
     async def start(self):
         if self.is_running:
@@ -204,7 +186,7 @@ class AutoMonitorService:
             logger.info("Auto monitor is DISABLED in settings.")
             return
 
-        # Restore unclosed sessions from DB before starting
+        # Restore unclosed sessions from DB before starting loop
         self._restore_sessions_from_db()
 
         self.is_running = True
@@ -238,7 +220,7 @@ class AutoMonitorService:
             if not cameras:
                 return
 
-            # Deduplicate cameras by (cs_id, cp_id) to prevent double-inspection
+            # Deduplicate cameras by (cs_id, cp_id) to prevent duplicate inspections
             seen_keys = set()
             unique_cameras = []
             for cam in cameras:
@@ -259,8 +241,79 @@ class AutoMonitorService:
         async with lock:
             await self._inspect_camera(camera, camera_key, db)
 
+    async def _record_start_event(
+        self,
+        camera: CCTVCamera,
+        camera_key: str,
+        detected_plate: str,
+        det_result,
+        image_bytes: bytes,
+        now: datetime,
+        db: Session
+    ):
+        """Record ONE START event in DB and update active_sessions state."""
+        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}"
+
+        relative_path = storage_service.generate_relative_path(
+            cs_id=camera.cs_id, cp_id=camera.cp_id or "CP01",
+            plate_number=detected_plate
+        )
+        await storage_service.save_image(image_bytes, relative_path)
+
+        plate_region_path = None
+        plate_crop_bytes = getattr(det_result, 'plate_crop_bytes', None)
+        if plate_crop_bytes:
+            plate_region_path = relative_path.replace(".jpg", "_plate.jpg")
+            await storage_service.save_image(plate_crop_bytes, plate_region_path)
+
+        is_non_ev = not det_result.is_ev and det_result.vehicle_type != "UNKNOWN"
+
+        entry_snapshot = CCTVSnapshot(
+            cs_id=camera.cs_id,
+            cp_id=camera.cp_id or "CP01",
+            connector_id=1,
+            session_id=session_id,
+            plate_number=detected_plate,
+            event_type=EventTypeEnum.START.value,
+            image_path=relative_path,
+            ai_confidence=det_result.confidence,
+            status="SUCCESS",
+            notes="Kirish: To'xtab turish boshlandi",
+            vehicle_type=det_result.vehicle_type,
+            is_ev=det_result.is_ev,
+            plate_color=det_result.plate_color,
+            alert_sent=is_non_ev,
+            alert_type="NON_EV_WARNING" if is_non_ev else None,
+            detection_source="CCTV_AUTO",
+            raw_ocr_text=det_result.raw_ocr_text,
+            plate_region_image=plate_region_path,
+            created_at=now
+        )
+        db.add(entry_snapshot)
+        db.commit()
+
+        self.active_sessions[camera_key] = {
+            "session_id": session_id,
+            "plate": detected_plate,
+            "entry_at": now,
+            "last_seen_at": now,
+            "missed_cycles": 0,
+            "pending_new_plate": None,
+            "pending_cycles": 0,
+            "vehicle_type": det_result.vehicle_type,
+            "is_ev": det_result.is_ev,
+            "plate_color": det_result.plate_color,
+            "confidence": det_result.confidence,
+            "image_path": relative_path,
+            "plate_region_path": plate_region_path,
+            "raw_ocr_text": det_result.raw_ocr_text,
+        }
+
+        ev_emoji = "⚡" if det_result.is_ev else "🚨"
+        logger.info(f"{ev_emoji} [{camera_key}] Kirish (START): {det_result.vehicle_type} - {detected_plate} (Session: {session_id})")
+
     async def _close_session(self, camera: CCTVCamera, camera_key: str, state: Dict, db: Session):
-        """Record END event when a vehicle departs."""
+        """Record ONE END event when a vehicle departs."""
         now = datetime.utcnow()
         entry_at = state.get("entry_at", now)
         last_seen_at = state.get("last_seen_at", now)
@@ -310,171 +363,76 @@ class AutoMonitorService:
         )
 
         if not capture_result.success or not capture_result.image_bytes:
-            # Network or camera error: do not increment missed cycles
+            # Network or camera error: do not alter state
             return
 
         # 2. Run detection pipeline
         det_result = await detection_pipeline.detect(capture_result.image_bytes)
 
-        # CASE A: No plate recognized in this frame
+        now = datetime.utcnow()
+        active = self.active_sessions.get(camera_key)
+
+        # ----------------------------------------------------
+        # SCENARIO 1: No plate recognized in this frame
+        # ----------------------------------------------------
         if not det_result.success or not det_result.plate_number:
-            if camera_key in self.last_seen_state:
-                state = self.last_seen_state[camera_key]
-                state["missed_cycles"] = state.get("missed_cycles", 0) + 1
-                state["pending_new_plate"] = None
-                state["pending_cycles"] = 0
-                if state["missed_cycles"] >= self.exit_threshold_cycles:
-                    # Vehicle has departed
-                    await self._close_session(camera, camera_key, state, db)
-                    del self.last_seen_state[camera_key]
+            if active:
+                active["missed_cycles"] = active.get("missed_cycles", 0) + 1
+                active["pending_new_plate"] = None
+                active["pending_cycles"] = 0
+                if active["missed_cycles"] >= self.exit_threshold_cycles:
+                    # Vehicle has officially departed -> Close session
+                    await self._close_session(camera, camera_key, active, db)
+                    del self.active_sessions[camera_key]
             return
 
         detected_plate = det_result.plate_number.strip().upper()
-        now = datetime.utcnow()
-        last_state = self.last_seen_state.get(camera_key)
 
-        # CASE B: Same vehicle is still present (with fuzzy OCR match support)
-        if last_state and is_same_plate(last_state.get("plate"), detected_plate):
-            last_state["last_seen_at"] = now
-            last_state["missed_cycles"] = 0
-            last_state["pending_new_plate"] = None
-            last_state["pending_cycles"] = 0
-            # If newer frame has higher confidence, update plate display string
-            if det_result.confidence > last_state.get("confidence", 0.0):
-                last_state["plate"] = detected_plate
-                last_state["confidence"] = det_result.confidence
-            return
-
-        # CASE C: A different vehicle is detected while previous was active
-        if last_state and not is_same_plate(last_state.get("plate"), detected_plate):
-            # Check if this new plate is already pending confirmation
-            pending_plate = last_state.get("pending_new_plate")
-            if pending_plate and is_same_plate(pending_plate, detected_plate):
-                last_state["pending_cycles"] = last_state.get("pending_cycles", 0) + 1
-                if last_state["pending_cycles"] >= self.transition_threshold_cycles:
-                    # Confirmed: Old vehicle departed and new vehicle took the slot
-                    await self._close_session(camera, camera_key, last_state, db)
-                    del self.last_seen_state[camera_key]
-                else:
-                    # Waiting for confirmation on next cycle
-                    return
-            else:
-                # First time seeing this new plate candidate
-                last_state["pending_new_plate"] = detected_plate
-                last_state["pending_cycles"] = 1
+        # ----------------------------------------------------
+        # SCENARIO 2: Slot is currently occupied
+        # ----------------------------------------------------
+        if active:
+            # Subcase 2A: Same vehicle is still present (with fuzzy matching)
+            if is_same_plate(active.get("plate"), detected_plate):
+                active["last_seen_at"] = now
+                active["missed_cycles"] = 0
+                active["pending_new_plate"] = None
+                active["pending_cycles"] = 0
+                if det_result.confidence > active.get("confidence", 0.0):
+                    active["plate"] = detected_plate
+                    active["confidence"] = det_result.confidence
                 return
 
-        # CASE D: New Vehicle Arrival (START Event)
-        # Idempotent check: Is there already an open session for this camera in DB?
-        existing_open = self._find_open_session_in_db(
-            camera.cs_id, camera.cp_id or "CP01", db
+            # Subcase 2B: Different plate detected -> Debounce transition
+            pending_plate = active.get("pending_new_plate")
+            if pending_plate and is_same_plate(pending_plate, detected_plate):
+                active["pending_cycles"] = active.get("pending_cycles", 0) + 1
+                if active["pending_cycles"] >= self.transition_threshold_cycles:
+                    # CONFIRMED TRANSITION:
+                    # 1. Close old vehicle session
+                    await self._close_session(camera, camera_key, active, db)
+                    del self.active_sessions[camera_key]
+
+                    # 2. Open new vehicle session
+                    await self._record_start_event(
+                        camera, camera_key, detected_plate, det_result, capture_result.image_bytes, now, db
+                    )
+                    return
+                else:
+                    # Waiting for second confirmation cycle
+                    return
+            else:
+                # First time seeing this different plate candidate
+                active["pending_new_plate"] = detected_plate
+                active["pending_cycles"] = 1
+                return
+
+        # ----------------------------------------------------
+        # SCENARIO 3: Slot was EMPTY -> New vehicle arrives
+        # ----------------------------------------------------
+        await self._record_start_event(
+            camera, camera_key, detected_plate, det_result, capture_result.image_bytes, now, db
         )
-        if existing_open and is_same_plate(existing_open.plate_number, detected_plate):
-            # Already have an open session for this plate — restore to memory, don't create duplicate
-            logger.info(
-                f"🔄 [{camera_key}] Ochiq sessiya DB da mavjud: {existing_open.plate_number} "
-                f"(Session: {existing_open.session_id}) — dublikat START yaratilmadi"
-            )
-            self.last_seen_state[camera_key] = {
-                "plate": existing_open.plate_number,
-                "session_id": existing_open.session_id,
-                "entry_at": existing_open.created_at,
-                "last_seen_at": now,
-                "missed_cycles": 0,
-                "pending_new_plate": None,
-                "pending_cycles": 0,
-                "vehicle_type": existing_open.vehicle_type or det_result.vehicle_type,
-                "is_ev": existing_open.is_ev,
-                "plate_color": existing_open.plate_color or det_result.plate_color,
-                "confidence": max(existing_open.ai_confidence or 0.0, det_result.confidence),
-                "image_path": existing_open.image_path or "",
-                "plate_region_path": existing_open.plate_region_image,
-                "raw_ocr_text": existing_open.raw_ocr_text or det_result.raw_ocr_text,
-            }
-            return
-
-        # If there's an open session for a DIFFERENT plate, close it first
-        if existing_open and not is_same_plate(existing_open.plate_number, detected_plate):
-            logger.info(
-                f"🔄 [{camera_key}] DB dagi ochiq sessiya ({existing_open.plate_number}) "
-                f"yangi mashina ({detected_plate}) uchun yopilmoqda."
-            )
-            close_state = {
-                "plate": existing_open.plate_number,
-                "session_id": existing_open.session_id,
-                "entry_at": existing_open.created_at,
-                "last_seen_at": now,
-                "confidence": existing_open.ai_confidence or 0.0,
-                "image_path": existing_open.image_path or "",
-                "vehicle_type": existing_open.vehicle_type or "UNKNOWN",
-                "is_ev": existing_open.is_ev or False,
-                "plate_color": existing_open.plate_color,
-                "raw_ocr_text": existing_open.raw_ocr_text,
-                "plate_region_path": existing_open.plate_region_image,
-            }
-            await self._close_session(camera, camera_key, close_state, db)
-
-        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}"
-
-        # Save snapshot image
-        relative_path = storage_service.generate_relative_path(
-            cs_id=camera.cs_id, cp_id=camera.cp_id or "CP01",
-            plate_number=detected_plate
-        )
-        await storage_service.save_image(capture_result.image_bytes, relative_path)
-
-        # Save plate crop if available
-        plate_region_path = None
-        plate_crop_bytes = getattr(det_result, 'plate_crop_bytes', None)
-        if plate_crop_bytes:
-            plate_region_path = relative_path.replace(".jpg", "_plate.jpg")
-            await storage_service.save_image(plate_crop_bytes, plate_region_path)
-
-        is_non_ev = not det_result.is_ev and det_result.vehicle_type != "UNKNOWN"
-
-        entry_snapshot = CCTVSnapshot(
-            cs_id=camera.cs_id,
-            cp_id=camera.cp_id or "CP01",
-            connector_id=1,
-            session_id=session_id,
-            plate_number=detected_plate,
-            event_type=EventTypeEnum.START.value,
-            image_path=relative_path,
-            ai_confidence=det_result.confidence,
-            status="SUCCESS",
-            notes="Kirish: To'xtab turish boshlandi",
-            vehicle_type=det_result.vehicle_type,
-            is_ev=det_result.is_ev,
-            plate_color=det_result.plate_color,
-            alert_sent=is_non_ev,
-            alert_type="NON_EV_WARNING" if is_non_ev else None,
-            detection_source="CCTV_AUTO",
-            raw_ocr_text=det_result.raw_ocr_text,
-            plate_region_image=plate_region_path,
-            created_at=now
-        )
-        db.add(entry_snapshot)
-        db.commit()
-
-        self.last_seen_state[camera_key] = {
-            "plate": detected_plate,
-            "session_id": session_id,
-            "entry_at": now,
-            "last_seen_at": now,
-            "missed_cycles": 0,
-            "pending_new_plate": None,
-            "pending_cycles": 0,
-            "vehicle_type": det_result.vehicle_type,
-            "is_ev": det_result.is_ev,
-            "plate_color": det_result.plate_color,
-            "confidence": det_result.confidence,
-            "image_path": relative_path,
-            "plate_region_path": plate_region_path,
-            "raw_ocr_text": det_result.raw_ocr_text,
-        }
-
-        ev_emoji = "⚡" if det_result.is_ev else "🚨"
-        logger.info(f"{ev_emoji} [{camera_key}] Kirish (START): {det_result.vehicle_type} - {detected_plate} (Session: {session_id})")
 
 
 auto_monitor_service = AutoMonitorService(

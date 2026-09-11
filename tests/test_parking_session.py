@@ -267,7 +267,11 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.db.add(existing_start)
         self.db.commit()
 
-        # Now monitor (fresh start, empty last_seen_state) detects the same car
+        # Simulate monitor startup (calls _restore_sessions_from_db)
+        with patch("app.services.monitor_service.SessionLocal", side_effect=self.SessionLocal):
+            self.monitor._restore_sessions_from_db()
+
+        # Now monitor detects the same car
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="81머2072", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.96
         )
@@ -327,7 +331,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
 
         # Create a fresh monitor and patch SessionLocal to use our test DB
         fresh_monitor = AutoMonitorService(interval_seconds=15, exit_threshold_cycles=3)
-        with patch("app.services.monitor_service.SessionLocal", return_value=self.db):
+        with patch("app.services.monitor_service.SessionLocal", side_effect=self.SessionLocal):
             fresh_monitor._restore_sessions_from_db()
 
         # Only the OPEN session should be restored

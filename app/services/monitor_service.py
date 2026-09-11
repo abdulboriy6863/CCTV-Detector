@@ -66,8 +66,11 @@ class AutoMonitorService:
         db: Session = SessionLocal()
         try:
             cameras = db.query(CCTVCamera).filter(CCTVCamera.is_active.is_(True)).all()
-            for cam in cameras:
-                await self._inspect_camera(cam, db)
+            if not cameras:
+                return
+            # Run all active camera inspections concurrently
+            tasks = [self._inspect_camera(cam, db) for cam in cameras]
+            await asyncio.gather(*tasks, return_exceptions=True)
         finally:
             db.close()
 

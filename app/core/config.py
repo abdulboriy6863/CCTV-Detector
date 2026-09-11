@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     EV_BLUE_THRESHOLD: float = 0.3
 
     # Monitor Settings
-    MONITOR_INTERVAL_SECONDS: int = 15
-    MONITOR_ENABLED: bool = False
+    MONITOR_INTERVAL_SECONDS: int = 10
+    MONITOR_ENABLED: bool = True
 
     @property
     def database_url(self) -> str:

@@ -140,210 +140,77 @@
         </div>
     </nav>
 
-    <!-- Main Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- Main Container (Full-Width Responsive Canvas) -->
+    <main class="max-w-[1680px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Top Statistics Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Total Detections -->
-            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="t('stat_total')"></p>
                     <h3 class="text-2xl font-black mt-1 text-slate-900 dark:text-white" x-text="stats.total_detections">0</h3>
                     <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_detections"></p>
                 </div>
-                <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 flex items-center justify-center text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 flex items-center justify-center text-xl shadow-inner">
                     <i class="fa-solid fa-camera"></i>
                 </div>
             </div>
 
             <!-- EV Detections -->
-            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400" x-text="t('stat_ev')"></p>
                     <h3 class="text-2xl font-black mt-1 text-sky-600 dark:text-sky-400" x-text="stats.ev_count">0</h3>
                     <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_ev"></p>
                 </div>
-                <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center text-xl shadow-inner">
                     <i class="fa-solid fa-bolt"></i>
                 </div>
             </div>
 
             <!-- Regular Detections -->
-            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="t('stat_regular')"></p>
                     <h3 class="text-2xl font-black mt-1 text-slate-700 dark:text-slate-200" x-text="stats.regular_count">0</h3>
                     <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_regular"></p>
                 </div>
-                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 flex items-center justify-center text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 flex items-center justify-center text-xl shadow-inner">
                     <i class="fa-solid fa-gas-pump"></i>
                 </div>
             </div>
 
             <!-- Today Alerts -->
-            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between" :class="stats.today_alerts > 0 ? 'border-red-300 dark:border-red-900/50 bg-red-50/20' : ''">
+            <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between" :class="stats.today_alerts > 0 ? 'border-red-300 dark:border-red-900/50 bg-red-50/20' : ''">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400" x-text="t('stat_alerts')"></p>
                     <h3 class="text-2xl font-black mt-1 text-red-600 dark:text-red-400" x-text="stats.today_alerts">0</h3>
                     <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_alert_desc')"></p>
                 </div>
-                <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center text-xl shadow-inner">
                     <i class="fa-solid fa-triangle-exclamation"></i>
                 </div>
             </div>
         </div>
 
-        <!-- Main Workspace 2-Column Grid -->
+        <!-- Middle 2-Column Section: Cameras & Test Recognition -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            <!-- LEFT COLUMN (5 cols): Test Upload & Recognition Box -->
-            <div class="lg:col-span-5 space-y-6">
-
-                <!-- Upload Card -->
-                <div class="bg-white dark:bg-darkcard p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center">
-                            <i class="fa-solid fa-file-arrow-up mr-2 text-blue-600"></i> <span x-text="t('test_title')"></span>
-                        </h2>
-                        <span class="text-xs text-slate-400" x-text="t('korean_plates_support')"></span>
-                    </div>
-
-                    <!-- Drag & Drop Box -->
-                    <div 
-                        class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer relative"
-                        @dragover.prevent="dragOver = true"
-                        @dragleave.prevent="dragOver = false"
-                        @drop.prevent="handleDrop($event)"
-                        :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
-                        @click="$refs.fileInput.click()"
-                    >
-                        <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect($event)">
-                        
-                        <div x-show="!isUploading">
-                            <div class="w-14 h-14 mx-auto rounded-2xl bg-blue-50 dark:bg-slate-800 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-3 text-2xl">
-                                <i class="fa-regular fa-image"></i>
-                            </div>
-                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
-                            <p class="text-xs text-slate-400 mt-1" x-text="t('dropzone_formats')"></p>
-                        </div>
-                        
-                        <div x-show="isUploading" class="py-6 flex flex-col items-center justify-center space-y-3">
-                            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600"></i>
-                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
-                            <p class="text-xs text-slate-400" x-text="t('analyzing_desc')"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Detection Live Result Card -->
-                <div x-show="uploadResult" x-cloak class="bg-white dark:bg-darkcard p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 space-y-4">
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center">
-                            <i class="fa-solid fa-circle-check mr-2 text-emerald-500"></i> <span x-text="t('result_title')"></span>
-                        </h3>
-                        <span class="text-xs font-mono text-slate-400" x-text="uploadResult ? (uploadResult.processing_time_ms + ' ms') : ''"></span>
-                    </div>
-
-                    <!-- SUCCESS RESULT -->
-                    <template x-if="uploadResult && uploadResult.success && uploadResult.data">
-                        <div class="space-y-4">
-                            <!-- Non-EV ALERT BANNER -->
-                            <template x-if="uploadResult.data.alert">
-                                <div class="animate-alert bg-red-500 text-white p-4 rounded-xl shadow-lg shadow-red-500/20 flex items-start space-x-3">
-                                    <i class="fa-solid fa-triangle-exclamation text-2xl shrink-0 mt-0.5"></i>
-                                    <div>
-                                        <h4 class="font-bold text-sm" x-text="t('alert_banner_title')"></h4>
-                                        <p class="text-xs text-red-100 mt-0.5" x-text="t('alert_banner_desc')"></p>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <!-- EV BADGE BANNER -->
-                            <template x-if="uploadResult.data.is_ev">
-                                <div class="bg-gradient-to-r from-sky-500 to-blue-600 text-white p-4 rounded-xl shadow-lg shadow-sky-500/20 flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <i class="fa-solid fa-circle-check text-2xl shrink-0"></i>
-                                        <div>
-                                            <h4 class="font-bold text-sm" x-text="t('ev_banner_title')"></h4>
-                                            <p class="text-xs text-sky-100" x-text="t('ev_banner_desc')"></p>
-                                        </div>
-                                    </div>
-                                    <span class="px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-lg text-xs font-bold" x-text="t('ev_allowed_tag')"></span>
-                                </div>
-                            </template>
-
-                            <!-- License Plate Display Box -->
-                            <div class="p-4 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-4"
-                                :class="uploadResult.data.is_ev ? 'bg-sky-50/50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'">
-                                <div>
-                                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider" x-text="t('recognized_plate_label')"></span>
-                                    <div class="text-2xl font-black tracking-wider text-slate-900 dark:text-white mt-0.5" x-text="uploadResult.data.plate_number"></div>
-                                </div>
-
-                                <div class="text-right">
-                                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider" x-text="t('vehicle_type_label')"></span>
-                                    <div class="mt-0.5">
-                                        <template x-if="uploadResult.data.is_ev">
-                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">
-                                                <i class="fa-solid fa-bolt mr-1"></i> <span x-text="t('type_ev')"></span>
-                                            </span>
-                                        </template>
-                                        <template x-if="!uploadResult.data.is_ev">
-                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200">
-                                                <i class="fa-solid fa-car mr-1"></i> <span x-text="t('type_regular')"></span>
-                                            </span>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Cropped Plate Preview -->
-                            <template x-if="uploadResult.data.plate_region_base64">
-                                <div>
-                                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1.5" x-text="t('plate_crop_label')"></span>
-                                    <img :src="'data:image/jpeg;base64,' + uploadResult.data.plate_region_base64" class="w-full h-auto max-h-36 object-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-black/5 p-1 shadow-inner" alt="Plate Crop">
-                                </div>
-                            </template>
-
-                            <!-- AI Confidence Grid -->
-                            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                                <div>
-                                    <span class="text-slate-400 block" x-text="t('ai_confidence_label')"></span>
-                                    <span class="font-bold text-slate-800 dark:text-slate-200" x-text="(uploadResult.data.confidence * 100).toFixed(1) + '%'"></span>
-                                </div>
-                                <div>
-                                    <span class="text-slate-400 block" x-text="t('plate_color_label')"></span>
-                                    <span class="font-bold uppercase" :class="uploadResult.data.plate_color === 'blue' ? 'text-sky-500' : 'text-slate-700 dark:text-slate-300'" x-text="uploadResult.data.plate_color"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- ERROR RESULT -->
-                    <template x-if="uploadResult && !uploadResult.success">
-                        <div class="py-8 text-center space-y-2">
-                            <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xl mx-auto">
-                                <i class="fa-solid fa-circle-question"></i>
-                            </div>
-                            <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200" x-text="t('recognition_fail_title')"></h4>
-                            <p class="text-xs text-slate-400 max-w-xs mx-auto" x-text="uploadResult.message || t('recognition_fail_desc')"></p>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
-            <!-- RIGHT COLUMN (7 cols): Camera Management & Vehicle History Table -->
+            <!-- LEFT: Camera Configuration & Live CCTV (col-span-7) -->
             <div class="lg:col-span-7 space-y-6">
-
-                <!-- Camera Configuration Card -->
-                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 p-6" x-data="{ addCamOpen: false }">
+                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-6" x-data="{ addCamOpen: false }">
                     <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center space-x-2">
-                            <i class="fa-solid fa-video text-blue-600"></i>
-                            <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('camera_mgmt_title')"></h2>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm shadow-inner">
+                                <i class="fa-solid fa-video"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('camera_mgmt_title')"></h2>
+                                <p class="text-[11px] text-slate-400">RTSP va IP kameralar holati</p>
+                            </div>
                         </div>
-                        <button @click="addCamOpen = !addCamOpen" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                        <button @click="addCamOpen = !addCamOpen" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm">
                             <i class="fa-solid" :class="addCamOpen ? 'fa-xmark' : 'fa-plus'"></i>
                             <span x-text="addCamOpen ? t('btn_close') : t('btn_add_camera')"></span>
                         </button>
@@ -399,32 +266,32 @@
                     </div>
 
                     <!-- Camera List Cards -->
-                    <div class="space-y-2.5">
+                    <div class="space-y-3">
                         <template x-for="cam in cameras" :key="cam.id">
-                            <div class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div class="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <div class="flex items-center space-x-3">
-                                    <div class="w-9 h-9 rounded-xl flex items-center justify-center text-sm" :class="cam.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-slate-200 text-slate-500'">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-sm shadow-inner" :class="cam.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-slate-200 text-slate-500'">
                                         <i class="fa-solid fa-video"></i>
                                     </div>
                                     <div>
                                         <div class="flex items-center space-x-2">
                                             <span class="text-xs font-bold text-slate-900 dark:text-white" x-text="cam.camera_name || t('unnamed_camera')"></span>
-                                            <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300" x-text="cam.camera_type"></span>
+                                            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold" x-text="cam.camera_type"></span>
                                             <span class="text-[10px] font-mono text-slate-400" x-text="cam.ip_address ? '(' + cam.ip_address + ')' : ''"></span>
                                         </div>
-                                        <p class="text-[11px] font-mono text-slate-400 truncate max-w-xs" x-text="cam.stream_url"></p>
+                                        <p class="text-[11px] font-mono text-slate-400 truncate max-w-sm mt-0.5" x-text="cam.stream_url"></p>
                                     </div>
                                 </div>
 
                                 <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
                                     <!-- Live Stream Button -->
-                                    <button @click="openLiveModal(cam)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition flex items-center space-x-1.5">
+                                    <button @click="openLiveModal(cam)" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition flex items-center space-x-1.5">
                                         <i class="fa-solid fa-circle-play text-xs"></i>
                                         <span x-text="t('btn_test')"></span>
                                     </button>
                                     <!-- Delete Button -->
-                                    <button @click="deleteCamera(cam.id)" class="p-1.5 text-slate-400 hover:text-red-500 transition" :title="t('btn_delete')">
-                                        <i class="fa-solid fa-trash-can"></i>
+                                    <button @click="deleteCamera(cam.id)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-500 flex items-center justify-center transition" :title="t('btn_delete')">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
                                     </button>
                                 </div>
                             </div>
@@ -434,138 +301,227 @@
                         </template>
                     </div>
                 </div>
+            </div>
 
-                <!-- Vehicles History Table Card -->
-                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800/80 overflow-hidden backdrop-blur-sm">
-                    <div class="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <!-- RIGHT: Test Upload & Recognition Box (col-span-5) -->
+            <div class="lg:col-span-5 space-y-6">
+                <!-- Upload Card -->
+                <div class="bg-white dark:bg-darkcard p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-inner">
-                                <i class="fa-solid fa-list-check"></i>
+                            <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm shadow-inner">
+                                <i class="fa-solid fa-file-arrow-up"></i>
                             </div>
                             <div>
-                                <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
-                                <p class="text-[11px] text-slate-400 dark:text-slate-500">Avtoturargoh kirish, chiqish va AI aniqlash tarixi</p>
+                                <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('test_title')"></h2>
+                                <p class="text-[11px] text-slate-400" x-text="t('korean_plates_support')"></p>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Drag & Drop Box -->
+                    <div 
+                        class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-5 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer relative"
+                        @dragover.prevent="dragOver = true"
+                        @dragleave.prevent="dragOver = false"
+                        @drop.prevent="handleDrop($event)"
+                        :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
+                        @click="$refs.fileInput.click()"
+                    >
+                        <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect($event)">
                         
-                        <div class="flex items-center space-x-2 w-full sm:w-auto">
-                            <select x-model="filters.type" @change="fetchVehicles()" class="text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
-                                <option value="" x-text="t('filter_all')"></option>
-                                <option value="EV" x-text="t('filter_ev_only')"></option>
-                                <option value="REGULAR" x-text="t('filter_regular_only')"></option>
-                            </select>
-                            <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
-                                <i class="fa-solid fa-rotate-right text-xs"></i>
-                            </button>
+                        <div x-show="!isUploading">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 text-xl">
+                                <i class="fa-regular fa-image"></i>
+                            </div>
+                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
+                            <p class="text-[10px] text-slate-400 mt-1" x-text="t('dropzone_formats')"></p>
+                        </div>
+                        
+                        <div x-show="isUploading" class="py-4 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600"></i>
+                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
+                            <p class="text-[10px] text-slate-400" x-text="t('analyzing_desc')"></p>
                         </div>
                     </div>
 
-                    <!-- Table -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs border-collapse">
-                            <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
-                                <tr>
-                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_time')"></th>
-                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_plate')"></th>
-                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_type')"></th>
-                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_confidence')"></th>
-                                    <th class="px-4 sm:px-6 py-3.5 text-right" x-text="t('th_actions')"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                <template x-for="item in vehicles" :key="item.id">
-                                    <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150">
-                                        <!-- Time & Event -->
-                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
-                                            <div class="font-mono font-semibold text-slate-700 dark:text-slate-200 text-xs" x-text="formatDate(item.created_at)"></div>
-                                            <div class="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
-                                        </td>
-                                        <!-- License Plate -->
-                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
-                                            <div class="inline-flex items-center space-x-2">
-                                                <!-- Korean Styled License Plate Badge -->
-                                                <div class="px-2.5 py-1 rounded-lg border font-mono font-extrabold tracking-widest text-xs shadow-sm inline-flex items-center space-x-1.5"
-                                                     :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
-                                                    <span x-show="item.is_ev" class="text-sky-500 text-[10px]">⚡</span>
-                                                    <span x-text="item.plate_number || t('unrecognized')"></span>
-                                                </div>
-                                                <!-- Event Type Pill -->
-                                                <template x-if="item.event_type === 'START'">
-                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 flex items-center space-x-1">
-                                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                        <span>Kirish</span>
-                                                    </span>
-                                                </template>
-                                                <template x-if="item.event_type === 'END'">
-                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 flex items-center space-x-1">
-                                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                                        <span>Chiqish</span>
-                                                    </span>
-                                                </template>
+                    <!-- Detection Live Result Card (Inline) -->
+                    <div x-show="uploadResult" x-cloak class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-white flex items-center">
+                                <i class="fa-solid fa-circle-check mr-1.5 text-emerald-500"></i> <span x-text="t('result_title')"></span>
+                            </h3>
+                            <span class="text-[11px] font-mono text-slate-400" x-text="uploadResult ? (uploadResult.processing_time_ms + ' ms') : ''"></span>
+                        </div>
+
+                        <!-- SUCCESS RESULT -->
+                        <template x-if="uploadResult && uploadResult.success && uploadResult.data">
+                            <div class="space-y-3">
+                                <!-- Plate Banner -->
+                                <div class="p-3 rounded-xl border flex items-center justify-between gap-3"
+                                    :class="uploadResult.data.is_ev ? 'bg-sky-50/60 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="px-2.5 py-1 rounded-lg border font-mono font-extrabold text-sm tracking-wider"
+                                             :class="uploadResult.data.is_ev ? 'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-900/60 dark:text-sky-200' : 'bg-slate-200 text-slate-900 border-slate-300 dark:bg-slate-700 dark:text-white'">
+                                            <span x-show="uploadResult.data.is_ev">⚡</span>
+                                            <span x-text="uploadResult.data.plate_number"></span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <template x-if="uploadResult.data.is_ev">
+                                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-500 text-white">⚡ EV (Elektr)</span>
+                                        </template>
+                                        <template x-if="!uploadResult.data.is_ev">
+                                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-700 text-white">🚗 Oddiy</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- ERROR RESULT -->
+                        <template x-if="uploadResult && !uploadResult.success">
+                            <div class="py-3 text-center space-y-1 bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3">
+                                <h4 class="font-bold text-xs text-slate-800 dark:text-slate-200" x-text="t('recognition_fail_title')"></h4>
+                                <p class="text-[11px] text-slate-400" x-text="uploadResult.message || t('recognition_fail_desc')"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM FULL-WIDTH SECTION: Aniqlangan mashinalar jurnali -->
+        <div class="w-full">
+            <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden backdrop-blur-sm">
+                <div class="p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-inner">
+                            <i class="fa-solid fa-list-check"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
+                            <p class="text-xs text-slate-400 dark:text-slate-500">Avtoturargoh kirish, chiqish va AI aniqlash tarixi</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3 w-full sm:w-auto">
+                        <select x-model="filters.type" @change="fetchVehicles()" class="text-xs px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
+                            <option value="" x-text="t('filter_all')"></option>
+                            <option value="EV" x-text="t('filter_ev_only')"></option>
+                            <option value="REGULAR" x-text="t('filter_regular_only')"></option>
+                        </select>
+                        <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
+                            <i class="fa-solid fa-rotate-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table with Generous Padding and No Overflow Issues -->
+                <div class="w-full overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse min-w-[700px]">
+                        <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
+                            <tr>
+                                <th class="px-6 py-4" x-text="t('th_time')"></th>
+                                <th class="px-6 py-4" x-text="t('th_plate')"></th>
+                                <th class="px-6 py-4" x-text="t('th_type')"></th>
+                                <th class="px-6 py-4" x-text="t('th_confidence')"></th>
+                                <th class="px-6 py-4 text-right" x-text="t('th_actions')"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                            <template x-for="item in vehicles" :key="item.id">
+                                <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150">
+                                    <!-- Time & Event -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" x-text="formatDate(item.created_at)"></div>
+                                        <div class="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
+                                    </td>
+                                    <!-- License Plate -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="inline-flex items-center space-x-2.5">
+                                            <!-- Korean Styled License Plate Badge -->
+                                            <div class="px-3 py-1.5 rounded-xl border font-mono font-extrabold tracking-widest text-xs shadow-sm inline-flex items-center space-x-1.5"
+                                                 :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
+                                                <span x-show="item.is_ev" class="text-sky-500 text-xs">⚡</span>
+                                                <span x-text="item.plate_number || t('unrecognized')"></span>
                                             </div>
-                                        </td>
-                                        <!-- Vehicle Type -->
-                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
-                                            <template x-if="item.is_ev">
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-gradient-to-r from-sky-500/15 to-blue-500/15 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
-                                                    <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> EV Avtomobil
+                                            <!-- Event Type Pill -->
+                                            <template x-if="item.event_type === 'START'">
+                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 inline-flex items-center space-x-1.5">
+                                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                    <span>Kirish</span>
                                                 </span>
                                             </template>
-                                            <template x-if="!item.is_ev">
-                                                <div class="inline-flex items-center space-x-1.5">
-                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                                        <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> Oddiy avtomobil
-                                                    </span>
-                                                    <template x-if="item.alert_sent">
-                                                        <span class="w-5 h-5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px]" :title="t('alert_sent_tooltip')">
-                                                            <i class="fa-solid fa-triangle-exclamation"></i>
-                                                        </span>
-                                                    </template>
-                                                </div>
+                                            <template x-if="item.event_type === 'END'">
+                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 inline-flex items-center space-x-1.5">
+                                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                                    <span>Chiqish</span>
+                                                </span>
                                             </template>
-                                        </td>
-                                        <!-- AI Confidence Progress -->
-                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
-                                            <div class="flex items-center space-x-2.5">
-                                                <div class="w-16 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-200/60 dark:border-slate-700/60">
-                                                    <div class="h-1.5 rounded-full transition-all duration-300"
-                                                         :class="item.is_ev ? 'bg-sky-500' : 'bg-indigo-500'"
-                                                         :style="'width: ' + ((item.ai_confidence || 0) * 100) + '%'"></div>
-                                                </div>
-                                                <span class="font-mono font-bold text-slate-600 dark:text-slate-300 text-xs" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></span>
+                                        </div>
+                                    </td>
+                                    <!-- Vehicle Type -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <template x-if="item.is_ev">
+                                            <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500/15 to-blue-500/15 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
+                                                <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> EV Avtomobil
+                                            </span>
+                                        </template>
+                                        <template x-if="!item.is_ev">
+                                            <div class="inline-flex items-center space-x-2">
+                                                <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                    <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> Oddiy avtomobil
+                                                </span>
+                                                <template x-if="item.alert_sent">
+                                                    <span class="w-6 h-6 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xs shadow-sm" :title="t('alert_sent_tooltip')">
+                                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                                    </span>
+                                                </template>
                                             </div>
-                                        </td>
-                                        <!-- Actions -->
-                                        <td class="px-4 sm:px-6 py-3.5 text-right whitespace-nowrap space-x-1.5">
-                                            <button @click="openImageModal(item.image_url)" class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
-                                                <i class="fa-solid fa-image text-xs"></i>
-                                            </button>
-                                            <button @click="deleteVehicle(item.id)" class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
-                                                <i class="fa-solid fa-trash-can text-xs"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                                <template x-if="vehicles.length === 0">
-                                    <tr>
-                                        <td colspan="5" class="px-6 py-12 text-center text-slate-400">
-                                            <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 text-xl">
-                                                <i class="fa-solid fa-car-side"></i>
+                                        </template>
+                                    </td>
+                                    <!-- AI Confidence Progress -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-24 bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-200/60 dark:border-slate-700/60">
+                                                <div class="h-2 rounded-full transition-all duration-300"
+                                                     :class="item.is_ev ? 'bg-sky-500' : 'bg-indigo-500'"
+                                                     :style="'width: ' + ((item.ai_confidence || 0) * 100) + '%'"></div>
                                             </div>
-                                            <p class="text-xs font-semibold" x-text="t('no_history_msg')"></p>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
+                                            <span class="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></span>
+                                        </div>
+                                    </td>
+                                    <!-- Actions -->
+                                    <td class="px-6 py-4 text-right whitespace-nowrap space-x-2">
+                                        <button @click="openImageModal(item.image_url)" class="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
+                                            <i class="fa-solid fa-image text-sm"></i>
+                                        </button>
+                                        <button @click="deleteVehicle(item.id)" class="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
+                                            <i class="fa-solid fa-trash-can text-sm"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-if="vehicles.length === 0">
+                                <tr>
+                                    <td colspan="5" class="px-6 py-16 text-center text-slate-400">
+                                        <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 text-2xl shadow-inner">
+                                            <i class="fa-solid fa-car-side"></i>
+                                        </div>
+                                        <p class="text-sm font-semibold" x-text="t('no_history_msg')"></p>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
 
-                    <!-- Pagination Controls -->
-                    <div class="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
-                        <button @click="prevPage()" :disabled="page === 1" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_prev')"></button>
-                        <span class="text-slate-500 font-mono text-xs font-medium"><span class="font-bold text-slate-700 dark:text-slate-200" x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
-                        <button @click="nextPage()" :disabled="page === totalPages" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_next')"></button>
-                    </div>
+                <!-- Pagination Controls -->
+                <div class="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
+                    <button @click="prevPage()" :disabled="page === 1" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_prev')"></button>
+                    <span class="text-slate-500 font-mono text-xs font-semibold"><span class="font-bold text-slate-800 dark:text-slate-100 text-sm" x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
+                    <button @click="nextPage()" :disabled="page === totalPages" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_next')"></button>
                 </div>
             </div>
         </div>

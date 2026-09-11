@@ -312,12 +312,31 @@ class AutoMonitorService:
         ev_emoji = "⚡" if det_result.is_ev else "🚨"
         logger.info(f"{ev_emoji} [{camera_key}] Kirish (START): {det_result.vehicle_type} - {detected_plate} (Session: {session_id})")
 
-    async def _close_session(self, camera: CCTVCamera, camera_key: str, state: Dict, db: Session):
+    async def _close_session(
+        self,
+        camera: CCTVCamera,
+        camera_key: str,
+        state: Dict,
+        db: Session,
+        departure_time: Optional[datetime] = None
+    ):
         """Record ONE END event when a vehicle departs."""
         now = datetime.utcnow()
         entry_at = state.get("entry_at", now)
-        last_seen_at = state.get("last_seen_at", now)
-        duration_seconds = max(0, int((last_seen_at - entry_at).total_seconds()))
+
+        if departure_time:
+            duration_seconds = max(1, int((departure_time - entry_at).total_seconds()))
+        else:
+            last_seen_at = state.get("last_seen_at", now)
+            if last_seen_at > entry_at:
+                duration_seconds = int((last_seen_at - entry_at).total_seconds())
+            else:
+                # If only recognized in initial frame before departing:
+                est_leave = now - timedelta(seconds=self.exit_threshold_cycles * self.interval_seconds)
+                duration_seconds = max(self.interval_seconds, int((est_leave - entry_at).total_seconds()))
+                if duration_seconds < 1:
+                    duration_seconds = max(1, int((now - entry_at).total_seconds()))
+
         duration_text = format_duration(duration_seconds)
 
         plate = state.get("plate", "UNKNOWN")
@@ -409,8 +428,8 @@ class AutoMonitorService:
                 active["pending_cycles"] = active.get("pending_cycles", 0) + 1
                 if active["pending_cycles"] >= self.transition_threshold_cycles:
                     # CONFIRMED TRANSITION:
-                    # 1. Close old vehicle session
-                    await self._close_session(camera, camera_key, active, db)
+                    # 1. Close old vehicle session with departure_time = now
+                    await self._close_session(camera, camera_key, active, db, departure_time=now)
                     del self.active_sessions[camera_key]
 
                     # 2. Open new vehicle session

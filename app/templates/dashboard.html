@@ -470,8 +470,27 @@
                             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                 <template x-for="item in vehicles" :key="item.id">
                                     <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                                        <td class="px-5 py-3.5 text-slate-500 font-mono" x-text="formatDate(item.created_at)"></td>
-                                        <td class="px-5 py-3.5 font-bold tracking-wider text-slate-900 dark:text-white text-sm" x-text="item.plate_number || t('unrecognized')"></td>
+                                        <td class="px-5 py-3.5 text-slate-500 font-mono">
+                                            <div x-text="formatDate(item.created_at)"></div>
+                                            <div class="mt-0.5" x-show="item.notes">
+                                                <span class="text-[10px] text-slate-400 dark:text-slate-500 italic" x-text="item.notes"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-5 py-3.5">
+                                            <div class="flex items-center space-x-1.5">
+                                                <template x-if="item.event_type === 'START'">
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" title="To'xtab turish boshlandi">
+                                                        <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> Kirish
+                                                    </span>
+                                                </template>
+                                                <template x-if="item.event_type === 'END'">
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" title="To'xtab turish yakunlandi">
+                                                        <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Chiqish
+                                                    </span>
+                                                </template>
+                                                <span class="font-bold tracking-wider text-slate-900 dark:text-white text-sm" x-text="item.plate_number || t('unrecognized')"></span>
+                                            </div>
+                                        </td>
                                         <td class="px-5 py-3.5">
                                             <template x-if="item.is_ev">
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">

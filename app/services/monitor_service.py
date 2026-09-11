@@ -21,13 +21,16 @@ class AutoMonitorService:
     Periodic CCTV Monitor:
     - Captures frames from registered cameras
     - Runs detection pipeline (plate detection + EV classification)
-    - Saves NEW vehicles to DB
+    - Manages Parking Sessions:
+        * On Arrival: Records START event with unique session_id
+        * While Parked: Tracks active state without creating duplicates
+        * On Departure (after 3 missed cycles): Records END event with duration
     - Sends alerts for non-EV vehicles
-    - Deduplicates same car within 30 minutes
     """
 
-    def __init__(self, interval_seconds: int = 15):
+    def __init__(self, interval_seconds: int = 15, exit_threshold_cycles: int = 3):
         self.interval_seconds = interval_seconds
+        self.exit_threshold_cycles = exit_threshold_cycles
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
         self.last_seen_state: Dict[str, Dict] = {}
@@ -74,6 +77,43 @@ class AutoMonitorService:
         finally:
             db.close()
 
+    async def _close_session(self, camera: CCTVCamera, camera_key: str, state: Dict, db: Session):
+        """Record END event when a vehicle departs."""
+        now = datetime.utcnow()
+        entry_at = state.get("entry_at", now)
+        last_seen_at = state.get("last_seen_at", now)
+        duration_seconds = max(0, int((last_seen_at - entry_at).total_seconds()))
+        duration_minutes = max(1, round(duration_seconds / 60))
+
+        plate = state.get("plate", "UNKNOWN")
+        session_id = state.get("session_id")
+
+        exit_snapshot = CCTVSnapshot(
+            cs_id=camera.cs_id,
+            cp_id=camera.cp_id or "CP01",
+            connector_id=1,
+            session_id=session_id,
+            plate_number=plate,
+            event_type=EventTypeEnum.END.value,
+            image_path=state.get("image_path", ""),
+            ai_confidence=state.get("confidence", 0.0),
+            status="SUCCESS",
+            notes=f"Chiqish: Jami {duration_minutes} daqiqa to'xtab turdi",
+            vehicle_type=state.get("vehicle_type", "UNKNOWN"),
+            is_ev=state.get("is_ev", False),
+            plate_color=state.get("plate_color"),
+            alert_sent=False,
+            alert_type=None,
+            detection_source="CCTV_AUTO",
+            raw_ocr_text=state.get("raw_ocr_text"),
+            plate_region_image=state.get("plate_region_path"),
+            created_at=now
+        )
+        db.add(exit_snapshot)
+        db.commit()
+
+        logger.info(f"🚗💨 [{camera_key}] Chiqib ketdi: {plate} (To'xtab turish: {duration_minutes} daq)")
+
     async def _inspect_camera(self, camera: CCTVCamera, db: Session):
         camera_key = f"{camera.cs_id}_{camera.cp_id or 'CP01'}"
 
@@ -90,26 +130,43 @@ class AutoMonitorService:
         )
 
         if not capture_result.success or not capture_result.image_bytes:
+            # Network or camera error: do not increment missed cycles
             return
 
         # 2. Run detection pipeline
         det_result = await detection_pipeline.detect(capture_result.image_bytes)
 
+        # CASE A: No plate recognized in this frame
         if not det_result.success or not det_result.plate_number:
             if camera_key in self.last_seen_state:
-                del self.last_seen_state[camera_key]
+                state = self.last_seen_state[camera_key]
+                state["missed_cycles"] = state.get("missed_cycles", 0) + 1
+                if state["missed_cycles"] >= self.exit_threshold_cycles:
+                    # Vehicle has departed
+                    await self._close_session(camera, camera_key, state, db)
+                    del self.last_seen_state[camera_key]
             return
 
-        detected_plate = det_result.plate_number.upper()
-
-        # 3. Deduplication
+        detected_plate = det_result.plate_number.strip().upper()
+        now = datetime.utcnow()
         last_state = self.last_seen_state.get(camera_key)
-        if last_state:
-            if (last_state.get("last_plate") == detected_plate and
-                    (datetime.utcnow() - last_state.get("last_saved_at", datetime.min)) < timedelta(minutes=30)):
-                return
 
-        # 4. Save image
+        # CASE B: Same vehicle is still present
+        if last_state and last_state.get("plate") == detected_plate:
+            last_state["last_seen_at"] = now
+            last_state["missed_cycles"] = 0
+            return
+
+        # CASE C: A different vehicle arrived while previous was tracked
+        if last_state and last_state.get("plate") != detected_plate:
+            # Close previous vehicle's session
+            await self._close_session(camera, camera_key, last_state, db)
+            del self.last_seen_state[camera_key]
+
+        # CASE D: New Vehicle Arrival (START Event)
+        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}"
+
+        # Save snapshot image
         relative_path = storage_service.generate_relative_path(
             cs_id=camera.cs_id, cp_id=camera.cp_id or "CP01",
             plate_number=detected_plate
@@ -118,25 +175,24 @@ class AutoMonitorService:
 
         # Save plate crop if available
         plate_region_path = None
-        if det_result.plate_crop_bytes:
+        plate_crop_bytes = getattr(det_result, 'plate_crop_bytes', None)
+        if plate_crop_bytes:
             plate_region_path = relative_path.replace(".jpg", "_plate.jpg")
-            await storage_service.save_image(det_result.plate_crop_bytes, plate_region_path)
+            await storage_service.save_image(plate_crop_bytes, plate_region_path)
 
-        # 5. Determine alert
         is_non_ev = not det_result.is_ev and det_result.vehicle_type != "UNKNOWN"
 
-        # 6. Save to DB
-        snapshot = CCTVSnapshot(
+        entry_snapshot = CCTVSnapshot(
             cs_id=camera.cs_id,
             cp_id=camera.cp_id or "CP01",
             connector_id=1,
-            session_id=f"AUTO_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            session_id=session_id,
             plate_number=detected_plate,
-            event_type=EventTypeEnum.MOTION.value,
+            event_type=EventTypeEnum.START.value,
             image_path=relative_path,
             ai_confidence=det_result.confidence,
             status="SUCCESS",
-            notes=f"Auto detected via {capture_result.protocol}",
+            notes="Kirish: To'xtab turish boshlandi",
             vehicle_type=det_result.vehicle_type,
             is_ev=det_result.is_ev,
             plate_color=det_result.plate_color,
@@ -145,18 +201,31 @@ class AutoMonitorService:
             detection_source="CCTV_AUTO",
             raw_ocr_text=det_result.raw_ocr_text,
             plate_region_image=plate_region_path,
-            created_at=datetime.utcnow()
+            created_at=now
         )
-        db.add(snapshot)
+        db.add(entry_snapshot)
         db.commit()
 
         self.last_seen_state[camera_key] = {
-            "last_plate": detected_plate,
-            "last_saved_at": datetime.utcnow()
+            "plate": detected_plate,
+            "session_id": session_id,
+            "entry_at": now,
+            "last_seen_at": now,
+            "missed_cycles": 0,
+            "vehicle_type": det_result.vehicle_type,
+            "is_ev": det_result.is_ev,
+            "plate_color": det_result.plate_color,
+            "confidence": det_result.confidence,
+            "image_path": relative_path,
+            "plate_region_path": plate_region_path,
+            "raw_ocr_text": det_result.raw_ocr_text,
         }
 
         ev_emoji = "⚡" if det_result.is_ev else "🚨"
-        logger.info(f"{ev_emoji} [{camera_key}] {det_result.vehicle_type}: {detected_plate}")
+        logger.info(f"{ev_emoji} [{camera_key}] Kirish (START): {det_result.vehicle_type} - {detected_plate} (Session: {session_id})")
 
 
-auto_monitor_service = AutoMonitorService(interval_seconds=settings.MONITOR_INTERVAL_SECONDS)
+auto_monitor_service = AutoMonitorService(
+    interval_seconds=settings.MONITOR_INTERVAL_SECONDS,
+    exit_threshold_cycles=3
+)

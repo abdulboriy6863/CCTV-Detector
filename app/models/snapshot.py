@@ -14,7 +14,7 @@ class CCTVSnapshot(Base):
     __tablename__ = "tb_cctv_snapshots"
 
     # ===== ORIGINAL COLUMNS (from CCTV-Screenshot) =====
-    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True, index=True)
     cs_id = Column(String(50), nullable=False, index=True, comment="Charge Station ID")
     cp_id = Column(String(50), nullable=False, index=True, comment="Charge Point ID")
     connector_id = Column(Integer, nullable=True, default=1, comment="Connector ID")
@@ -68,7 +68,7 @@ class CCTVCamera(Base):
     """
     __tablename__ = "tb_cctv_cameras"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     cs_id = Column(String(50), nullable=False, index=True, comment="Charge Station ID")
     cp_id = Column(String(50), nullable=True, index=True, comment="Charge Point ID")
     camera_name = Column(String(100), nullable=True, comment="Camera name")

@@ -161,6 +161,66 @@ class RTSPCameraAdapter(BaseCameraAdapter):
             )
 
 
+    async def stream_frames(
+        self,
+        stream_url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        port: Optional[int] = 554,
+        target_fps: int = 15,
+        target_width: int = 1280
+    ):
+        """
+        Asynchronously yields multipart MJPEG video frames for continuous live browser streaming.
+        """
+        formatted_url = self._format_rtsp_url(
+            stream_url=stream_url,
+            username=username,
+            password=password,
+            ip_address=ip_address,
+            port=port
+        )
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000|buffer_size;1024000"
+
+        cap = cv2.VideoCapture(formatted_url, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            logger.warning(f"Could not open live RTSP stream from {formatted_url}. Streaming mock frames.")
+            delay = 1.0 / target_fps
+            while True:
+                mock = MockCameraGenerator.generate_mock_frame(cs_id="LIVE", cp_id="CAM")
+                if mock.image_bytes:
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n\r\n" + mock.image_bytes + b"\r\n")
+                await asyncio.sleep(delay)
+
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+        delay = 1.0 / target_fps
+        try:
+            while True:
+                ret, frame = await asyncio.to_thread(cap.read)
+                if not ret or frame is None:
+                    await asyncio.sleep(0.05)
+                    continue
+
+                if target_width and frame.shape[1] > target_width:
+                    scale = target_width / frame.shape[1]
+                    new_h = int(frame.shape[0] * scale)
+                    frame = cv2.resize(frame, (target_width, new_h), interpolation=cv2.INTER_LINEAR)
+
+                success, buffer = cv2.imencode(".jpg", frame, encode_param)
+                if success:
+                    frame_bytes = buffer.tobytes()
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n")
+
+                await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            cap.release()
+
+
 class HTTPSnapshotCameraAdapter(BaseCameraAdapter):
     """
     HTTP/HTTPS Snapshot API Adapter.
@@ -239,6 +299,34 @@ class HTTPSnapshotCameraAdapter(BaseCameraAdapter):
                     protocol="HTTP_SNAPSHOT"
                 )
 
+    async def stream_frames(
+        self,
+        stream_url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        port: Optional[int] = 80,
+        target_fps: int = 5,
+        **kwargs
+    ):
+        """Streams snapshots repeatedly for HTTP snapshot cameras."""
+        delay = 1.0 / target_fps
+        try:
+            while True:
+                res = await self.capture(
+                    stream_url=stream_url,
+                    username=username,
+                    password=password,
+                    ip_address=ip_address,
+                    port=port
+                )
+                if res.success and res.image_bytes:
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n\r\n" + res.image_bytes + b"\r\n")
+                await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            pass
+
 
 class ONVIFCameraAdapter(BaseCameraAdapter):
     """
@@ -278,6 +366,27 @@ class ONVIFCameraAdapter(BaseCameraAdapter):
             ip_address=ip_address,
             port=port
         )
+
+    async def stream_frames(
+        self,
+        stream_url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        port: Optional[int] = 80,
+        **kwargs
+    ):
+        if stream_url.startswith("http://") or stream_url.startswith("https://"):
+            async for chunk in self._http_adapter.stream_frames(
+                stream_url=stream_url, username=username, password=password, ip_address=ip_address, port=port
+            ):
+                yield chunk
+        else:
+            rtsp_adapter = RTSPCameraAdapter(timeout_seconds=self.timeout_seconds)
+            async for chunk in rtsp_adapter.stream_frames(
+                stream_url=stream_url, username=username, password=password, ip_address=ip_address, port=port
+            ):
+                yield chunk
 
 
 class MockCameraGenerator:
@@ -382,6 +491,41 @@ class CameraService:
             return mock_result
 
         return result
+
+    async def get_live_stream(
+        self,
+        camera_type: CameraTypeEnum,
+        stream_url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        port: Optional[int] = None,
+    ):
+        """Yields continuous MJPEG multipart stream for live browser preview."""
+        adapter = self.adapters.get(camera_type, self.adapters[CameraTypeEnum.RTSP])
+        if hasattr(adapter, "stream_frames"):
+            async for chunk in adapter.stream_frames(
+                stream_url=stream_url,
+                username=username,
+                password=password,
+                ip_address=ip_address,
+                port=port
+            ):
+                yield chunk
+        else:
+            delay = 0.2
+            while True:
+                res = await adapter.capture(
+                    stream_url=stream_url,
+                    username=username,
+                    password=password,
+                    ip_address=ip_address,
+                    port=port
+                )
+                if res.success and res.image_bytes:
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n\r\n" + res.image_bytes + b"\r\n")
+                await asyncio.sleep(delay)
 
 
 # Singleton instance

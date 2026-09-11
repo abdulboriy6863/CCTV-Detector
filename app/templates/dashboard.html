@@ -349,8 +349,8 @@
                         </button>
                     </div>
 
-                    <!-- Add Camera Form (Collapsible) -->
-                    <div x-show="addCamOpen" x-cloak class="mb-5 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                    <!-- Add Camera Form (Collapsible & Simplified) -->
+                    <div x-show="addCamOpen" x-cloak class="mb-5 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3" x-data="{ showAdvanced: false }">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500" x-text="t('add_camera_header')"></h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
@@ -358,34 +358,42 @@
                                 <input type="text" x-model="newCam.camera_name" :placeholder="t('cam_name_ph')" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
                             </div>
                             <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_ip_label')"></label>
+                                <div class="flex space-x-2">
+                                    <input type="text" x-model="newCam.ip_address" placeholder="192.168.0.10" class="w-2/3 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                                    <input type="number" x-model.number="newCam.port" :placeholder="newCam.camera_type === 'RTSP' ? '554' : '80'" class="w-1/3 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono" :title="t('cam_port_label')">
+                                </div>
+                            </div>
+                            <div>
                                 <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_protocol_label')"></label>
                                 <select x-model="newCam.camera_type" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
-                                    <option value="RTSP">RTSP Stream</option>
-                                    <option value="HTTP_SNAPSHOT">HTTP Snapshot (Hikvision/Dahua)</option>
+                                    <option value="RTSP">RTSP Stream (Tavsiya etiladi)</option>
+                                    <option value="HTTP_SNAPSHOT">HTTP Snapshot</option>
                                     <option value="ONVIF">ONVIF Protocol</option>
                                 </select>
                             </div>
-                            <div class="sm:col-span-2">
-                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_url_label')"></label>
-                                <input type="text" x-model="newCam.stream_url" :placeholder="newCam.camera_type === 'RTSP' ? 'rtsp://192.168.0.10:554/stream1' : 'http://192.168.0.10/api/snapshot'" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
-                            </div>
                             <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_ip_port_label')"></label>
-                                <div class="flex space-x-2">
-                                    <input type="text" x-model="newCam.ip_address" placeholder="192.168.1.100" class="w-2/3 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
-                                    <input type="number" x-model.number="newCam.port" placeholder="554" class="w-1/3 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_auth_label')"></label>
+                                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_user_label') + ' / ' + t('cam_pass_label')"></label>
                                 <div class="flex space-x-2">
                                     <input type="text" x-model="newCam.username" placeholder="admin" class="w-1/2 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
-                                    <input type="password" x-model="newCam.password" placeholder="••••••" class="w-1/2 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                                    <input type="password" x-model="newCam.password" placeholder="••••••••" class="w-1/2 text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Optional Advanced URL Toggle -->
+                        <div class="pt-1">
+                            <button type="button" @click="showAdvanced = !showAdvanced" class="text-[11px] text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center space-x-1">
+                                <i class="fa-solid text-[9px]" :class="showAdvanced ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                                <span x-text="t('advanced_url_toggle')"></span>
+                            </button>
+                            <div x-show="showAdvanced" class="mt-2">
+                                <input type="text" x-model="newCam.stream_url" :placeholder="newCam.camera_type === 'RTSP' ? 'rtsp://192.168.0.10:554/stream1' : 'http://192.168.0.10/api/snapshot'" class="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                            </div>
+                        </div>
+
                         <div class="flex justify-end pt-2">
-                            <button @click="createCamera()" :disabled="!newCam.stream_url" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition" x-text="t('btn_save_camera')">
+                            <button @click="createCamera(); addCamOpen = false" :disabled="!newCam.ip_address && !newCam.stream_url" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition" x-text="t('btn_save_camera')">
                             </button>
                         </div>
                     </div>
@@ -402,15 +410,16 @@
                                         <div class="flex items-center space-x-2">
                                             <span class="text-xs font-bold text-slate-900 dark:text-white" x-text="cam.camera_name || t('unnamed_camera')"></span>
                                             <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300" x-text="cam.camera_type"></span>
+                                            <span class="text-[10px] font-mono text-slate-400" x-text="cam.ip_address ? '(' + cam.ip_address + ')' : ''"></span>
                                         </div>
                                         <p class="text-[11px] font-mono text-slate-400 truncate max-w-xs" x-text="cam.stream_url"></p>
                                     </div>
                                 </div>
 
                                 <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
-                                    <!-- Test Connection Button -->
-                                    <button @click="testCamera(cam.id)" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center space-x-1">
-                                        <i class="fa-solid fa-play text-[10px] text-emerald-500"></i>
+                                    <!-- Live Stream Button -->
+                                    <button @click="openLiveModal(cam)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition flex items-center space-x-1.5">
+                                        <i class="fa-solid fa-circle-play text-xs"></i>
                                         <span x-text="t('btn_test')"></span>
                                     </button>
                                     <!-- Delete Button -->
@@ -508,38 +517,73 @@
         </div>
     </main>
 
-    <!-- Camera Live Snapshot Test Modal -->
-    <div x-show="testModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4">
-            <div class="flex items-center justify-between">
-                <h3 class="font-bold text-slate-900 dark:text-white flex items-center">
-                    <i class="fa-solid fa-camera mr-2 text-blue-600"></i> <span x-text="t('modal_test_title')"></span>
-                </h3>
-                <button @click="testModal.open = false" class="text-slate-400 hover:text-slate-600">
-                    <i class="fa-solid fa-xmark"></i>
+    <!-- CCTV Live Video Streaming Player Modal -->
+    <div x-show="liveModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-md">
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-3xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-video"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white" x-text="liveModal.camera?.camera_name || t('unnamed_camera')"></h3>
+                            <span class="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white uppercase tracking-wider">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                <span x-text="t('live_badge')"></span>
+                            </span>
+                        </div>
+                        <p class="text-[11px] font-mono text-slate-400" x-text="liveModal.camera?.stream_url"></p>
+                    </div>
+                </div>
+                <button @click="closeLiveModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-base"></i>
                 </button>
             </div>
             
-            <div class="rounded-xl overflow-hidden bg-black/10 border border-slate-200 dark:border-slate-700 min-h-48 flex items-center justify-center">
-                <template x-if="testModal.loading">
-                    <div class="py-12 text-center text-slate-400">
-                        <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-2 text-blue-600"></i>
-                        <p class="text-xs" x-text="t('capturing_stream_msg')"></p>
-                    </div>
-                </template>
-                <template x-if="!testModal.loading && testModal.image">
-                    <img :src="'data:image/jpeg;base64,' + testModal.image" class="w-full h-auto object-cover" alt="Captured Frame">
-                </template>
-                <template x-if="!testModal.loading && !testModal.image">
-                    <div class="py-12 text-center text-red-500 px-4">
-                        <i class="fa-solid fa-triangle-exclamation text-3xl mb-2"></i>
-                        <p class="text-xs font-semibold" x-text="testModal.message"></p>
-                    </div>
+            <!-- Video Stream Container -->
+            <div class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-slate-800 shadow-inner">
+                <template x-if="liveModal.open && liveModal.camera">
+                    <img :src="'/api/v1/cameras/' + liveModal.camera.id + '/stream'" class="w-full h-full object-contain" alt="Live CCTV Video">
                 </template>
             </div>
 
-            <div class="flex justify-end">
-                <button @click="testModal.open = false" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold" x-text="t('btn_close')"></button>
+            <!-- Instant AI Scan Result Panel (if scanned) -->
+            <template x-if="liveModal.aiResult">
+                <div class="p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in" :class="liveModal.aiResult.is_ev ? 'bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800' : (liveModal.aiResult.success ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700')">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl" x-text="liveModal.aiResult.is_ev ? '⚡' : (liveModal.aiResult.success ? '🚨' : '❓')"></div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-black tracking-wider text-slate-900 dark:text-white" x-text="liveModal.aiResult.plate_number || t('unrecognized')"></span>
+                                <template x-if="liveModal.aiResult.is_ev">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500 text-white">EV (Elektr)</span>
+                                </template>
+                                <template x-if="!liveModal.aiResult.is_ev && liveModal.aiResult.success">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white">Oddiy (Benzin/Dizel)</span>
+                                </template>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? 'EV zaryadlashga ruxsat etildi' : (liveModal.aiResult.success ? 'OGOHLANTIRISH: Noqonuniy to\'xtash!' : 'Raqam aniqlanmadi')"></p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-mono font-bold text-slate-600 dark:text-slate-300" x-text="(liveModal.aiResult.confidence * 100).toFixed(0) + '% ishonch'"></span>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="liveModal.aiError">
+                <div class="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-xs font-semibold" x-text="liveModal.aiError"></div>
+            </template>
+
+            <!-- Action Controls -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <button @click="scanLiveFrame()" :disabled="liveModal.aiLoading" class="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 shadow-sm transition">
+                    <i class="fa-solid" :class="liveModal.aiLoading ? 'fa-circle-notch fa-spin' : 'fa-wand-magic-sparkles'"></i>
+                    <span x-text="liveModal.aiLoading ? 'AI Tahlil qilinmoqda...' : t('btn_ai_scan_now')"></span>
+                </button>
+                <button @click="closeLiveModal()" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition" x-text="t('btn_close')"></button>
             </div>
         </div>
     </div>
@@ -604,14 +648,16 @@
                 btn_close: "Yopish",
                 add_camera_header: "Yangi CCTV Kamera qo'shish",
                 cam_name_label: "Kamera nomi",
-                cam_name_ph: "Masalan: 1-ustun old kamera",
+                cam_name_ph: "Masalan: 1-ustun kamera",
                 cam_protocol_label: "Protokol turi",
-                cam_url_label: "Stream / Snapshot URL",
-                cam_ip_port_label: "IP Manzil / Port",
-                cam_auth_label: "Kirish hisobi (Login / Parol)",
+                cam_ip_label: "Kamera IP Manzili",
+                cam_port_label: "Port",
+                cam_user_label: "Login (ID)",
+                cam_pass_label: "Parol",
+                advanced_url_toggle: "Maxsus Stream URL (ixtiyoriy)",
                 btn_save_camera: "Kamerani saqlash va faollashtirish",
                 unnamed_camera: "Nomsiz kamera",
-                btn_test: "Test",
+                btn_test: "Jonli ko'rish (Live)",
                 btn_delete: "O'chirish",
                 no_cameras_msg: "Hozircha CCTV kamera qo'shilmagan. Yuqoridagi 'Kamera qo'shish' tugmasidan foydalaning.",
                 history_title: "Aniqlangan mashinalar jurnali",
@@ -631,8 +677,10 @@
                 btn_prev: "Oldingi",
                 btn_next: "Keyingi",
                 page_label: "sahifa",
-                modal_test_title: "Kamera jonli kadrini test qilish",
-                capturing_stream_msg: "Kamera oqimidan kadr olinmoqda...",
+                modal_test_title: "CCTV Jonli Video Oqimi (Live Stream)",
+                live_badge: "JONLI / LIVE",
+                btn_ai_scan_now: "⚡ Hozirgi kadrni AI tahlil qilish",
+                capturing_stream_msg: "Jonli video oqimiga ulanmoqda...",
                 confirm_delete_vehicle: "Haqiqatan ham ushbu yozuvni o'chirmoqchimisiz?",
                 confirm_delete_cam: "Haqiqatan ham ushbu kamerani o'chirmoqchimisiz?",
                 upload_img_only: "Faqat rasm fayllari yuklanishi mumkin."
@@ -683,15 +731,17 @@
                 btn_add_camera: "카메라 추가",
                 btn_close: "닫기",
                 add_camera_header: "새 CCTV 카메라 등록",
-                cam_name_label: "카메라 이름",
-                cam_name_ph: "예: 1번 베이 전면 카메라",
+                cam_name_label: "카amera 이름",
+                cam_name_ph: "예: 1번 베이 카메라",
                 cam_protocol_label: "프로토콜 유형",
-                cam_url_label: "스트림 / 스냅샷 URL",
-                cam_ip_port_label: "IP 주소 / 포트",
-                cam_auth_label: "접속 계정 (아이디/비번)",
+                cam_ip_label: "카메라 IP 주소",
+                cam_port_label: "포트",
+                cam_user_label: "접속 아이디 (ID)",
+                cam_pass_label: "비밀번호",
+                advanced_url_toggle: "맞춤 스트림 URL (선택사항)",
                 btn_save_camera: "카메라 저장 및 활성화",
                 unnamed_camera: "이름 없음",
-                btn_test: "테스트",
+                btn_test: "실시간 라이브 보기",
                 btn_delete: "삭제",
                 no_cameras_msg: "등록된 CCTV 카메라가 없습니다. 상단 '카메라 추가' 버튼을 눌러 등록하세요.",
                 history_title: "감지 이력 목록",
@@ -711,8 +761,10 @@
                 btn_prev: "이전",
                 btn_next: "다음",
                 page_label: "페이지",
-                modal_test_title: "카메라 실시간 캡처 테스트",
-                capturing_stream_msg: "카메라 스트림에서 프레임 캡처 중...",
+                modal_test_title: "CCTV 실시간 라이브 영상 스트림",
+                live_badge: "실시간 LIVE",
+                btn_ai_scan_now: "⚡ 현재 프레임 AI 번호판 분석",
+                capturing_stream_msg: "실시간 비디오 스트림 연결 중...",
                 confirm_delete_vehicle: "이 감지 기록을 삭제하시겠습니까?",
                 confirm_delete_cam: "정말 이 카메라를 삭제하시겠습니까?",
                 upload_img_only: "이미지 파일만 업로드 가능합니다."
@@ -750,7 +802,7 @@
                     is_active: true
                 },
 
-                testModal: { open: false, loading: false, image: null, message: '' },
+                liveModal: { open: false, camera: null, aiLoading: false, aiResult: null, aiError: null },
                 previewImage: { open: false, url: '' },
                 
                 init() {
@@ -838,20 +890,68 @@
                     } catch (e) { console.error("Create camera error:", e); }
                 },
 
-                async testCamera(cameraId) {
-                    this.testModal = { open: true, loading: true, image: null, message: '' };
+                openLiveModal(cam) {
+                    this.liveModal = {
+                        open: true,
+                        camera: cam,
+                        aiLoading: false,
+                        aiResult: null,
+                        aiError: null
+                    };
+                },
+
+                closeLiveModal() {
+                    this.liveModal = {
+                        open: false,
+                        camera: null,
+                        aiLoading: false,
+                        aiResult: null,
+                        aiError: null
+                    };
+                },
+
+                async scanLiveFrame() {
+                    if (!this.liveModal.camera) return;
+                    this.liveModal.aiLoading = true;
+                    this.liveModal.aiResult = null;
+                    this.liveModal.aiError = null;
                     try {
-                        const res = await fetch(`/api/v1/cameras/${cameraId}/test`, { method: 'POST' });
+                        const res = await fetch(`/api/v1/cameras/${this.liveModal.camera.id}/test`, { method: 'POST' });
                         const data = await res.json();
-                        this.testModal.loading = false;
                         if (data.success && data.image_base64) {
-                            this.testModal.image = data.image_base64;
+                            // Convert base64 to Blob and send to detect endpoint
+                            const byteCharacters = atob(data.image_base64);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: 'image/jpeg' });
+                            
+                            const formData = new FormData();
+                            formData.append('file', blob, 'cctv_live_snap.jpg');
+                            formData.append('cs_id', this.liveModal.camera.cs_id || 'CS_TASHKENT_01');
+                            formData.append('cp_id', this.liveModal.camera.cp_id || 'CP01');
+                            
+                            const detRes = await fetch('/api/v1/detect/upload', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            this.liveModal.aiLoading = false;
+                            if (detRes.ok) {
+                                this.liveModal.aiResult = await detRes.json();
+                                this.fetchStats();
+                                this.fetchVehicles();
+                            } else {
+                                this.liveModal.aiError = 'AI tahlil xatosi yuz berdi';
+                            }
                         } else {
-                            this.testModal.message = data.message || 'Connection failed';
+                            this.liveModal.aiLoading = false;
+                            this.liveModal.aiError = data.message || 'Kameradan kadr olib bo\'lmadi';
                         }
                     } catch (e) {
-                        this.testModal.loading = false;
-                        this.testModal.message = 'Communication error';
+                        this.liveModal.aiLoading = false;
+                        this.liveModal.aiError = 'Kamera bilan aloqa xatosi: ' + e;
                     }
                 },
 

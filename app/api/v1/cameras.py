@@ -27,14 +27,25 @@ def list_cameras(
 
 @router.post("", response_model=CameraResponse, summary="Add camera")
 def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
+    stream_url = camera_in.stream_url
+    if not stream_url and camera_in.ip_address:
+        from app.schemas.snapshot import CameraTypeEnum
+        if camera_in.camera_type == CameraTypeEnum.RTSP:
+            port_val = camera_in.port or 554
+            stream_url = f"rtsp://{camera_in.ip_address}:{port_val}/stream1"
+        else:
+            port_val = camera_in.port or 80
+            port_str = f":{port_val}" if port_val != 80 else ""
+            stream_url = f"http://{camera_in.ip_address}{port_str}/api/snapshot"
+
     cam = CCTVCamera(
         cs_id=camera_in.cs_id,
         cp_id=camera_in.cp_id,
         camera_name=camera_in.camera_name,
         camera_type=camera_in.camera_type.value,
-        stream_url=camera_in.stream_url,
+        stream_url=stream_url or f"rtsp://{camera_in.ip_address or '127.0.0.1'}:554/stream1",
         ip_address=camera_in.ip_address,
-        port=camera_in.port,
+        port=camera_in.port or (554 if camera_in.camera_type.value == "RTSP" else 80),
         username=camera_in.username,
         password=camera_in.password,
         is_active=camera_in.is_active,
@@ -114,4 +125,33 @@ async def test_camera(camera_id: int, db: Session = Depends(get_db)):
         "protocol": result.protocol,
         "image_base64": b64_img
     }
+
+
+@router.get("/{camera_id}/stream", summary="Live continuous MJPEG video stream")
+async def stream_camera(camera_id: int, db: Session = Depends(get_db)):
+    """
+    Streams continuous live video (MJPEG) from CCTV RTSP/HTTP camera.
+    Compatible with standard <img> tags in any browser.
+    """
+    from fastapi.responses import StreamingResponse
+    from app.services.camera_service import camera_service
+    from app.schemas.snapshot import CameraTypeEnum
+
+    cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
+    if not cam:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    stream_generator = camera_service.get_live_stream(
+        camera_type=CameraTypeEnum(cam.camera_type),
+        stream_url=cam.stream_url,
+        username=cam.username,
+        password=cam.password,
+        ip_address=cam.ip_address,
+        port=cam.port
+    )
+    return StreamingResponse(
+        stream_generator,
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
 

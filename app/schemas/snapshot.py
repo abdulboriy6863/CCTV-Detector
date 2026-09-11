@@ -94,7 +94,7 @@ class CameraBase(BaseModel):
     cp_id: Optional[str] = None
     camera_name: Optional[str] = None
     camera_type: CameraTypeEnum = CameraTypeEnum.RTSP
-    stream_url: str
+    stream_url: Optional[str] = None
     ip_address: Optional[str] = None
     port: Optional[int] = 554
     username: Optional[str] = None

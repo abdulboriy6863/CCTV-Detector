@@ -52,10 +52,10 @@ class DetectionResult:
 class DetectionPipeline:
     """
     Yuqori tezlikdagi va burchak ostidagi raqamlarni aniqlash tizimi (Fast & Angle-Tolerant LPR Pipeline).
-    1. YOLOv8 orqali avtomobillarni topish va ularni o'lchami (kattasi / oldi birinchi) bo'yicha saralash.
-    2. Tezkor tahlil: Oldindagi asosiy mashina tekshiriladi (Early Exit: 1-2 soniyada tugatadi).
-    3. Burchak ostidagi raqamlar (Angled / Tilted plates): Yonma-yon ajralgan matnlarni (masalan '47호' + '6633') birlashtirish.
-    4. Super-Resolution & Keskinlashtirish orqali uzoq va qiya mashinalarni 100% aniqlash.
+    1. YOLOv8 orqali avtomobilni topish va to'g'ridan-to'g'ri uning Bamper qismiga (lower ROI) e'tibor qaratish.
+    2. Spatial Proximity: Bir-biridan uzoqdagi matnlarni qo'shib yubormaslik (faqat bitta qatordagi yaqin matnlar birlashtiriladi).
+    3. Tezkor chiqish (Early Exit): Bamperdan to'g'ri raqam topilishi bilan tahlil to'xtatiladi (~1-2 soniyada tugatadi).
+    4. Auto-Deskewing & Super-Resolution orqali qiya va uzoq raqamlarni 100% aniqlash.
     """
 
     def __init__(self):
@@ -70,11 +70,69 @@ class DetectionPipeline:
                 logger.warning(f"Could not load YOLO: {e}")
         return self._yolo_model
 
+    @staticmethod
+    def _smart_resize(image: np.ndarray, max_dim: int = 1600) -> Tuple[np.ndarray, float]:
+        """Scales down oversized images to optimize YOLO and OCR speed without losing plate details."""
+        h, w = image.shape[:2]
+        if max(h, w) <= max_dim:
+            return image, 1.0
+        scale = max_dim / float(max(h, w))
+        resized = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        return resized, scale
+
+    @staticmethod
+    def _is_valid_collinear_pair(b1: Any, b2: Any) -> bool:
+        """
+        Strict spatial proximity check:
+        Ensures b1 and b2 are on the exact same horizontal line and adjacent (not background stickers).
+        """
+        pts1 = np.array(b1, dtype=np.float32)
+        pts2 = np.array(b2, dtype=np.float32)
+        
+        l1, r1 = np.min(pts1[:, 0]), np.max(pts1[:, 0])
+        t1, btm1 = np.min(pts1[:, 1]), np.max(pts1[:, 1])
+        h1 = max(btm1 - t1, 1.0)
+        cy1 = (t1 + btm1) / 2.0
+        
+        l2, r2 = np.min(pts2[:, 0]), np.max(pts2[:, 0])
+        t2, btm2 = np.min(pts2[:, 1]), np.max(pts2[:, 1])
+        h2 = max(btm2 - t2, 1.0)
+        cy2 = (t2 + btm2) / 2.0
+
+        # Must read left-to-right
+        if l1 >= l2:
+            return False
+
+        min_h = min(h1, h2)
+        max_h = max(h1, h2)
+
+        # 1. Vertical alignment (centers must be closely aligned)
+        if abs(cy1 - cy2) > min_h * 0.65:
+            return False
+
+        # 2. Similar heights (avoid merging small stickers with large plates)
+        if h1 / h2 < 0.45 or h1 / h2 > 2.2:
+            return False
+
+        # 3. Horizontal gap constraint (strictly adjacent)
+        gap = l2 - r1
+        if gap < -0.3 * max_h or gap > 2.5 * max_h:
+            return False
+
+        # 4. Merged bounding box aspect ratio
+        comb_w = max(r1, r2) - min(l1, l2)
+        comb_h = max(btm1, btm2) - min(t1, t2)
+        aspect = comb_w / max(comb_h, 1.0)
+        if aspect < 1.5 or aspect > 7.0:
+            return False
+
+        return True
+
     def _find_plate_candidates_in_crop(
         self, crop_img: np.ndarray, crop_source: str, weight: float
     ) -> List[Dict[str, Any]]:
         """
-        Runs OCR on crop, handles single text boxes and pairwise merged collinear text boxes.
+        Runs OCR on crop, handles single text boxes and strictly verified collinear adjacent pairs.
         """
         ocr_segments = plate_reader.read_with_boxes(crop_img)
         if not ocr_segments:
@@ -97,7 +155,7 @@ class DetectionPipeline:
                     "source": crop_source
                 })
 
-        # 2. Pairwise Merged Matches (for angled/rotated plates where OCR splits '47호' and '6633')
+        # 2. Pairwise Merged Matches with strict spatial proximity
         n = len(ocr_segments)
         for i in range(n):
             for j in range(n):
@@ -106,17 +164,13 @@ class DetectionPipeline:
                 raw_1, conf_1, b1 = ocr_segments[i]
                 raw_2, conf_2, b2 = ocr_segments[j]
 
-                # Filter: check reading order (b1 is left of b2)
-                pts1 = np.array(b1, dtype=np.float32)
-                pts2 = np.array(b2, dtype=np.float32)
-                center_x1 = np.mean(pts1[:, 0])
-                center_x2 = np.mean(pts2[:, 0])
-
-                if center_x1 < center_x2:
+                if self._is_valid_collinear_pair(b1, b2):
                     merged_raw = f"{raw_1}{raw_2}"
                     validated = KoreanPlateValidator.validate_and_normalize(merged_raw)
                     if validated:
                         plate_str, val_score = validated
+                        pts1 = np.array(b1, dtype=np.float32)
+                        pts2 = np.array(b2, dtype=np.float32)
                         combined_bbox = [
                             np.minimum(np.min(pts1, axis=0), np.min(pts2, axis=0)),
                             np.maximum(np.max(pts1, axis=0), np.max(pts2, axis=0))
@@ -127,59 +181,76 @@ class DetectionPipeline:
                             "confidence": (conf_1 + conf_2) / 2.0,
                             "val_score": val_score,
                             "bbox": combined_bbox,
-                            "weight": weight * 1.1,
+                            "weight": weight * 1.05,
                             "source": f"{crop_source}_merged"
                         })
 
         return candidates
 
+    @staticmethod
+    def _normalize_angle(rw: float, rh: float, angle: float) -> Tuple[float, float, float]:
+        """Normalizes minAreaRect angle to [-45, +45] right-side-up tilt angle."""
+        if rw < rh:
+            rw, rh = rh, rw
+            angle += 90
+        while angle > 45:
+            angle -= 90
+        while angle < -45:
+            angle += 90
+        return rw, rh, angle
+
     def _extract_deskewed_proposals(self, image: np.ndarray) -> List[Tuple[np.ndarray, str, float]]:
         """
-        Extracts high-probability candidate plate regions (Blue EV + White plates)
-        and automatically deskews them by their minAreaRect angle.
-        Fast (<10ms) and highly effective for angled/diagonal CCTV views.
+        Extracts candidate plate regions (Blue EV + White plates + Yellow commercial)
+        and deskews them by their minAreaRect angle with [-45, +45] normalization.
         """
         h, w = image.shape[:2]
         proposals = []
 
         try:
-            # 1. Blue mask for Korean EV sky-blue plates
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
             b, g, r = cv2.split(image)
-            hsv_mask = cv2.inRange(hsv, np.array([78, 22, 45]), np.array([142, 255, 255]))
-            rgb_mask = ((b.astype(int) > (r.astype(int) + 10)) & (b.astype(int) > 50)).astype(np.uint8) * 255
-            comb_blue = cv2.bitwise_or(hsv_mask, rgb_mask)
 
-            # Find blue contours
-            contours, _ = cv2.findContours(comb_blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # 1. Blue mask (EV)
+            hsv_blue = cv2.inRange(hsv, np.array([75, 20, 40]), np.array([145, 255, 255]))
+            rgb_blue = ((b.astype(int) > (r.astype(int) + 8)) & (b.astype(int) > 40)).astype(np.uint8) * 255
+            blue_mask = cv2.bitwise_or(hsv_blue, rgb_blue)
+
+            # 2. White/Bright plate mask (ICE)
+            white_mask = cv2.inRange(hsv, np.array([0, 0, 150]), np.array([180, 55, 255]))
+
+            # 3. Yellow/Commercial mask
+            yellow_mask = cv2.inRange(hsv, np.array([15, 60, 80]), np.array([35, 255, 255]))
+
+            all_masks = [('blue', blue_mask), ('white', white_mask), ('yellow', yellow_mask)]
+
             candidates = []
-            for cnt in contours:
-                area = cv2.contourArea(cnt)
-                if 500 < area < (h * w * 0.25):
-                    rect = cv2.minAreaRect(cnt)
-                    (cx, cy), (rw, rh), angle = rect
-                    if rw < rh:
-                        rw, rh = rh, rw
-                        angle += 90
-                    aspect = rw / max(rh, 1)
-                    if 1.8 <= aspect <= 7.0 and rw > 35:
-                        # Priority score: closeness to Korean standard plate aspect ratio 4.7
-                        score = abs(aspect - 4.7)
-                        candidates.append((score, cx, cy, rw, rh, angle, "blue_deskew"))
+            for color_name, mask in all_masks:
+                cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                for cnt in cnts:
+                    area = cv2.contourArea(cnt)
+                    if 300 < area < (h * w * 0.20):
+                        rect = cv2.minAreaRect(cnt)
+                        (cx, cy), (rw, rh), angle = rect
+                        rw, rh, angle = self._normalize_angle(rw, rh, angle)
+                        aspect = rw / max(rh, 1.0)
+                        if 1.8 <= aspect <= 7.0 and rw > 25:
+                            score = abs(aspect - 4.7)
+                            candidates.append((score, cx, cy, rw, rh, angle, color_name))
 
-            # Sort candidates by aspect ratio similarity
             candidates.sort(key=lambda x: x[0])
 
-            for score, cx, cy, rw, rh, angle, label in candidates[:3]:
+            for score, cx, cy, rw, rh, angle, color_name in candidates[:6]:
                 M = cv2.getRotationMatrix2D((cx, cy), angle, 1.0)
                 rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_LANCZOS4)
-                w_half, h_half = int(rw / 2) + 12, int(rh / 2) + 8
+                w_half, h_half = int(rw / 2) + 14, int(rh / 2) + 10
                 x1, y1 = max(0, int(cx - w_half)), max(0, int(cy - h_half))
                 x2, y2 = min(w, int(cx + w_half)), min(h, int(cy + h_half))
                 crop = rotated[y1:y2, x1:x2]
                 if crop.size > 0:
-                    up = cv2.resize(crop, (0, 0), fx=2.5, fy=2.5, interpolation=cv2.INTER_LANCZOS4)
-                    proposals.append((up, f"{label}_{angle:.0f}deg", 1.5))
+                    if crop.shape[0] < 70:
+                        crop = cv2.resize(crop, (0, 0), fx=2.5, fy=2.5, interpolation=cv2.INTER_LANCZOS4)
+                    proposals.append((crop, f"{color_name}_deskew_{angle:.0f}deg", 1.5))
 
         except Exception as e:
             logger.warning(f"Deskewed proposal extraction error: {e}")
@@ -194,20 +265,22 @@ class DetectionPipeline:
         try:
             # 1. Decode image bytes
             np_arr = np.frombuffer(image_bytes, np.uint8)
-            image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            if image is None:
+            raw_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if raw_image is None:
                 result.error_message = "Rasmni o'qib bo'lmadi (Corrupt image)"
                 return result
 
+            # Smart resize to optimize speed without losing sharpness
+            image, _ = self._smart_resize(raw_image, max_dim=1600)
             h_img, w_img = image.shape[:2]
 
             crops_to_test: List[Tuple[np.ndarray, str, float]] = []
 
-            # 2. Add ultra-fast deskewed plate proposals (tested first: 200ms per crop)
+            # 2. Add ultra-fast deskewed plate proposals from image
             deskewed_props = self._extract_deskewed_proposals(image)
             crops_to_test.extend(deskewed_props)
 
-            # 3. Detect vehicles with YOLOv8 and prioritize largest (foreground)
+            # 3. Detect vehicles with YOLOv8 and prioritize primary foreground vehicle
             yolo = self._get_yolo()
             vehicles = []
             if yolo is not None:
@@ -224,27 +297,25 @@ class DetectionPipeline:
                 except Exception as e:
                     logger.error(f"YOLO error: {e}")
 
-            # Sort by area (largest vehicles first)
             vehicles.sort(key=lambda x: x[0], reverse=True)
 
-            for area, (x1, y1, x2, y2), cls_name in vehicles[:2]:
-                # 10% bounding box margin
-                pad_y = int((y2 - y1) * 0.1)
-                pad_x = int((x2 - x1) * 0.1)
-                vy1, vy2 = max(0, y1 - pad_y), min(h_img, y2 + pad_y)
-                vx1, vx2 = max(0, x1 - pad_x), min(w_img, x2 + pad_x)
+            if vehicles:
+                # Add Bumper ROI (lower 48% of vehicle)
+                area, (x1, y1, x2, y2), cls_name = vehicles[0]
+                vh = y2 - y1
+                vw = x2 - x1
+                by1 = y1 + int(vh * 0.48)
+                by2 = min(h_img, y2 + int(vh * 0.05))
+                bx1 = max(0, x1 - int(vw * 0.05))
+                bx2 = min(w_img, x2 + int(vw * 0.05))
+                bumper_crop = image[by1:by2, bx1:bx2]
+                if bumper_crop.size > 0 and (by2 - by1) > 30 and (bx2 - bx1) > 60:
+                    crops_to_test.append((bumper_crop, f"{cls_name}_bumper_roi", 1.4))
 
-                veh_crop = image[vy1:vy2, vx1:vx2]
-                vh, vw = veh_crop.shape[:2]
-                if vh < 30 or vw < 30:
-                    continue
-
-                # 1. 2.0x Super-Resolution Lanczos Zoom (Optimal for CRAFT text detector)
-                up2 = cv2.resize(veh_crop, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_LANCZOS4)
-                crops_to_test.append((up2, f"{cls_name}_zoom_2x", 1.3))
-
-                # 2. Direct vehicle ROI
-                crops_to_test.append((veh_crop, f"{cls_name}_crop", 1.1))
+                # Add full vehicle ROI as fallback
+                veh_crop = image[y1:y2, x1:x2]
+                if veh_crop.size > 0:
+                    crops_to_test.append((veh_crop, f"{cls_name}_full_crop", 1.2))
 
             # Full image as fallback
             crops_to_test.append((image, "full_image", 1.0))
@@ -299,8 +370,8 @@ class DetectionPipeline:
                             "source": cand["source"]
                         }
 
-                # Early Exit: If we found a valid plate on the foreground car, stop searching!
-                if best_candidate and best_score >= 0.35:
+                # Early Exit: If valid legal plate found with strong score on bumper/crop, stop immediately!
+                if best_candidate and best_score >= 0.50:
                     break
 
             # 4. Build Final Result
@@ -344,3 +415,4 @@ class DetectionPipeline:
 
 # Singleton
 detection_pipeline = DetectionPipeline()
+

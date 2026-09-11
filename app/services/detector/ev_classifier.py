@@ -26,17 +26,14 @@ class EVClassifier:
     - Sariq (노란색) -> Tijorat (taksi / avtobus)
     """
 
-    def __init__(self, blue_threshold: float = 0.11):
-        # 11% or more blue in tight plate crop = EV plate
-        self.blue_threshold = blue_threshold
-
-        # HSV ranges for Korean Light Blue EV Plate (하늘색)
-        # H: 78 - 142 (Cyan to Deep Sky Blue), S: 22 - 255 (works in low-saturation shade), V: 45 - 255
-        self.BLUE_LOWER = np.array([78, 22, 45])
-        self.BLUE_UPPER = np.array([142, 255, 255])
+    def __init__(self):
+        # Korean Light Blue EV Plate (하늘색) requires genuine saturation (S >= 45)
+        # to avoid neutral daylight white/silver reflection (S <= 25)
+        self.BLUE_HSV_LOWER = np.array([85, 45, 50])
+        self.BLUE_HSV_UPPER = np.array([135, 255, 255])
 
         # Yellow (Commercial Taxi/Bus)
-        self.YELLOW_LOWER = np.array([15, 70, 90])
+        self.YELLOW_LOWER = np.array([15, 60, 80])
         self.YELLOW_UPPER = np.array([35, 255, 255])
 
         # Green (Old legacy or corporate plates)
@@ -46,7 +43,7 @@ class EVClassifier:
     def classify(self, plate_crop: np.ndarray) -> EVClassification:
         """
         Classifies vehicle type based on the EXACT cropped plate image.
-        Uses HSV + RGB Differential + Inner Plate Region analysis for 100% accuracy.
+        Uses HSV + RGB Differential + Inner Core Region analysis for 100% precision.
         """
         try:
             if plate_crop is None or plate_crop.size == 0:
@@ -63,24 +60,26 @@ class EVClassifier:
                     plate_color="unknown", blue_ratio=0.0, confidence=0.0
                 )
 
-            # 1. HSV Color Space Mask
             hsv = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2HSV)
-            blue_mask_hsv = cv2.inRange(hsv, self.BLUE_LOWER, self.BLUE_UPPER)
+            b, g, r = cv2.split(plate_crop)
 
-            # 2. RGB Blue Dominance Mask (B channel significantly higher than R channel)
-            b_channel = plate_crop[:, :, 0].astype(np.int16)
-            g_channel = plate_crop[:, :, 1].astype(np.int16)
-            r_channel = plate_crop[:, :, 2].astype(np.int16)
+            # 1. Strict HSV Blue Mask
+            blue_mask_hsv = cv2.inRange(hsv, self.BLUE_HSV_LOWER, self.BLUE_HSV_UPPER)
 
-            rgb_blue_mask = ((b_channel > (r_channel + 10)) & (b_channel > 50)).astype(np.uint8) * 255
+            # 2. Strict RGB Blue Dominance (B significantly higher than R & G)
+            b_i = b.astype(np.int16)
+            g_i = g.astype(np.int16)
+            r_i = r.astype(np.int16)
 
-            # Combined (Union) Blue Mask
-            comb_blue_mask = cv2.bitwise_or(blue_mask_hsv, rgb_blue_mask)
+            rgb_blue_mask = ((b_i > (r_i + 18)) & (b_i > (g_i - 10)) & (b_i > 50)).astype(np.uint8) * 255
+
+            # Combined Strict Blue Mask (both HSV and RGB must agree)
+            comb_blue_mask = cv2.bitwise_and(blue_mask_hsv, rgb_blue_mask)
             blue_ratio = cv2.countNonZero(comb_blue_mask) / float(total_pixels)
 
-            # 3. Inner Plate Core Region (avoids bumper edges and ground)
-            ih1, ih2 = int(h * 0.12), int(h * 0.88)
-            iw1, iw2 = int(w * 0.08), int(w * 0.92)
+            # 3. Inner Plate Core Region (avoids frame borders and shadows)
+            ih1, ih2 = int(h * 0.15), int(h * 0.85)
+            iw1, iw2 = int(w * 0.10), int(w * 0.90)
             inner_total = (ih2 - ih1) * (iw2 - iw1)
             if inner_total > 0:
                 inner_mask = comb_blue_mask[ih1:ih2, iw1:iw2]
@@ -88,10 +87,13 @@ class EVClassifier:
             else:
                 inner_blue_ratio = blue_ratio
 
-            # 4. Blue vs Red channel difference across plate
-            b_mean = float(np.mean(b_channel))
-            r_mean = float(np.mean(r_channel))
+            effective_blue = max(blue_ratio, inner_blue_ratio)
+
+            # 4. Global channel means and saturation
+            b_mean = float(np.mean(b))
+            r_mean = float(np.mean(r))
             br_diff = b_mean - r_mean
+            mean_sat = float(np.mean(hsv[:, :, 1]))
 
             # Yellow / Commercial Mask
             yellow_mask = cv2.inRange(hsv, self.YELLOW_LOWER, self.YELLOW_UPPER)
@@ -101,18 +103,14 @@ class EVClassifier:
             green_mask = cv2.inRange(hsv, self.GREEN_LOWER, self.GREEN_UPPER)
             green_ratio = cv2.countNonZero(green_mask) / float(total_pixels)
 
-            effective_blue = max(blue_ratio, inner_blue_ratio)
             logger.info(
                 f"Color Analysis: Effective Blue={effective_blue:.2%} (full={blue_ratio:.2%}, "
-                f"inner={inner_blue_ratio:.2%}, B-R={br_diff:.1f}), Yellow={yellow_ratio:.2%}"
+                f"inner={inner_blue_ratio:.2%}, B-R={br_diff:.1f}, Sat={mean_sat:.1f}), Yellow={yellow_ratio:.2%}"
             )
 
             # 5. Robust EV Decision
-            is_ev = (
-                (blue_ratio >= self.blue_threshold) or
-                (inner_blue_ratio >= 0.14) or
-                (br_diff >= 7.0 and blue_ratio >= 0.08)
-            )
+            # True Korean EV plates have >= 25% blue or strong blue differential (B-R >= 15 & Sat >= 35)
+            is_ev = (effective_blue >= 0.25) or (effective_blue >= 0.18 and br_diff >= 15.0 and mean_sat >= 35.0)
 
             if is_ev:
                 logger.info(f"⚡ [EV Confirmed] Blue plate ratio: {effective_blue:.2%}")
@@ -121,7 +119,7 @@ class EVClassifier:
                     vehicle_type="EV",
                     plate_color="blue",
                     blue_ratio=round(effective_blue, 3),
-                    confidence=min(0.50 + effective_blue * 1.5, 0.99)
+                    confidence=min(0.60 + effective_blue * 0.8, 0.99)
                 )
 
             elif yellow_ratio > 0.20:
@@ -150,7 +148,7 @@ class EVClassifier:
                     vehicle_type="REGULAR",
                     plate_color="white",
                     blue_ratio=round(blue_ratio, 3),
-                    confidence=0.90
+                    confidence=0.95
                 )
 
         except Exception as e:

@@ -1066,10 +1066,10 @@
                 formatNote(item) {
                     if (!item) return '';
                     if (item.event_type === 'END') {
-                        if (item.notes && item.notes.includes('daqiqa')) {
+                        if (item.notes && item.notes.startsWith('Chiqish: ')) {
                             return item.notes.replace('Chiqish: ', '⏱️ ');
                         }
-                        return '⏱️ Chiqish qayd etildi';
+                        return item.notes ? '⏱️ ' + item.notes : '⏱️ Chiqish qayd etildi';
                     }
                     if (item.event_type === 'START') {
                         return '🚗 Kirish vaqti';

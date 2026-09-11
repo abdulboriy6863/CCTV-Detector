@@ -16,6 +16,59 @@ from app.services.storage_service import storage_service
 logger = logging.getLogger("cctv_monitor")
 
 
+def _levenshtein_distance(s1: str, s2: str) -> int:
+    """Calculate edit distance between two strings."""
+    if len(s1) < len(s2):
+        return _levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
+def is_same_plate(plate1: Optional[str], plate2: Optional[str]) -> bool:
+    """
+    Compare two license plate strings with tolerance for OCR jitter / minor typos.
+    - Exact match after cleaning whitespace and dashes
+    - Levenshtein distance <= 1 for plates with length >= 5
+    """
+    if not plate1 or not plate2:
+        return False
+    p1 = "".join(plate1.split()).upper().replace("-", "")
+    p2 = "".join(plate2.split()).upper().replace("-", "")
+    if p1 == p2:
+        return True
+    if len(p1) >= 5 and len(p2) >= 5 and abs(len(p1) - len(p2)) <= 1:
+        if _levenshtein_distance(p1, p2) <= 1:
+            return True
+    return False
+
+
+def format_duration(duration_seconds: int) -> str:
+    """Format duration in seconds into human-readable Uzbek string."""
+    if duration_seconds < 60:
+        return f"{max(1, duration_seconds)} soniya"
+    mins = duration_seconds // 60
+    secs = duration_seconds % 60
+    if duration_seconds < 3600:
+        if secs > 0:
+            return f"{mins} daqiqa {secs} soniya"
+        return f"{mins} daqiqa"
+    hours = duration_seconds // 3600
+    rem_mins = (duration_seconds % 3600) // 60
+    if rem_mins > 0:
+        return f"{hours} soat {rem_mins} daqiqa"
+    return f"{hours} soat"
+
+
 class AutoMonitorService:
     """
     Periodic CCTV Monitor:
@@ -23,14 +76,21 @@ class AutoMonitorService:
     - Runs detection pipeline (plate detection + EV classification)
     - Manages Parking Sessions:
         * On Arrival: Records START event with unique session_id
-        * While Parked: Tracks active state without creating duplicates
-        * On Departure (after 3 missed cycles): Records END event with duration
+        * While Parked: Tracks active state with fuzzy OCR matching
+        * On Plate Change: Requires transition debounce to confirm new car
+        * On Departure: Records END event with precise duration
     - Sends alerts for non-EV vehicles
     """
 
-    def __init__(self, interval_seconds: int = 15, exit_threshold_cycles: int = 3):
+    def __init__(
+        self,
+        interval_seconds: int = 15,
+        exit_threshold_cycles: int = 3,
+        transition_threshold_cycles: int = 2
+    ):
         self.interval_seconds = interval_seconds
         self.exit_threshold_cycles = exit_threshold_cycles
+        self.transition_threshold_cycles = transition_threshold_cycles
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
         self.last_seen_state: Dict[str, Dict] = {}
@@ -83,7 +143,7 @@ class AutoMonitorService:
         entry_at = state.get("entry_at", now)
         last_seen_at = state.get("last_seen_at", now)
         duration_seconds = max(0, int((last_seen_at - entry_at).total_seconds()))
-        duration_minutes = max(1, round(duration_seconds / 60))
+        duration_text = format_duration(duration_seconds)
 
         plate = state.get("plate", "UNKNOWN")
         session_id = state.get("session_id")
@@ -98,7 +158,7 @@ class AutoMonitorService:
             image_path=state.get("image_path", ""),
             ai_confidence=state.get("confidence", 0.0),
             status="SUCCESS",
-            notes=f"Chiqish: Jami {duration_minutes} daqiqa to'xtab turdi",
+            notes=f"Chiqish: Jami {duration_text} to'xtab turdi",
             vehicle_type=state.get("vehicle_type", "UNKNOWN"),
             is_ev=state.get("is_ev", False),
             plate_color=state.get("plate_color"),
@@ -112,7 +172,7 @@ class AutoMonitorService:
         db.add(exit_snapshot)
         db.commit()
 
-        logger.info(f"🚗💨 [{camera_key}] Chiqib ketdi: {plate} (To'xtab turish: {duration_minutes} daq)")
+        logger.info(f"🚗💨 [{camera_key}] Chiqib ketdi: {plate} (To'xtab turish: {duration_text})")
 
     async def _inspect_camera(self, camera: CCTVCamera, db: Session):
         camera_key = f"{camera.cs_id}_{camera.cp_id or 'CP01'}"
@@ -141,6 +201,8 @@ class AutoMonitorService:
             if camera_key in self.last_seen_state:
                 state = self.last_seen_state[camera_key]
                 state["missed_cycles"] = state.get("missed_cycles", 0) + 1
+                state["pending_new_plate"] = None
+                state["pending_cycles"] = 0
                 if state["missed_cycles"] >= self.exit_threshold_cycles:
                     # Vehicle has departed
                     await self._close_session(camera, camera_key, state, db)
@@ -151,17 +213,36 @@ class AutoMonitorService:
         now = datetime.utcnow()
         last_state = self.last_seen_state.get(camera_key)
 
-        # CASE B: Same vehicle is still present
-        if last_state and last_state.get("plate") == detected_plate:
+        # CASE B: Same vehicle is still present (with fuzzy OCR match support)
+        if last_state and is_same_plate(last_state.get("plate"), detected_plate):
             last_state["last_seen_at"] = now
             last_state["missed_cycles"] = 0
+            last_state["pending_new_plate"] = None
+            last_state["pending_cycles"] = 0
+            # If newer frame has higher confidence, update plate display string
+            if det_result.confidence > last_state.get("confidence", 0.0):
+                last_state["plate"] = detected_plate
+                last_state["confidence"] = det_result.confidence
             return
 
-        # CASE C: A different vehicle arrived while previous was tracked
-        if last_state and last_state.get("plate") != detected_plate:
-            # Close previous vehicle's session
-            await self._close_session(camera, camera_key, last_state, db)
-            del self.last_seen_state[camera_key]
+        # CASE C: A different vehicle is detected while previous was active
+        if last_state and not is_same_plate(last_state.get("plate"), detected_plate):
+            # Check if this new plate is already pending confirmation
+            pending_plate = last_state.get("pending_new_plate")
+            if pending_plate and is_same_plate(pending_plate, detected_plate):
+                last_state["pending_cycles"] = last_state.get("pending_cycles", 0) + 1
+                if last_state["pending_cycles"] >= self.transition_threshold_cycles:
+                    # Confirmed: Old vehicle departed and new vehicle took the slot
+                    await self._close_session(camera, camera_key, last_state, db)
+                    del self.last_seen_state[camera_key]
+                else:
+                    # Waiting for confirmation on next cycle
+                    return
+            else:
+                # First time seeing this new plate candidate
+                last_state["pending_new_plate"] = detected_plate
+                last_state["pending_cycles"] = 1
+                return
 
         # CASE D: New Vehicle Arrival (START Event)
         session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}"
@@ -212,6 +293,8 @@ class AutoMonitorService:
             "entry_at": now,
             "last_seen_at": now,
             "missed_cycles": 0,
+            "pending_new_plate": None,
+            "pending_cycles": 0,
             "vehicle_type": det_result.vehicle_type,
             "is_ev": det_result.is_ev,
             "plate_color": det_result.plate_color,
@@ -227,5 +310,6 @@ class AutoMonitorService:
 
 auto_monitor_service = AutoMonitorService(
     interval_seconds=settings.MONITOR_INTERVAL_SECONDS,
-    exit_threshold_cycles=3
+    exit_threshold_cycles=3,
+    transition_threshold_cycles=2
 )

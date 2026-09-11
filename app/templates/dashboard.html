@@ -436,20 +436,25 @@
                 </div>
 
                 <!-- Vehicles History Table Card -->
-                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/60 overflow-hidden">
-                    <div class="p-5 border-b border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div class="flex items-center space-x-2">
-                            <i class="fa-solid fa-list-check text-blue-600"></i>
-                            <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
+                <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800/80 overflow-hidden backdrop-blur-sm">
+                    <div class="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-inner">
+                                <i class="fa-solid fa-list-check"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
+                                <p class="text-[11px] text-slate-400 dark:text-slate-500">Avtoturargoh kirish, chiqish va AI aniqlash tarixi</p>
+                            </div>
                         </div>
                         
                         <div class="flex items-center space-x-2 w-full sm:w-auto">
-                            <select x-model="filters.type" @change="fetchVehicles()" class="text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                            <select x-model="filters.type" @change="fetchVehicles()" class="text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
                                 <option value="" x-text="t('filter_all')"></option>
                                 <option value="EV" x-text="t('filter_ev_only')"></option>
                                 <option value="REGULAR" x-text="t('filter_regular_only')"></option>
                             </select>
-                            <button @click="fetchVehicles()" class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition" :title="t('btn_refresh')">
+                            <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
                                 <i class="fa-solid fa-rotate-right text-xs"></i>
                             </button>
                         </div>
@@ -457,68 +462,98 @@
 
                     <!-- Table -->
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs whitespace-nowrap">
-                            <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700/80 font-semibold">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
                                 <tr>
-                                    <th class="px-5 py-3" x-text="t('th_time')"></th>
-                                    <th class="px-5 py-3" x-text="t('th_plate')"></th>
-                                    <th class="px-5 py-3" x-text="t('th_type')"></th>
-                                    <th class="px-5 py-3" x-text="t('th_confidence')"></th>
-                                    <th class="px-5 py-3 text-right" x-text="t('th_actions')"></th>
+                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_time')"></th>
+                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_plate')"></th>
+                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_type')"></th>
+                                    <th class="px-4 sm:px-6 py-3.5" x-text="t('th_confidence')"></th>
+                                    <th class="px-4 sm:px-6 py-3.5 text-right" x-text="t('th_actions')"></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
                                 <template x-for="item in vehicles" :key="item.id">
-                                    <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                                        <td class="px-5 py-3.5 text-slate-500 font-mono">
-                                            <div x-text="formatDate(item.created_at)"></div>
-                                            <div class="mt-0.5" x-show="item.notes">
-                                                <span class="text-[10px] text-slate-400 dark:text-slate-500 italic" x-text="item.notes"></span>
-                                            </div>
+                                    <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150">
+                                        <!-- Time & Event -->
+                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
+                                            <div class="font-mono font-semibold text-slate-700 dark:text-slate-200 text-xs" x-text="formatDate(item.created_at)"></div>
+                                            <div class="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
                                         </td>
-                                        <td class="px-5 py-3.5">
-                                            <div class="flex items-center space-x-1.5">
+                                        <!-- License Plate -->
+                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
+                                            <div class="inline-flex items-center space-x-2">
+                                                <!-- Korean Styled License Plate Badge -->
+                                                <div class="px-2.5 py-1 rounded-lg border font-mono font-extrabold tracking-widest text-xs shadow-sm inline-flex items-center space-x-1.5"
+                                                     :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
+                                                    <span x-show="item.is_ev" class="text-sky-500 text-[10px]">⚡</span>
+                                                    <span x-text="item.plate_number || t('unrecognized')"></span>
+                                                </div>
+                                                <!-- Event Type Pill -->
                                                 <template x-if="item.event_type === 'START'">
-                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" title="To'xtab turish boshlandi">
-                                                        <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> Kirish
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 flex items-center space-x-1">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                        <span>Kirish</span>
                                                     </span>
                                                 </template>
                                                 <template x-if="item.event_type === 'END'">
-                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" title="To'xtab turish yakunlandi">
-                                                        <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Chiqish
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 flex items-center space-x-1">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                        <span>Chiqish</span>
                                                     </span>
                                                 </template>
-                                                <span class="font-bold tracking-wider text-slate-900 dark:text-white text-sm" x-text="item.plate_number || t('unrecognized')"></span>
                                             </div>
                                         </td>
-                                        <td class="px-5 py-3.5">
+                                        <!-- Vehicle Type -->
+                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
                                             <template x-if="item.is_ev">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">
-                                                    <i class="fa-solid fa-bolt mr-1"></i> EV
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-gradient-to-r from-sky-500/15 to-blue-500/15 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
+                                                    <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> EV Avtomobil
                                                 </span>
                                             </template>
                                             <template x-if="!item.is_ev">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-300" x-text="t('type_regular')">
-                                                </span>
-                                            </template>
-                                            <template x-if="item.alert_sent">
-                                                <span class="ml-1 text-red-500 text-xs" :title="t('alert_sent_tooltip')"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                                                <div class="inline-flex items-center space-x-1.5">
+                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                        <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> Oddiy avtomobil
+                                                    </span>
+                                                    <template x-if="item.alert_sent">
+                                                        <span class="w-5 h-5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px]" :title="t('alert_sent_tooltip')">
+                                                            <i class="fa-solid fa-triangle-exclamation"></i>
+                                                        </span>
+                                                    </template>
+                                                </div>
                                             </template>
                                         </td>
-                                        <td class="px-5 py-3.5 text-slate-500" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></td>
-                                        <td class="px-5 py-3.5 text-right space-x-2">
-                                            <button @click="openImageModal(item.image_url)" class="p-1.5 text-blue-600 hover:text-blue-800 dark:text-blue-400" :title="t('view_image')">
-                                                <i class="fa-solid fa-image"></i>
+                                        <!-- AI Confidence Progress -->
+                                        <td class="px-4 sm:px-6 py-3.5 whitespace-nowrap">
+                                            <div class="flex items-center space-x-2.5">
+                                                <div class="w-16 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-200/60 dark:border-slate-700/60">
+                                                    <div class="h-1.5 rounded-full transition-all duration-300"
+                                                         :class="item.is_ev ? 'bg-sky-500' : 'bg-indigo-500'"
+                                                         :style="'width: ' + ((item.ai_confidence || 0) * 100) + '%'"></div>
+                                                </div>
+                                                <span class="font-mono font-bold text-slate-600 dark:text-slate-300 text-xs" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></span>
+                                            </div>
+                                        </td>
+                                        <!-- Actions -->
+                                        <td class="px-4 sm:px-6 py-3.5 text-right whitespace-nowrap space-x-1.5">
+                                            <button @click="openImageModal(item.image_url)" class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
+                                                <i class="fa-solid fa-image text-xs"></i>
                                             </button>
-                                            <button @click="deleteVehicle(item.id)" class="p-1.5 text-slate-400 hover:text-red-500" :title="t('btn_delete')">
-                                                <i class="fa-solid fa-trash-can"></i>
+                                            <button @click="deleteVehicle(item.id)" class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
+                                                <i class="fa-solid fa-trash-can text-xs"></i>
                                             </button>
                                         </td>
                                     </tr>
                                 </template>
                                 <template x-if="vehicles.length === 0">
                                     <tr>
-                                        <td colspan="5" class="px-5 py-10 text-center text-slate-400" x-text="t('no_history_msg')"></td>
+                                        <td colspan="5" class="px-6 py-12 text-center text-slate-400">
+                                            <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 text-xl">
+                                                <i class="fa-solid fa-car-side"></i>
+                                            </div>
+                                            <p class="text-xs font-semibold" x-text="t('no_history_msg')"></p>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -526,10 +561,10 @@
                     </div>
 
                     <!-- Pagination Controls -->
-                    <div class="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
-                        <button @click="prevPage()" :disabled="page === 1" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 font-medium" x-text="t('btn_prev')"></button>
-                        <span class="text-slate-500 font-mono"><span x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
-                        <button @click="nextPage()" :disabled="page === totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 font-medium" x-text="t('btn_next')"></button>
+                    <div class="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
+                        <button @click="prevPage()" :disabled="page === 1" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_prev')"></button>
+                        <span class="text-slate-500 font-mono text-xs font-medium"><span class="font-bold text-slate-700 dark:text-slate-200" x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
+                        <button @click="nextPage()" :disabled="page === totalPages" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_next')"></button>
                     </div>
                 </div>
             </div>
@@ -1057,6 +1092,26 @@
                     if (!dateStr) return '';
                     const d = new Date(dateStr);
                     return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                },
+
+                formatNote(item) {
+                    if (!item) return '';
+                    if (item.event_type === 'END') {
+                        if (item.notes && item.notes.includes('daqiqa')) {
+                            return item.notes.replace('Chiqish: ', '⏱️ ');
+                        }
+                        return '⏱️ Chiqish qayd etildi';
+                    }
+                    if (item.event_type === 'START') {
+                        return '🚗 Kirish vaqti';
+                    }
+                    if (item.detection_source === 'CCTV_AUTO') {
+                        return '📹 CCTV Avto';
+                    }
+                    if (item.detection_source === 'MANUAL_UPLOAD') {
+                        return '📤 Qo\'lda tahlil';
+                    }
+                    return item.notes || '';
                 }
             }));
         });

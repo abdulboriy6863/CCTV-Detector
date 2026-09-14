@@ -7,10 +7,20 @@ from sqlalchemy.orm import Session
 from app.core.config import get_kst_now
 from app.core.database import get_db
 from app.models.snapshot import CCTVCamera
-from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum
+from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum, SlotStatusResponse
 from app.services.camera_service import camera_service
+from app.services.monitor_service import auto_monitor_service
 
 router = APIRouter()
+
+
+@router.get("/slots-status", response_model=List[SlotStatusResponse], summary="Live occupancy and health status of all parking slots")
+def get_slots_status(db: Session = Depends(get_db)):
+    """
+    Returns real-time occupancy, active vehicle plate, parking duration,
+    and camera stream health for all configured parking slots / cameras.
+    """
+    return auto_monitor_service.get_all_slot_statuses(db)
 
 
 @router.get("", response_model=List[CameraResponse], summary="List cameras")

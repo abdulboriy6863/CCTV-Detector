@@ -96,7 +96,68 @@ class AutoMonitorService:
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
         self.active_sessions: Dict[str, Dict] = {}
+        self.camera_health: Dict[str, Dict] = {}
         self._camera_locks: Dict[str, asyncio.Lock] = {}
+
+    def get_all_slot_statuses(self, db: Session) -> list:
+        """
+        Aggregate live parking slot states across all cameras.
+        Combines DB camera records with active memory sessions and health states.
+        """
+        cameras = db.query(CCTVCamera).order_by(CCTVCamera.id.asc()).all()
+        statuses = []
+        now = get_kst_now()
+
+        for cam in cameras:
+            camera_key = f"{cam.cs_id}_{cam.cp_id or 'CP01'}"
+            session_info = self.active_sessions.get(camera_key)
+            health_info = self.camera_health.get(camera_key, {
+                "is_online": cam.is_active,
+                "last_error": None
+            })
+
+            is_occupied = session_info is not None
+            current_plate = session_info.get("plate") if is_occupied else None
+            vehicle_type = session_info.get("vehicle_type") if is_occupied else None
+            is_ev = session_info.get("is_ev", False) if is_occupied else False
+            plate_color = session_info.get("plate_color") if is_occupied else None
+            session_id = session_info.get("session_id") if is_occupied else None
+            entry_at = session_info.get("entry_at") if is_occupied else None
+            last_seen_at = session_info.get("last_seen_at") if is_occupied else None
+
+            duration_seconds = 0
+            duration_formatted = None
+            if is_occupied and entry_at:
+                duration_seconds = max(0, int((now - entry_at).total_seconds()))
+                duration_formatted = format_duration(duration_seconds)
+
+            live_stream_url = f"/api/v1/cameras/{cam.id}/live" if cam.is_active else None
+
+            statuses.append({
+                "camera_id": cam.id,
+                "camera_name": cam.camera_name or f"{cam.cs_id} - {cam.cp_id or 'CP01'}",
+                "cs_id": cam.cs_id,
+                "cp_id": cam.cp_id or "CP01",
+                "camera_type": cam.camera_type,
+                "is_active": cam.is_active,
+                "is_online": health_info.get("is_online", cam.is_active),
+                "stream_url": cam.stream_url,
+                "live_stream_url": live_stream_url,
+                "is_occupied": is_occupied,
+                "current_plate": current_plate,
+                "vehicle_type": vehicle_type,
+                "is_ev": is_ev,
+                "plate_color": plate_color,
+                "session_id": session_id,
+                "entry_at": entry_at,
+                "last_seen_at": last_seen_at,
+                "duration_seconds": duration_seconds,
+                "duration_formatted": duration_formatted,
+                "last_image_url": session_info.get("image_path") if is_occupied else None,
+                "last_error": health_info.get("last_error")
+            })
+
+        return statuses
 
     @property
     def last_seen_state(self) -> Dict[str, Dict]:
@@ -383,8 +444,20 @@ class AutoMonitorService:
         )
 
         if not capture_result.success or not capture_result.image_bytes:
-            # Network or camera error: do not alter state
+            # Record offline / network error state
+            self.camera_health[camera_key] = {
+                "is_online": False,
+                "last_error": capture_result.error_message or "Frame capture failed",
+                "last_checked_at": get_kst_now()
+            }
             return
+
+        # Record online state
+        self.camera_health[camera_key] = {
+            "is_online": True,
+            "last_error": None,
+            "last_checked_at": get_kst_now()
+        }
 
         # 2. Run detection pipeline
         det_result = await detection_pipeline.detect(capture_result.image_bytes)

@@ -55,12 +55,12 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         Base.metadata.drop_all(self.engine)
 
     def test_duration_formatting(self):
-        self.assertEqual(format_duration(25), "25 soniya")
-        self.assertEqual(format_duration(60), "1 daqiqa")
-        self.assertEqual(format_duration(95), "1 daqiqa 35 soniya")
-        self.assertEqual(format_duration(600), "10 daqiqa")
-        self.assertEqual(format_duration(3600), "1 soat")
-        self.assertEqual(format_duration(3660), "1 soat 1 daqiqa")
+        self.assertEqual(format_duration(25), "25초")
+        self.assertEqual(format_duration(60), "1분")
+        self.assertEqual(format_duration(95), "1분 35초")
+        self.assertEqual(format_duration(600), "10분")
+        self.assertEqual(format_duration(3600), "1시간")
+        self.assertEqual(format_duration(3660), "1시간 1분")
 
     def test_fuzzy_plate_matching(self):
         self.assertTrue(is_same_plate("81머2072", "81머2072"))
@@ -145,7 +145,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(end_rec.event_type, EventTypeEnum.END.value)
         self.assertEqual(end_rec.session_id, start_rec.session_id)
         self.assertEqual(end_rec.plate_number, "81머2072")
-        self.assertTrue("Chiqish: Jami 10 daqiqa to'xtab turdi" in end_rec.notes)
+        self.assertTrue("10분" in end_rec.notes)
 
         # Tracking state should now be cleared
         self.assertNotIn(camera_key, self.monitor.last_seen_state)
@@ -378,7 +378,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(slot1["is_occupied"])
         self.assertEqual(slot1["current_plate"], "52어0586")
         self.assertTrue(slot1["is_ev"])
-        self.assertIn("daqiqa", slot1["duration_formatted"])
+        self.assertIn("분", slot1["duration_formatted"])
 
         # Verify Slot 2 (Empty)
         slot2 = next(s for s in statuses if s["camera_id"] == 2)

@@ -95,6 +95,7 @@ def db_health_check(db: Session = Depends(get_db)):
 
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
+@app.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
 def serve_dashboard(request: Request):
     """Single-page admin dashboard."""
     dashboard_path = BASE_DIR / "app" / "templates" / "dashboard.html"

@@ -52,9 +52,20 @@ class Settings(BaseSettings):
     MONITOR_INTERVAL_SECONDS: int = 10
     MONITOR_ENABLED: bool = True
 
+    # CSMS Cloud Database Settings (Read-Only for Live Charger Data)
+    CSMS_DB_HOST: str = "211.252.86.250"
+    CSMS_DB_PORT: int = 3306
+    CSMS_DB_USER: str = "blue_networks"
+    CSMS_DB_PASSWORD: str = "blue_networks"
+    CSMS_DB_NAME: str = "blue_networks"
+
     @property
     def database_url(self) -> str:
         return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+
+    @property
+    def csms_database_url(self) -> str:
+        return f"mysql+pymysql://{self.CSMS_DB_USER}:{self.CSMS_DB_PASSWORD}@{self.CSMS_DB_HOST}:{self.CSMS_DB_PORT}/{self.CSMS_DB_NAME}?charset=utf8mb4"
 
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),

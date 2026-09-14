@@ -151,6 +151,19 @@ class SlotStatusResponse(BaseModel):
     duration_formatted: Optional[str] = None
     last_image_url: Optional[str] = None
     last_error: Optional[str] = None
+    connector_status: Optional[str] = "AVAILABLE"
+    connector_status_kr: Optional[str] = "사용 가능"
+    is_charging: bool = False
+    battery_soc: Optional[int] = None
+    charge_power_kw: float = 0.0
+    charged_energy_kwh: float = 0.0
+    charging_duration_seconds: int = 0
+    charging_duration_formatted: Optional[str] = "0분"
+    overstay_seconds: int = 0
+    overstay_formatted: Optional[str] = "0분"
+    violation_type: str = "NONE"
+    violation_label_kr: str = "정상"
+    violation_level: str = "info"
 
 
 class DashboardStats(BaseModel):

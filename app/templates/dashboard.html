@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" x-data="appData()" :class="{ 'dark': isDark }">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -53,7 +53,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 dark:bg-darkbg dark:text-slate-100 transition-colors duration-200 min-h-screen flex flex-col">
+<body x-data="appData()" :class="{ 'dark': isDark }" class="bg-slate-100 text-slate-800 dark:bg-darkbg dark:text-slate-100 transition-colors duration-200 min-h-screen flex flex-col">
 
     <!-- Top Navbar -->
     <nav class="bg-white/90 dark:bg-darkcard/90 backdrop-blur-md shadow-sm border-b border-slate-200 dark:border-slate-700/80 sticky top-0 z-40">
@@ -167,7 +167,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
 
             <!-- LEFT: Camera Configuration & Live CCTV Slots List -->
-            <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 h-[380px] flex flex-col">
+            <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 h-[400px] flex flex-col">
                 <div class="flex items-center justify-between mb-3 shrink-0">
                     <div class="flex items-center space-x-3">
                         <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-base shadow-inner">
@@ -193,52 +193,130 @@
                 <!-- Scrollable Container for Camera Items -->
                 <div class="flex-1 overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
                     <template x-for="slot in slots" :key="slot.camera_id">
-                        <div class="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition">
-                            <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs shrink-0 shadow-inner" 
-                                    :class="slot.is_online ? (slot.is_occupied ? (slot.is_ev ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400') : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400') : 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'">
-                                    <i class="fa-solid" :class="slot.is_online ? 'fa-video' : 'fa-video-slash'"></i>
-                                </div>
-                                <div class="min-w-0 space-y-0.5">
-                                    <div class="flex items-center space-x-2 flex-wrap gap-y-1">
-                                        <div class="flex items-center space-x-1 text-xs font-black text-slate-900 dark:text-white truncate">
-                                            <i class="fa-solid fa-charging-station text-blue-500 text-[11px]"></i>
-                                            <span x-text="slot.cs_id"></span>
-                                            <span class="text-slate-300 dark:text-slate-600">/</span>
-                                            <span class="text-blue-600 dark:text-blue-400 font-bold" x-text="slot.cp_id"></span>
-                                        </div>
-                                        <span class="text-[10px] text-slate-400 font-medium" x-text="'(' + (slot.camera_name || t('unnamed_camera')) + ')'"></span>
-                                        
-                                        <!-- Slot Occupancy Badge -->
-                                        <template x-if="slot.is_occupied">
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold shadow-sm inline-flex items-center space-x-1"
-                                                :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'">
-                                                <span x-show="slot.is_ev">⚡</span>
-                                                <span x-text="slot.current_plate"></span>
-                                                <span x-show="slot.duration_formatted" class="text-[9px] opacity-90" x-text="'(' + formatDurationText(slot.duration_formatted) + ')'"></span>
-                                            </span>
-                                        </template>
-                                        <template x-if="!slot.is_occupied && slot.is_online">
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="t('slot_vacant_badge')"></span>
-                                        </template>
-                                        <template x-if="!slot.is_online">
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300" x-text="t('slot_offline_badge')"></span>
-                                        </template>
+                        <div class="p-3 rounded-xl border transition duration-200"
+                            :class="slot.violation_level === 'danger' ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/60 shadow-sm' : (slot.violation_level === 'warning' ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900/60 shadow-sm' : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/80 dark:border-slate-800 hover:border-slate-300')">
+                            
+                            <!-- Header: Station/Slot ID + Camera Name + Status & Actions -->
+                            <div class="flex items-center justify-between gap-2 pb-2 border-b border-slate-200/60 dark:border-slate-700/50">
+                                <div class="flex items-center space-x-2 min-w-0">
+                                    <div class="w-2.5 h-2.5 rounded-full shrink-0"
+                                        :class="slot.is_online ? 'bg-emerald-500' : 'bg-rose-500'"></div>
+                                    <div class="font-bold text-xs text-slate-900 dark:text-white truncate flex items-center space-x-1.5">
+                                        <span class="font-mono text-blue-600 dark:text-blue-400" x-text="slot.cs_id + '/' + slot.cp_id"></span>
+                                        <span class="text-[11px] text-slate-400 font-normal truncate" x-text="'(' + (slot.camera_name || t('unnamed_camera')) + ')'"></span>
                                     </div>
-                                    <p class="text-[10px] font-mono text-slate-400 truncate max-w-[220px] sm:max-w-xs" x-text="slot.stream_url"></p>
+                                </div>
+                                
+                                <div class="flex items-center space-x-1.5 shrink-0">
+                                    <!-- Live Stream & Test Button -->
+                                    <button @click="openLiveModal(slot)" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition flex items-center space-x-1">
+                                        <i class="fa-solid fa-circle-play text-[10px]"></i>
+                                        <span x-text="t('btn_test')"></span>
+                                    </button>
+                                    <!-- Delete Button -->
+                                    <button @click="deleteCamera(slot.camera_id)" class="w-6 h-6 rounded-lg bg-slate-200/60 dark:bg-slate-700 hover:bg-rose-100 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-500 flex items-center justify-center transition" :title="t('btn_delete')">
+                                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                                    </button>
                                 </div>
                             </div>
 
-                            <div class="flex items-center space-x-1.5 shrink-0">
-                                <!-- Live Stream & AI Test Button -->
-                                <button @click="openLiveModal(slot)" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition flex items-center space-x-1.5">
-                                    <i class="fa-solid fa-circle-play text-[11px]"></i>
-                                    <span class="hidden sm:inline" x-text="t('btn_test')"></span>
-                                </button>
-                                <!-- Delete Button -->
-                                <button @click="deleteCamera(slot.camera_id)" class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-500 flex items-center justify-center transition" :title="t('btn_delete')">
-                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                </button>
+                            <!-- Body: Vehicle & Live Charger Information -->
+                            <div class="pt-2 space-y-2">
+                                <!-- When Occupied -->
+                                <template x-if="slot.is_occupied">
+                                    <div class="space-y-1.5">
+                                        <div class="flex items-center justify-between flex-wrap gap-1.5">
+                                            <!-- Plate Number & Vehicle Type Badge -->
+                                            <div class="flex items-center space-x-1.5">
+                                                <span class="px-2.5 py-1 rounded-lg font-mono font-extrabold text-xs tracking-wider shadow-sm inline-flex items-center space-x-1"
+                                                    :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'">
+                                                    <span x-show="slot.is_ev">⚡</span>
+                                                    <span x-text="slot.current_plate"></span>
+                                                </span>
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                                                    :class="slot.is_ev ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
+                                                    x-text="slot.is_ev ? '전기차 (EV)' : '일반차'"></span>
+                                            </div>
+
+                                            <!-- Charger Live Status Badge -->
+                                            <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center space-x-1"
+                                                :class="slot.is_charging ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : (slot.battery_soc >= 100 ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300')">
+                                                <i class="fa-solid" :class="slot.is_charging ? 'fa-bolt text-emerald-600' : 'fa-plug'"></i>
+                                                <span x-text="slot.connector_status_kr || '사용 가능'"></span>
+                                            </span>
+                                        </div>
+
+                                        <!-- Battery Bar (if SOC available) -->
+                                        <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined">
+                                            <div class="p-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 space-y-1">
+                                                <div class="flex items-center justify-between text-[10px] font-bold">
+                                                    <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
+                                                        <i class="fa-solid fa-battery-three-quarters text-emerald-500"></i>
+                                                        <span>배터리 (SoC)</span>
+                                                    </span>
+                                                    <span class="font-mono text-emerald-600 dark:text-emerald-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
+                                                </div>
+                                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                                    <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <!-- Dual Timers -->
+                                        <div class="flex items-center justify-between text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-white/60 dark:bg-slate-900/40 px-2 py-1 rounded-lg border border-slate-200/40 dark:border-slate-700/40">
+                                            <span>🅿️ 주차: <strong class="text-slate-700 dark:text-slate-200 font-mono" x-text="slot.duration_formatted || '0분'"></strong></span>
+                                            <span x-show="slot.is_charging || slot.charging_duration_seconds > 0">⚡ 충전: <strong class="text-emerald-600 dark:text-emerald-400 font-mono" x-text="slot.charging_duration_formatted || '0분'"></strong></span>
+                                        </div>
+
+                                        <!-- Violation Banner (if any) -->
+                                        <template x-if="slot.violation_type !== 'NORMAL_CHARGING' && slot.violation_type !== 'NONE' && slot.violation_type !== 'PREPARING'">
+                                            <div class="px-2 py-1 rounded-lg text-[10px] font-bold flex items-center space-x-1.5"
+                                                :class="slot.violation_level === 'danger' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-slate-950'">
+                                                <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
+                                                <span x-text="slot.violation_label_kr"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <!-- When Not Occupied by CCTV Vision -->
+                                <template x-if="!slot.is_occupied">
+                                    <div class="py-1">
+                                        <template x-if="slot.is_charging || slot.connector_status === 'CHARGING'">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 flex items-center space-x-1">
+                                                    <span>⚡ 충전 진행 중 (차량 점유)</span>
+                                                </span>
+                                                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center space-x-1">
+                                                    <i class="fa-solid fa-bolt text-emerald-500"></i>
+                                                    <span x-text="'충전기: ' + (slot.connector_status_kr || '충전 중')"></span>
+                                                </span>
+                                            </div>
+                                        </template>
+                                        <template x-if="!slot.is_charging && slot.connector_status === 'PREPARING'">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 flex items-center space-x-1">
+                                                    <span>🔌 케이블 연결/준비 중</span>
+                                                </span>
+                                                <span class="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center space-x-1">
+                                                    <i class="fa-solid fa-plug text-amber-500"></i>
+                                                    <span x-text="'충전기: ' + (slot.connector_status_kr || '준비 중')"></span>
+                                                </span>
+                                            </div>
+                                        </template>
+                                        <template x-if="!slot.is_charging && slot.connector_status !== 'PREPARING' && slot.connector_status !== 'CHARGING'">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center space-x-1">
+                                                    <span>🟢 빈자리 (주차/충전 가능)</span>
+                                                </span>
+                                                <span class="text-[10px] text-slate-400 font-mono flex items-center space-x-1">
+                                                    <i class="fa-solid fa-plug-circle-check text-blue-500"></i>
+                                                    <span x-text="'충전기: ' + (slot.connector_status_kr || '사용 가능')"></span>
+                                                </span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </template>
@@ -257,7 +335,7 @@
             </div>
 
             <!-- RIGHT: Test Upload & Recognition Box (Matched Height) -->
-            <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 h-[380px] flex flex-col">
+            <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 h-[400px] flex flex-col">
                 <div class="flex items-center justify-between mb-3 shrink-0">
                     <div class="flex items-center space-x-3">
                         <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-base shadow-inner">
@@ -797,10 +875,10 @@
             }
         };
 
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('appData', () => ({
+        function appData() {
+            return {
                 isDark: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
-                currentLang: localStorage.getItem('app_lang') || 'uz',
+                currentLang: localStorage.getItem('app_lang') || 'ko',
 
                 stats: { total_detections: 0, ev_count: 0, regular_count: 0, today_detections: 0, today_ev: 0, today_regular: 0, today_alerts: 0 },
                 slots: [],
@@ -852,7 +930,8 @@
                 },
 
                 t(key) {
-                    const dict = translations[this.currentLang] || translations.uz;
+                    const lang = this.currentLang || localStorage.getItem('app_lang') || 'ko';
+                    const dict = (translations && translations[lang]) || (translations && translations.ko) || (translations && translations.uz) || {};
                     return dict[key] || key;
                 },
 
@@ -1136,7 +1215,19 @@
                     }
                     return item.notes || '';
                 }
-            }));
+            };
+        }
+
+        window.appData = appData;
+        window.translations = translations;
+        window.t = function(key) {
+            const lang = localStorage.getItem('app_lang') || 'ko';
+            const dict = (translations && translations[lang]) || (translations && translations.ko) || {};
+            return dict[key] || key;
+        };
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('appData', appData);
         });
     </script>
 </body>

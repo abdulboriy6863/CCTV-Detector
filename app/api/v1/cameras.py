@@ -10,6 +10,7 @@ from app.models.snapshot import CCTVCamera
 from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum, SlotStatusResponse
 from app.services.camera_service import camera_service
 from app.services.monitor_service import auto_monitor_service
+from app.services.charger_service import charger_service
 
 router = APIRouter()
 
@@ -39,6 +40,18 @@ def list_cameras(
 
 @router.post("", response_model=CameraResponse, summary="Add camera")
 async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
+    # Validate cs_id and cp_id existence against CSMS database
+    is_valid_charger, charger_msg = charger_service.validate_station_and_charger(
+        cs_id=camera_in.cs_id,
+        cp_id=camera_in.cp_id,
+        db=db
+    )
+    if not is_valid_charger:
+        raise HTTPException(
+            status_code=400,
+            detail=charger_msg
+        )
+
     stream_url = camera_in.stream_url
     if camera_in.ip_address:
         if not stream_url or camera_in.ip_address not in stream_url:
@@ -65,7 +78,7 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
     if not is_reachable:
         raise HTTPException(
             status_code=400,
-            detail=f"Kameraga ulanib bo'lmadi: {reachability_msg}"
+            detail=f"카메라 연결 실패: {reachability_msg}"
         )
 
     cam = CCTVCamera(
@@ -79,8 +92,8 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
         username=camera_in.username,
         password=camera_in.password,
         is_active=camera_in.is_active,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=get_kst_now(),
+        updated_at=get_kst_now()
     )
     db.add(cam)
     db.commit()
@@ -92,9 +105,24 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
 async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = Depends(get_db)):
     cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
     if not cam:
-        raise HTTPException(status_code=404, detail="Camera not found")
+        raise HTTPException(status_code=404, detail="카메라를 찾을 수 없습니다.")
 
     update_data = camera_in.model_dump(exclude_unset=True)
+
+    # Validate cs_id / cp_id if changed
+    check_cs = update_data.get('cs_id', cam.cs_id)
+    check_cp = update_data.get('cp_id', cam.cp_id)
+    if 'cs_id' in update_data or 'cp_id' in update_data:
+        is_valid_charger, charger_msg = charger_service.validate_station_and_charger(
+            cs_id=check_cs,
+            cp_id=check_cp,
+            db=db
+        )
+        if not is_valid_charger:
+            raise HTTPException(
+                status_code=400,
+                detail=charger_msg
+            )
 
     # If stream_url or ip_address changed, validate reachability
     test_type = CameraTypeEnum(update_data.get('camera_type', cam.camera_type))
@@ -117,7 +145,7 @@ async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = D
         if not is_reachable:
             raise HTTPException(
                 status_code=400,
-                detail=f"Kameraga ulanib bo'lmadi: {reachability_msg}"
+                detail=f"카메라 연결 실패: {reachability_msg}"
             )
 
     if 'camera_type' in update_data and update_data['camera_type']:

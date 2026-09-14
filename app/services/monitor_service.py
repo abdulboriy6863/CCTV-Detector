@@ -14,6 +14,7 @@ from app.schemas.snapshot import CameraTypeEnum, EventTypeEnum
 from app.services.camera_service import camera_service
 from app.services.detector.pipeline import detection_pipeline
 from app.services.storage_service import storage_service
+from app.services.charger_service import charger_service, format_duration_kr
 
 logger = logging.getLogger("cctv_monitor")
 
@@ -55,20 +56,8 @@ def is_same_plate(plate1: Optional[str], plate2: Optional[str]) -> bool:
 
 
 def format_duration(duration_seconds: int) -> str:
-    """Format duration in seconds into human-readable Uzbek string."""
-    if duration_seconds < 60:
-        return f"{max(1, duration_seconds)} soniya"
-    mins = duration_seconds // 60
-    secs = duration_seconds % 60
-    if duration_seconds < 3600:
-        if secs > 0:
-            return f"{mins} daqiqa {secs} soniya"
-        return f"{mins} daqiqa"
-    hours = duration_seconds // 3600
-    rem_mins = (duration_seconds % 3600) // 60
-    if rem_mins > 0:
-        return f"{hours} soat {rem_mins} daqiqa"
-    return f"{hours} soat"
+    """Format duration in seconds into standard Korean string."""
+    return format_duration_kr(duration_seconds)
 
 
 class AutoMonitorService:
@@ -102,7 +91,7 @@ class AutoMonitorService:
     def get_all_slot_statuses(self, db: Session) -> list:
         """
         Aggregate live parking slot states across all cameras.
-        Combines DB camera records with active memory sessions and health states.
+        Combines DB camera records with active memory sessions, health states, and CSMS charging status.
         """
         cameras = db.query(CCTVCamera).order_by(CCTVCamera.id.asc()).all()
         statuses = []
@@ -129,9 +118,17 @@ class AutoMonitorService:
             duration_formatted = None
             if is_occupied and entry_at:
                 duration_seconds = max(0, int((now - entry_at).total_seconds()))
-                duration_formatted = format_duration(duration_seconds)
+                duration_formatted = format_duration_kr(duration_seconds)
 
             live_stream_url = f"/api/v1/cameras/{cam.id}/live" if cam.is_active else None
+
+            # Fetch live charger status from CSMS
+            charger_info = charger_service.get_charger_realtime_status(
+                cs_id=cam.cs_id,
+                cp_id=cam.cp_id,
+                db=db,
+                session_info=session_info
+            )
 
             statuses.append({
                 "camera_id": cam.id,
@@ -154,7 +151,21 @@ class AutoMonitorService:
                 "duration_seconds": duration_seconds,
                 "duration_formatted": duration_formatted,
                 "last_image_url": session_info.get("image_path") if is_occupied else None,
-                "last_error": health_info.get("last_error")
+                "last_error": health_info.get("last_error"),
+                # Live CSMS Charger & Violation info
+                "connector_status": charger_info.get("connector_status", "AVAILABLE"),
+                "connector_status_kr": charger_info.get("connector_status_kr", "사용 가능"),
+                "is_charging": charger_info.get("is_charging", False),
+                "battery_soc": charger_info.get("battery_soc"),
+                "charge_power_kw": charger_info.get("charge_power_kw", 0.0),
+                "charged_energy_kwh": charger_info.get("charged_energy_kwh", 0.0),
+                "charging_duration_seconds": charger_info.get("charging_duration_seconds", 0),
+                "charging_duration_formatted": charger_info.get("charging_duration_formatted", "0분"),
+                "overstay_seconds": charger_info.get("overstay_seconds", 0),
+                "overstay_formatted": charger_info.get("overstay_formatted", "0분"),
+                "violation_type": charger_info.get("violation_type", "NONE"),
+                "violation_label_kr": charger_info.get("violation_label_kr", "정상"),
+                "violation_level": charger_info.get("violation_level", "info"),
             })
 
         return statuses

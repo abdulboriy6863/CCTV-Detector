@@ -1,10 +1,19 @@
 import os
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Base Directory of project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Korean Standard Time (KST / UTC+9)
+KST = timezone(timedelta(hours=9))
+
+
+def get_kst_now() -> datetime:
+    """Returns current datetime in Korean Standard Time (KST / UTC+9) as naive datetime."""
+    return datetime.now(KST).replace(tzinfo=None)
 
 
 class Settings(BaseSettings):

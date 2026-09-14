@@ -4,6 +4,7 @@ from sqlalchemy import (
     Enum, Text, Index, Boolean, UniqueConstraint,
 )
 from app.core.database import Base
+from app.core.config import get_kst_now
 
 
 class CCTVSnapshot(Base):
@@ -29,7 +30,7 @@ class CCTVSnapshot(Base):
     ai_confidence = Column(Float, nullable=True, comment="AI LPR confidence (0.0-1.0)")
     status = Column(String(20), default="SUCCESS", comment="Processing status")
     notes = Column(Text, nullable=True, comment="Additional notes")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=get_kst_now, nullable=False, index=True)
 
     # ===== NEW EV DETECTION COLUMNS =====
     vehicle_type = Column(
@@ -82,8 +83,8 @@ class CCTVCamera(Base):
     username = Column(String(100), nullable=True)
     password = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_kst_now, nullable=False)
+    updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now, nullable=False)
 
     __table_args__ = (
         Index("idx_camera_cs_cp", "cs_id", "cp_id"),

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.core.config import get_kst_now
 from app.core.database import get_db
 from app.models.snapshot import CCTVSnapshot, CCTVCamera
 
@@ -12,7 +13,7 @@ router = APIRouter()
 
 @router.get("/summary", summary="Dashboard statistics summary")
 def get_stats(db: Session = Depends(get_db)):
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = get_kst_now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     total = db.query(func.count(CCTVSnapshot.id)).scalar() or 0
     ev_total = db.query(func.count(CCTVSnapshot.id)).filter(CCTVSnapshot.is_ev == True).scalar() or 0

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
-from app.core.config import settings
+from app.core.config import settings, get_kst_now
 from app.core.database import SessionLocal
 from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.schemas.snapshot import CameraTypeEnum, EventTypeEnum
@@ -322,7 +322,7 @@ class AutoMonitorService:
         departure_time: Optional[datetime] = None
     ):
         """Record ONE END event when a vehicle departs."""
-        now = datetime.utcnow()
+        now = get_kst_now()
         entry_at = state.get("entry_at", now)
 
         if departure_time:
@@ -389,7 +389,7 @@ class AutoMonitorService:
         # 2. Run detection pipeline
         det_result = await detection_pipeline.detect(capture_result.image_bytes)
 
-        now = datetime.utcnow()
+        now = get_kst_now()
         active = self.active_sessions.get(camera_key)
 
         # ----------------------------------------------------

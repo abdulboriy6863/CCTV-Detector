@@ -8,9 +8,10 @@ import threading
 import numpy as np
 from datetime import datetime
 from typing import Optional, Tuple, Dict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlparse, urlunparse
 
+from app.core.config import get_kst_now
 from app.schemas.snapshot import CameraTypeEnum
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ class CaptureResult:
     width: Optional[int] = None
     height: Optional[int] = None
     error_message: Optional[str] = None
-    captured_at: datetime = datetime.utcnow()
+    captured_at: datetime = field(default_factory=get_kst_now)
     protocol: Optional[str] = None
 
 
@@ -478,7 +479,7 @@ class MockCameraGenerator:
         cv2.putText(image, sample_plate, (540, 475), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 3)
 
         # Draw OSD / Watermark header
-        timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp_str = get_kst_now().strftime("%Y-%m-%d %H:%M:%S")
         osd_text = f"CCTV CAM - STATION: {cs_id} | CP: {cp_id} | {timestamp_str}"
         cv2.putText(image, osd_text, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
@@ -490,7 +491,7 @@ class MockCameraGenerator:
             image_bytes=buffer.tobytes(),
             width=width,
             height=height,
-            captured_at=datetime.utcnow(),
+            captured_at=get_kst_now(),
             protocol="SIMULATED_MOCK"
         )
 

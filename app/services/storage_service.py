@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Tuple
-from app.core.config import settings
+from app.core.config import settings, get_kst_now
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class StorageService:
         self, cs_id: str, cp_id: str,
         plate_number: Optional[str] = None, extension: str = "jpg"
     ) -> str:
-        now = datetime.now()
+        now = get_kst_now()
         date_folder = now.strftime("%Y/%m/%d")
         timestamp_str = now.strftime("%Y%m%d_%H%M%S")
         clean_plate = (plate_number or "UNKNOWN").replace(" ", "_").upper()

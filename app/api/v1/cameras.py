@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.config import get_kst_now
 from app.core.database import get_db
 from app.models.snapshot import CCTVCamera
 from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum
@@ -113,7 +114,7 @@ async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = D
         update_data['camera_type'] = update_data['camera_type'].value
     for key, value in update_data.items():
         setattr(cam, key, value)
-    cam.updated_at = datetime.utcnow()
+    cam.updated_at = get_kst_now()
     db.commit()
     db.refresh(cam)
     return cam

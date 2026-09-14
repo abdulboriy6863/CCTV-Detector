@@ -9,6 +9,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+from app.core.config import get_kst_now
 from app.core.database import get_db
 from app.models.snapshot import CCTVSnapshot
 from app.schemas.snapshot import SnapshotResponse, EventTypeEnum
@@ -70,7 +71,7 @@ async def detect_upload(
             cs_id=cs_id,
             cp_id=cp_id,
             connector_id=1,
-            session_id=f"UPLOAD_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}",
+            session_id=f"UPLOAD_{get_kst_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}",
             plate_number=result.plate_number,
             event_type=EventTypeEnum.MANUAL.value,
             image_path=relative_path,
@@ -85,7 +86,7 @@ async def detect_upload(
             detection_source="MANUAL_UPLOAD",
             raw_ocr_text=result.raw_ocr_text,
             plate_region_image=plate_region_path,
-            created_at=datetime.utcnow()
+            created_at=get_kst_now()
         )
         db.add(snapshot)
         db.commit()

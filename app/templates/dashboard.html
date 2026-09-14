@@ -67,16 +67,16 @@
                     <div>
                         <div class="flex items-center space-x-2">
                             <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">CCTV EV Detector</span>
-                            <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Multi-CCTV</span>
+                            <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Smart Monitor</span>
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400" x-text="t('app_subtitle')"></p>
                     </div>
                 </div>
 
-                <!-- Right Menu: Status, Theme, Settings, Language Switcher -->
+                <!-- Right Menu: Status, Theme, Language Switcher -->
                 <div class="flex items-center space-x-2 sm:space-x-3">
                     <!-- CCTV Active Count Badge -->
-                    <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                    <div class="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
                         <span class="w-2 h-2 rounded-full" :class="slots.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'"></span>
                         <span class="text-slate-700 dark:text-slate-300 font-semibold" x-text="slots.length + ' ' + t('cameras_connected')"></span>
                     </div>
@@ -163,318 +163,179 @@
             </div>
         </div>
 
-        <!-- SECTION: Multi-CCTV Monitoring Hub Header & View Switcher -->
-        <div class="bg-white dark:bg-darkcard p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shadow-inner">
-                    <i class="fa-solid fa-network-wired"></i>
-                </div>
-                <div>
-                    <div class="flex items-center space-x-2">
-                        <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white" x-text="t('multi_monitor_title')"></h2>
-                        <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center space-x-1">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                            <span x-text="t('auto_monitor_badge')"></span>
-                        </span>
-                    </div>
-                    <p class="text-xs text-slate-400 dark:text-slate-500" x-text="t('multi_monitor_subtitle')"></p>
-                </div>
-            </div>
+        <!-- Middle 2-Column Section: Cameras Configuration & Test Recognition -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
 
-            <!-- View Mode Switcher + Add Camera Button -->
-            <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
-                <!-- Grid / Tab Switcher -->
-                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
-                    <button @click="viewMode = 'grid'" class="px-3.5 py-1.5 rounded-lg transition flex items-center space-x-1.5"
-                        :class="viewMode === 'grid' ? 'bg-white dark:bg-darkcard text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'">
-                        <i class="fa-solid fa-table-cells-large"></i>
-                        <span x-text="t('view_grid')"></span>
-                    </button>
-                    <button @click="viewMode = 'tab'" class="px-3.5 py-1.5 rounded-lg transition flex items-center space-x-1.5"
-                        :class="viewMode === 'tab' ? 'bg-white dark:bg-darkcard text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'">
-                        <i class="fa-solid fa-folder-open"></i>
-                        <span x-text="t('view_tabs')"></span>
-                    </button>
-                </div>
-
-                <!-- Add Camera Button -->
-                <button @click="addCamModal = true" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
-                    <i class="fa-solid fa-plus"></i>
-                    <span x-text="t('btn_add_camera')"></span>
-                </button>
-            </div>
-        </div>
-
-        <!-- VIEW MODE 1: GRID VIEW (Multi-CCTV Responsive Grid) -->
-        <div x-show="viewMode === 'grid'" x-cloak class="space-y-4">
-            <!-- Camera Grid Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
-                <template x-for="slot in slots" :key="slot.camera_id">
-                    <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border transition duration-200 overflow-hidden flex flex-col"
-                        :class="slot.is_occupied ? (slot.is_ev ? 'border-sky-300 dark:border-sky-800' : 'border-amber-300 dark:border-amber-800') : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
-                        
-                        <!-- Card Header: Station & Slot info -->
-                        <div class="p-3.5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
-                            <div class="min-w-0 pr-2">
-                                <div class="flex items-center space-x-1.5 text-xs font-black text-slate-900 dark:text-white truncate">
-                                    <i class="fa-solid fa-charging-station text-blue-500 text-xs"></i>
-                                    <span x-text="slot.cs_id"></span>
-                                    <span class="text-slate-300 dark:text-slate-600">/</span>
-                                    <span class="text-blue-600 dark:text-blue-400 font-bold" x-text="slot.cp_id"></span>
-                                </div>
-                                <p class="text-[11px] text-slate-400 truncate" x-text="slot.camera_name"></p>
-                            </div>
-
-                            <!-- Online / Offline Badge -->
-                            <div>
-                                <template x-if="slot.is_online">
-                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 inline-flex items-center space-x-1">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <span>ONLINE</span>
-                                    </span>
-                                </template>
-                                <template x-if="!slot.is_online">
-                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 inline-flex items-center space-x-1">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                        <span>OFFLINE</span>
-                                    </span>
-                                </template>
-                            </div>
+            <!-- LEFT: Camera Configuration & Live CCTV Slots List -->
+            <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 h-[380px] flex flex-col">
+                <div class="flex items-center justify-between mb-3 shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-base shadow-inner">
+                            <i class="fa-solid fa-video"></i>
                         </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('camera_mgmt_title')"></h2>
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center space-x-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                    <span x-text="slots.length + ' ' + t('cameras_connected')"></span>
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">RTSP va IP kameralar monitoring holati</p>
+                        </div>
+                    </div>
+                    <button @click="addCamModal = true" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-plus"></i>
+                        <span x-text="t('btn_add_camera')"></span>
+                    </button>
+                </div>
 
-                        <!-- Card Video Stream / Snapshot Frame -->
-                        <div class="relative bg-black aspect-video overflow-hidden group cursor-pointer" @click="openLiveModal(slot)">
-                            <template x-if="slot.is_active && slot.is_online">
-                                <img :src="'/api/v1/cameras/' + slot.camera_id + '/live'" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="CCTV Stream">
-                            </template>
-                            <template x-if="!slot.is_online">
-                                <div class="w-full h-full flex flex-col items-center justify-center text-slate-500 space-y-1">
-                                    <i class="fa-solid fa-video-slash text-2xl text-red-400"></i>
-                                    <span class="text-xs font-mono" x-text="slot.last_error || 'Signal Yo'q'"></span>
+                <!-- Scrollable Container for Camera Items -->
+                <div class="flex-1 overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
+                    <template x-for="slot in slots" :key="slot.camera_id">
+                        <div class="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition">
+                            <div class="flex items-center space-x-3 min-w-0">
+                                <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs shrink-0 shadow-inner" 
+                                    :class="slot.is_online ? (slot.is_occupied ? (slot.is_ev ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400') : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400') : 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'">
+                                    <i class="fa-solid" :class="slot.is_online ? 'fa-video' : 'fa-video-slash'"></i>
                                 </div>
-                            </template>
-
-                            <!-- Live Tag Overlay -->
-                            <div class="absolute top-2.5 left-2.5 flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold">
-                                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-                                <span>LIVE</span>
-                            </div>
-
-                            <!-- Expand Icon Overlay -->
-                            <div class="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md">
-                                <i class="fa-solid fa-expand text-xs"></i>
-                            </div>
-
-                            <!-- Bottom Status Banner Overlay -->
-                            <div class="absolute bottom-0 inset-x-0 p-2.5 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-center justify-between text-white">
-                                <!-- Vehicle Status -->
-                                <div>
-                                    <template x-if="slot.is_occupied">
-                                        <div class="flex items-center space-x-1.5">
-                                            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-extrabold shadow"
+                                <div class="min-w-0 space-y-0.5">
+                                    <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                                        <div class="flex items-center space-x-1 text-xs font-black text-slate-900 dark:text-white truncate">
+                                            <i class="fa-solid fa-charging-station text-blue-500 text-[11px]"></i>
+                                            <span x-text="slot.cs_id"></span>
+                                            <span class="text-slate-300 dark:text-slate-600">/</span>
+                                            <span class="text-blue-600 dark:text-blue-400 font-bold" x-text="slot.cp_id"></span>
+                                        </div>
+                                        <span class="text-[10px] text-slate-400 font-medium" x-text="'(' + (slot.camera_name || t('unnamed_camera')) + ')'"></span>
+                                        
+                                        <!-- Slot Occupancy Badge -->
+                                        <template x-if="slot.is_occupied">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold shadow-sm inline-flex items-center space-x-1"
                                                 :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'">
                                                 <span x-show="slot.is_ev">⚡</span>
                                                 <span x-text="slot.current_plate"></span>
+                                                <span x-show="slot.duration_formatted" class="text-[9px] opacity-90" x-text="'(' + slot.duration_formatted + ')'"></span>
                                             </span>
-                                        </div>
-                                    </template>
-                                    <template x-if="!slot.is_occupied">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600/90 text-white flex items-center space-x-1">
-                                            <i class="fa-solid fa-circle-check text-[9px]"></i>
-                                            <span x-text="t('slot_vacant')"></span>
-                                        </span>
-                                    </template>
-                                </div>
-
-                                <!-- Duration Timer -->
-                                <div x-show="slot.is_occupied" class="text-[11px] font-mono font-bold text-amber-300 flex items-center space-x-1">
-                                    <i class="fa-solid fa-stopwatch text-xs"></i>
-                                    <span x-text="slot.duration_formatted || '0 soniya'"></span>
+                                        </template>
+                                        <template x-if="!slot.is_occupied && slot.is_online">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                                🟢 Bo'sh
+                                            </span>
+                                        </template>
+                                        <template x-if="!slot.is_online">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                                🔴 OFFLINE
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <p class="text-[10px] font-mono text-slate-400 truncate max-w-[220px] sm:max-w-xs" x-text="slot.stream_url"></p>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Card Footer Controls -->
-                        <div class="p-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-white dark:bg-darkcard text-xs">
-                            <span class="text-[11px] font-mono text-slate-400" x-text="slot.camera_type"></span>
-                            
-                            <div class="flex items-center space-x-1.5">
-                                <button @click="openLiveModal(slot)" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-[11px] transition">
-                                    <i class="fa-solid fa-magnifying-glass mr-1"></i> <span x-text="t('btn_view')"></span>
+                            <div class="flex items-center space-x-1.5 shrink-0">
+                                <!-- Live Stream & AI Test Button -->
+                                <button @click="openLiveModal(slot)" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-circle-play text-[11px]"></i>
+                                    <span class="hidden sm:inline" x-text="t('btn_test')"></span>
                                 </button>
-                                <button @click="deleteCamera(slot.camera_id)" class="w-7 h-7 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-500 flex items-center justify-center transition" :title="t('btn_delete')">
+                                <!-- Delete Button -->
+                                <button @click="deleteCamera(slot.camera_id)" class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-500 flex items-center justify-center transition" :title="t('btn_delete')">
                                     <i class="fa-solid fa-trash-can text-xs"></i>
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </template>
-            </div>
-
-            <!-- Empty State if no cameras -->
-            <template x-if="slots.length === 0">
-                <div class="bg-white dark:bg-darkcard rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
-                    <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center text-3xl shadow-inner">
-                        <i class="fa-solid fa-video"></i>
-                    </div>
-                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-base" x-text="t('no_cameras_msg')"></h3>
-                    <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Har bir zaryadlash ustuni yoki parkovka uchun CCTV kamerani qo'shing.</p>
-                    <button @click="addCamModal = true" class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition">
-                        <i class="fa-solid fa-plus mr-1"></i> <span x-text="t('btn_add_camera')"></span>
-                    </button>
-                </div>
-            </template>
-        </div>
-
-        <!-- VIEW MODE 2: TAB VIEW (Single CCTV Focused Viewer with Tabs) -->
-        <div x-show="viewMode === 'tab'" x-cloak class="space-y-4">
-            <!-- Tabs Navigation Bar -->
-            <div class="flex items-center space-x-2 overflow-x-auto pb-2 custom-scrollbar">
-                <template x-for="slot in slots" :key="slot.camera_id">
-                    <button @click="selectedSlotId = slot.camera_id" 
-                        class="px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center space-x-2 whitespace-nowrap transition shadow-sm"
-                        :class="selectedSlotId === slot.camera_id ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20' : 'bg-white dark:bg-darkcard text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300'">
-                        <span class="w-2 h-2 rounded-full" :class="slot.is_occupied ? (slot.is_ev ? 'bg-sky-400' : 'bg-amber-400') : 'bg-emerald-400'"></span>
-                        <span x-text="slot.cs_id + ' / ' + slot.cp_id"></span>
-                        <span class="text-[10px] opacity-75 font-normal" x-text="'(' + slot.camera_name + ')'"></span>
-                    </button>
-                </template>
-            </div>
-
-            <!-- Focused Tab CCTV Display -->
-            <template x-if="currentSlot">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    <!-- Left: Big Player -->
-                    <div class="lg:col-span-2 bg-black rounded-2xl overflow-hidden shadow-xl border border-slate-800 aspect-video relative flex items-center justify-center">
-                        <img :src="'/api/v1/cameras/' + currentSlot.camera_id + '/live'" class="w-full h-full object-contain" alt="Focused CCTV Stream">
-                        
-                        <!-- Overlay Details -->
-                        <div class="absolute top-3 left-3 flex items-center space-x-2">
-                            <span class="px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold text-xs flex items-center space-x-1.5 shadow">
-                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                                <span>LIVE</span>
-                            </span>
-                            <span class="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white font-mono text-xs font-bold" x-text="currentSlot.camera_name"></span>
-                        </div>
-                    </div>
-
-                    <!-- Right: Slot Status & Controls -->
-                    <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4">
-                        <div class="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                            <div>
-                                <h3 class="font-bold text-slate-900 dark:text-white text-base" x-text="currentSlot.cs_id + ' - ' + currentSlot.cp_id"></h3>
-                                <p class="text-xs text-slate-400" x-text="currentSlot.camera_name"></p>
+                    </template>
+                    <template x-if="slots.length === 0">
+                        <div class="text-center py-14 text-slate-400 text-xs">
+                            <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center text-xl shadow-inner">
+                                <i class="fa-solid fa-video"></i>
                             </div>
-                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold"
-                                :class="currentSlot.is_occupied ? (currentSlot.is_ev ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300') : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'"
-                                x-text="currentSlot.is_occupied ? (currentSlot.is_ev ? '⚡ EV Band' : '🚗 Non-EV Band') : '🟢 Bo'sh'">
-                            </span>
+                            <p class="font-bold" x-text="t('no_cameras_msg')"></p>
+                            <button @click="addCamModal = true" class="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+                                <i class="fa-solid fa-plus mr-1"></i> <span x-text="t('btn_add_camera')"></span>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- RIGHT: Test Upload & Recognition Box (Matched Height) -->
+            <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 h-[380px] flex flex-col">
+                <div class="flex items-center justify-between mb-3 shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-base shadow-inner">
+                            <i class="fa-solid fa-file-arrow-up"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('test_title')"></h2>
+                            <p class="text-[11px] text-slate-400" x-text="t('korean_plates_support')"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drag & Drop Box + Inline Detection Result -->
+                <div class="flex-1 flex flex-col overflow-y-auto pr-1.5 custom-scrollbar">
+                    <!-- Dropzone -->
+                    <div 
+                        class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer relative flex-1 flex flex-col items-center justify-center min-h-[140px]"
+                        @dragover.prevent="dragOver = true"
+                        @dragleave.prevent="dragOver = false"
+                        @drop.prevent="handleDrop($event)"
+                        :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
+                        @click="$refs.fileInput.click()"
+                    >
+                        <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect($event)">
+                        
+                        <div x-show="!isUploading">
+                            <div class="w-10 h-10 mx-auto rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 text-lg">
+                                <i class="fa-regular fa-image"></i>
+                            </div>
+                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
+                            <p class="text-[10px] text-slate-400 mt-0.5" x-text="t('dropzone_formats')"></p>
+                        </div>
+                        
+                        <div x-show="isUploading" class="py-3 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600"></i>
+                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
+                            <p class="text-[10px] text-slate-400" x-text="t('analyzing_desc')"></p>
+                        </div>
+                    </div>
+
+                    <!-- Detection Live Result Card (Inline) -->
+                    <div x-show="uploadResult" x-cloak class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-white flex items-center">
+                                <i class="fa-solid fa-circle-check mr-1.5 text-emerald-500"></i> <span x-text="t('result_title')"></span>
+                            </h3>
+                            <span class="text-[10px] font-mono text-slate-400" x-text="uploadResult ? (uploadResult.processing_time_ms + ' ms') : ''"></span>
                         </div>
 
-                        <!-- Occupant Details -->
-                        <template x-if="currentSlot.is_occupied">
-                            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs text-slate-400 font-semibold" x-text="t('recognized_plate_label')"></span>
-                                    <div class="px-3 py-1 rounded-lg font-mono font-black text-sm border shadow-sm"
-                                        :class="currentSlot.is_ev ? 'bg-sky-50 dark:bg-sky-950 border-sky-300 text-sky-900 dark:text-sky-200' : 'bg-slate-200 text-slate-900'">
-                                        <span x-show="currentSlot.is_ev">⚡</span>
-                                        <span x-text="currentSlot.current_plate"></span>
+                        <!-- SUCCESS RESULT -->
+                        <template x-if="uploadResult && uploadResult.success && uploadResult.data">
+                            <div class="p-3 rounded-xl border flex items-center justify-between gap-2"
+                                :class="uploadResult.data.is_ev ? 'bg-sky-50/60 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'">
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-2xl" x-text="uploadResult.data.is_ev ? '⚡' : '🚗'"></span>
+                                    <div>
+                                        <div class="font-mono font-black text-sm text-slate-900 dark:text-white" x-text="uploadResult.data.plate_number"></div>
+                                        <span class="text-[11px] font-bold" :class="uploadResult.data.is_ev ? 'text-sky-500' : 'text-slate-500'" x-text="uploadResult.data.is_ev ? '⚡ EV Tasdiqlandi' : '🚗 Oddiy avtomobil'"></span>
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs text-slate-400 font-semibold">To'xtab turish vaqti:</span>
-                                    <span class="font-mono font-bold text-amber-500 text-sm" x-text="currentSlot.duration_formatted"></span>
-                                </div>
-                                <div class="flex items-center justify-between text-xs">
-                                    <span class="text-slate-400">Kirish vaqti:</span>
-                                    <span class="font-mono text-slate-600 dark:text-slate-300" x-text="formatDate(currentSlot.entry_at)"></span>
+                                <div class="text-right">
+                                    <span class="text-xs font-mono font-bold text-slate-600 dark:text-slate-300" x-text="((uploadResult.data.confidence || 0) * 100).toFixed(0) + '%'"></span>
                                 </div>
                             </div>
                         </template>
 
-                        <!-- Camera Specs -->
-                        <div class="space-y-2 text-xs">
-                            <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                                <span class="text-slate-400">Stream URL:</span>
-                                <span class="font-mono text-slate-600 dark:text-slate-300 truncate max-w-[200px]" x-text="currentSlot.stream_url"></span>
+                        <!-- ERROR / UNRECOGNIZED RESULT -->
+                        <template x-if="uploadResult && !uploadResult.success">
+                            <div class="p-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/60 dark:bg-rose-950/20 flex items-center space-x-2 text-rose-700 dark:text-rose-400 text-xs">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <span x-text="uploadResult.message || 'Raqam aniqlanmadi'"></span>
                             </div>
-                            <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                                <span class="text-slate-400">Protokol:</span>
-                                <span class="font-mono font-bold text-slate-600 dark:text-slate-300" x-text="currentSlot.camera_type"></span>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="pt-2 flex flex-col space-y-2">
-                            <button @click="openLiveModal(currentSlot)" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 shadow-sm transition">
-                                <i class="fa-solid fa-expand"></i>
-                                <span>Kattalashtirib ko'rish & AI Scan</span>
-                            </button>
-                        </div>
+                        </template>
                     </div>
-                </div>
-            </template>
-        </div>
-
-        <!-- MIDDLE SECTION: Upload Test Box -->
-        <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800" x-data="{ uploadBoxOpen: false }">
-            <div class="flex items-center justify-between cursor-pointer" @click="uploadBoxOpen = !uploadBoxOpen">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm shadow-inner">
-                        <i class="fa-solid fa-file-arrow-up"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('test_title')"></h2>
-                        <p class="text-[11px] text-slate-400" x-text="t('korean_plates_support')"></p>
-                    </div>
-                </div>
-                <button class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center">
-                    <i class="fa-solid text-xs" :class="uploadBoxOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                </button>
-            </div>
-
-            <!-- Collapsible Upload Box -->
-            <div x-show="uploadBoxOpen" x-cloak class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                <div 
-                    class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer flex flex-col items-center justify-center"
-                    @dragover.prevent="dragOver = true"
-                    @dragleave.prevent="dragOver = false"
-                    @drop.prevent="handleDrop()"
-                    :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
-                    @click=".fileInput.click()"
-                >
-                    <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect()">
-                    
-                    <div x-show="!isUploading">
-                        <div class="w-10 h-10 mx-auto rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 text-lg">
-                            <i class="fa-regular fa-image"></i>
-                        </div>
-                        <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
-                        <p class="text-[10px] text-slate-400 mt-0.5" x-text="t('dropzone_formats')"></p>
-                    </div>
-                    
-                    <div x-show="isUploading" class="py-3 flex flex-col items-center justify-center space-y-2">
-                        <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600"></i>
-                        <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
-                        <p class="text-[10px] text-slate-400" x-text="t('analyzing_desc')"></p>
-                    </div>
-                </div>
-
-                <!-- Upload Detection Result -->
-                <div x-show="uploadResult" x-cloak class="p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700">
-                    <template x-if="uploadResult && uploadResult.success && uploadResult.data">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <span class="text-2xl" x-text="uploadResult.data.is_ev ? '⚡' : '🚗'"></span>
-                                <div>
-                                    <div class="font-mono font-black text-sm text-slate-900 dark:text-white" x-text="uploadResult.data.plate_number"></div>
-                                    <span class="text-[11px] font-bold" :class="uploadResult.data.is_ev ? 'text-sky-500' : 'text-slate-500'" x-text="uploadResult.data.is_ev ? '⚡ EV Tasdiqlandi' : '🚗 Oddiy avtomobil'"></span>
-                                </div>
-                            </div>
-                            <span class="text-xs font-mono text-slate-400" x-text="uploadResult.processing_time_ms + ' ms'"></span>
-                        </div>
-                    </template>
                 </div>
             </div>
         </div>
@@ -764,12 +625,8 @@
                 cameras_connected: "ta kamera ulangan",
                 theme_light: "Yorug' rejimga o'tish",
                 theme_dark: "Qorong'i rejimga o'tish",
-                multi_monitor_title: "Markaziy CCTV Monitoring Paneli",
-                multi_monitor_subtitle: "Barcha zaryadlash stansiyalari va parkovka joylarini real vaqtda kuzatish",
-                auto_monitor_badge: "AVTO MONITORING FAOL",
-                view_grid: "To'r Ko'rinish (Grid)",
-                view_tabs: "Tab Ko'rinish (Single)",
-                slot_vacant: "Bo'sh (Vacant)",
+                camera_mgmt_title: "Kameralar konfiguratsiyasi & Jonli CCTV",
+                btn_test: "Jonli efir / Test",
                 stat_total: "Jami aniqlangan",
                 stat_ev: "Elektr avtomobil (EV)",
                 stat_regular: "Oddiy avtomobil",
@@ -826,12 +683,8 @@
                 cameras_connected: "개 카메라 연결됨",
                 theme_light: "라이트 모드로 전환",
                 theme_dark: "다크 모드로 전환",
-                multi_monitor_title: "통합 CCTV 모니터링 허브",
-                multi_monitor_subtitle: "모든 충전소 및 주차 베이 실시간 모니터링",
-                auto_monitor_badge: "자동 모니터링 가동 중",
-                view_grid: "그리드 뷰 (Grid)",
-                view_tabs: "탭 뷰 (Single)",
-                slot_vacant: "비어있음 (공석)",
+                camera_mgmt_title: "카메라 구성 및 실시간 CCTV",
+                btn_test: "실시간 / 테스트",
                 stat_total: "총 감지 차량",
                 stat_ev: "전기차 (EV) 감지",
                 stat_regular: "일반 차량 (내연기관)",
@@ -889,9 +742,6 @@
             Alpine.data('appData', () => ({
                 isDark: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
                 currentLang: localStorage.getItem('app_lang') || 'uz',
-                
-                viewMode: 'grid', // 'grid' or 'tab'
-                selectedSlotId: null,
 
                 stats: { total_detections: 0, ev_count: 0, regular_count: 0, today_detections: 0, today_ev: 0, today_regular: 0, today_alerts: 0 },
                 slots: [],
@@ -923,12 +773,6 @@
                 liveModal: { open: false, slot: null, aiLoading: false, aiResult: null, aiError: null },
                 previewImage: { open: false, url: '' },
                 isSavingCam: false,
-
-                get currentSlot() {
-                    if (!this.slots.length) return null;
-                    if (!this.selectedSlotId) return this.slots[0];
-                    return this.slots.find(s => s.camera_id === this.selectedSlotId) || this.slots[0];
-                },
                 
                 init() {
                     this.$watch('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
@@ -936,12 +780,12 @@
                     this.fetchSlots();
                     this.fetchVehicles();
                     
-                    // Live polling every 5s for smooth slot updates
+                    // Live polling every 3s for real-time slot and detection updates
                     setInterval(() => {
                         this.fetchSlots();
                         this.fetchStats();
                         if (this.page === 1) this.fetchVehicles();
-                    }, 5000);
+                    }, 3000);
                 },
 
                 t(key) {
@@ -970,9 +814,6 @@
                         const res = await fetch('/api/v1/cameras/slots-status');
                         if (res.ok) {
                             this.slots = await res.json();
-                            if (!this.selectedSlotId && this.slots.length) {
-                                this.selectedSlotId = this.slots[0].camera_id;
-                            }
                         }
                     } catch (e) { console.error("Slots fetch error:", e); }
                 },
@@ -1096,7 +937,7 @@
                             }
                         } else {
                             this.liveModal.aiLoading = false;
-                            this.liveModal.aiError = data.message || 'Kameradan kadr olib bo\'lmadi';
+                            this.liveModal.aiError = data.message || 'Kameradan kadr olib bo'lmadi';
                         }
                     } catch (e) {
                         this.liveModal.aiLoading = false;
@@ -1201,7 +1042,7 @@
                         return '📹 CCTV Avto';
                     }
                     if (item.detection_source === 'MANUAL_UPLOAD') {
-                        return '📤 Qo\'lda tahlil';
+                        return '📤 Qo'lda tahlil';
                     }
                     return item.notes || '';
                 }

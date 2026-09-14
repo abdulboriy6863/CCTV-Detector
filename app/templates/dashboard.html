@@ -349,12 +349,33 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center space-x-3 w-full sm:w-auto">
-                    <select x-model="filters.type" @change="fetchVehicles()" class="text-xs px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
+                <!-- Center & Right: Date Range Filter + Export CSV + Type Filter + Refresh -->
+                <div class="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
+                    <!-- Date Range Box (Default Today) -->
+                    <div class="flex items-center space-x-1.5 bg-slate-50 dark:bg-slate-800/80 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div class="flex items-center space-x-1 text-slate-500 dark:text-slate-400 px-1 text-xs">
+                            <i class="fa-regular fa-calendar text-blue-500"></i>
+                            <span class="text-[10px] font-bold uppercase hidden sm:inline" x-text="t('lbl_date_range')"></span>
+                        </div>
+                        <input type="date" x-model="filters.startDate" @change="page = 1; fetchVehicles()" class="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-mono font-semibold focus:ring-1 focus:ring-blue-500 outline-none transition cursor-pointer">
+                        <span class="text-slate-400 text-xs font-bold">-</span>
+                        <input type="date" x-model="filters.endDate" @change="page = 1; fetchVehicles()" class="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-mono font-semibold focus:ring-1 focus:ring-blue-500 outline-none transition cursor-pointer">
+                    </div>
+
+                    <!-- Excel / CSV Export Button -->
+                    <button @click="exportCSV()" class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm" :title="t('btn_export_csv')">
+                        <i class="fa-solid fa-file-excel text-sm"></i>
+                        <span x-text="t('btn_export_csv')"></span>
+                    </button>
+
+                    <!-- Type Filter Select -->
+                    <select x-model="filters.type" @change="page = 1; fetchVehicles()" class="h-9 text-xs px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
                         <option value="" x-text="t('filter_all')"></option>
                         <option value="EV" x-text="t('filter_ev_only')"></option>
                         <option value="REGULAR" x-text="t('filter_regular_only')"></option>
                     </select>
+
+                    <!-- Refresh Button -->
                     <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
                         <i class="fa-solid fa-rotate-right text-xs"></i>
                     </button>
@@ -654,6 +675,8 @@
                 no_cameras_msg: "Hozircha CCTV kamera ulanmagan.",
                 history_title: "Aniqlangan mashinalar jurnali",
                 history_subtitle: "Stansiya va parkovka joylari bo'yicha kirish/chiqish tarixi",
+                lbl_date_range: "Sana:",
+                btn_export_csv: "Excel / CSV",
                 filter_all: "Barcha mashinalar",
                 filter_ev_only: "Faqat Elektr (EV)",
                 filter_regular_only: "Faqat Oddiy mashinalar",
@@ -733,6 +756,8 @@
                 no_cameras_msg: "등록된 CCTV 카메라가 없습니다.",
                 history_title: "감지 이력 목록",
                 history_subtitle: "충전소 및 주차 베이별 입차/출차 기록",
+                lbl_date_range: "날짜:",
+                btn_export_csv: "Excel / CSV",
                 filter_all: "전체 차량",
                 filter_ev_only: "전기차 (EV) 만",
                 filter_regular_only: "일반 차량 (내연기관)",
@@ -788,7 +813,11 @@
                 totalVehicles: 0,
                 page: 1,
                 pageSize: 6,
-                filters: { type: '' },
+                filters: {
+                    type: '',
+                    startDate: new Date().toISOString().slice(0, 10),
+                    endDate: new Date().toISOString().slice(0, 10)
+                },
                 
                 addCamModal: false,
                 newCam: {
@@ -857,6 +886,8 @@
                         let url = `/api/v1/vehicles?page=${this.page}&page_size=${this.pageSize}`;
                         if (this.filters.type === 'EV') url += '&is_ev=true';
                         else if (this.filters.type === 'REGULAR') url += '&vehicle_type=REGULAR';
+                        if (this.filters.startDate) url += `&start_date=${this.filters.startDate}`;
+                        if (this.filters.endDate) url += `&end_date=${this.filters.endDate}`;
                         
                         const res = await fetch(url);
                         if (res.ok) {
@@ -865,6 +896,17 @@
                             this.totalVehicles = data.total;
                         }
                     } catch (e) { console.error("Vehicles fetch error:", e); }
+                },
+
+                exportCSV() {
+                    let url = '/api/v1/vehicles/export?';
+                    const params = [];
+                    if (this.filters.type === 'EV') params.push('is_ev=true');
+                    else if (this.filters.type === 'REGULAR') params.push('vehicle_type=REGULAR');
+                    if (this.filters.startDate) params.push(`start_date=${this.filters.startDate}`);
+                    if (this.filters.endDate) params.push(`end_date=${this.filters.endDate}`);
+                    url += params.join('&');
+                    window.location.href = url;
                 },
 
                 async createCamera() {

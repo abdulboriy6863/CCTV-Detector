@@ -937,7 +937,7 @@
                             }
                         } else {
                             this.liveModal.aiLoading = false;
-                            this.liveModal.aiError = data.message || 'Kameradan kadr olib bo'lmadi';
+                            this.liveModal.aiError = data.message || "Kameradan kadr olib bo'lmadi";
                         }
                     } catch (e) {
                         this.liveModal.aiLoading = false;
@@ -1042,7 +1042,7 @@
                         return '📹 CCTV Avto';
                     }
                     if (item.detection_source === 'MANUAL_UPLOAD') {
-                        return '📤 Qo'lda tahlil';
+                        return "📤 Qo'lda tahlil";
                     }
                     return item.notes || '';
                 }

@@ -29,14 +29,15 @@ def list_cameras(
 @router.post("", response_model=CameraResponse, summary="Add camera")
 async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
     stream_url = camera_in.stream_url
-    if not stream_url and camera_in.ip_address:
-        if camera_in.camera_type == CameraTypeEnum.RTSP:
-            port_val = camera_in.port or 554
-            stream_url = f"rtsp://{camera_in.ip_address}:{port_val}/stream1"
-        else:
-            port_val = camera_in.port or 80
-            port_str = f":{port_val}" if port_val != 80 else ""
-            stream_url = f"http://{camera_in.ip_address}{port_str}/api/snapshot"
+    if camera_in.ip_address:
+        if not stream_url or camera_in.ip_address not in stream_url:
+            if camera_in.camera_type == CameraTypeEnum.RTSP:
+                port_val = camera_in.port or 554
+                stream_url = f"rtsp://{camera_in.ip_address}:{port_val}/stream1"
+            else:
+                port_val = camera_in.port or 80
+                port_str = f":{port_val}" if port_val != 80 else ""
+                stream_url = f"http://{camera_in.ip_address}{port_str}/api/snapshot"
 
     final_stream_url = stream_url or f"rtsp://{camera_in.ip_address or '127.0.0.1'}:554/stream1"
 

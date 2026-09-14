@@ -893,16 +893,18 @@
                 async createCamera() {
                     try {
                         this.isSavingCam = true;
-                        if (!this.newCam.stream_url && this.newCam.ip_address) {
-                            if (this.newCam.camera_type === 'RTSP') {
-                                this.newCam.stream_url = `rtsp://${this.newCam.ip_address}:${this.newCam.port || 554}/stream1`;
-                            } else {
-                                const portPart = (this.newCam.port && this.newCam.port !== 80) ? `:${this.newCam.port}` : '';
-                                this.newCam.stream_url = `http://${this.newCam.ip_address}${portPart}/api/snapshot`;
-                            }
-                        }
                         if (!this.newCam.port) {
                             this.newCam.port = this.newCam.camera_type === 'RTSP' ? 554 : 80;
+                        }
+                        if (!this.showAdvanced || !this.newCam.stream_url) {
+                            if (this.newCam.ip_address) {
+                                if (this.newCam.camera_type === 'RTSP') {
+                                    this.newCam.stream_url = `rtsp://${this.newCam.ip_address}:${this.newCam.port}/stream1`;
+                                } else {
+                                    const portPart = (this.newCam.port && this.newCam.port !== 80) ? `:${this.newCam.port}` : '';
+                                    this.newCam.stream_url = `http://${this.newCam.ip_address}${portPart}/api/snapshot`;
+                                }
+                            }
                         }
                         const res = await fetch('/api/v1/cameras', {
                             method: 'POST',

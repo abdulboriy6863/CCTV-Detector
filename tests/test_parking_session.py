@@ -343,6 +343,49 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             "PARK_CS_TEST_01_CP01_20260911070000"
         )
 
+    def test_get_all_slot_statuses_multi_camera(self):
+        """Test that get_all_slot_statuses aggregates cameras and occupancy state correctly."""
+        # Add a second camera
+        cam2 = CCTVCamera(
+            id=2,
+            cs_id="CS_TEST_01",
+            cp_id="CP02",
+            camera_name="Bay 2 Cam",
+            camera_type="RTSP",
+            stream_url="rtsp://fake-stream-2",
+            is_active=True
+        )
+        self.db.add(cam2)
+        self.db.commit()
+
+        # Simulate Slot 1 is occupied by an EV
+        self.monitor.active_sessions["CS_TEST_01_CP01"] = {
+            "session_id": "PARK_01",
+            "plate": "52어0586",
+            "vehicle_type": "EV",
+            "is_ev": True,
+            "plate_color": "blue",
+            "entry_at": datetime.now() - timedelta(minutes=15),
+            "last_seen_at": datetime.now()
+        }
+
+        # Query slot statuses
+        statuses = self.monitor.get_all_slot_statuses(self.db)
+        self.assertEqual(len(statuses), 2)
+
+        # Verify Slot 1
+        slot1 = next(s for s in statuses if s["camera_id"] == 1)
+        self.assertTrue(slot1["is_occupied"])
+        self.assertEqual(slot1["current_plate"], "52어0586")
+        self.assertTrue(slot1["is_ev"])
+        self.assertIn("daqiqa", slot1["duration_formatted"])
+
+        # Verify Slot 2 (Empty)
+        slot2 = next(s for s in statuses if s["camera_id"] == 2)
+        self.assertFalse(slot2["is_occupied"])
+        self.assertIsNone(slot2["current_plate"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

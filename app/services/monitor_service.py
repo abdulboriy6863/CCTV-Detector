@@ -109,7 +109,7 @@ class AutoMonitorService:
         now = get_kst_now()
 
         for cam in cameras:
-            camera_key = f"{cam.cs_id}_{cam.cp_id or 'CP01'}"
+            camera_key = f"{cam.cs_id}_{cam.cp_id or 'BNS00000'}"
             session_info = self.active_sessions.get(camera_key)
             health_info = self.camera_health.get(camera_key, {
                 "is_online": cam.is_active,
@@ -135,9 +135,9 @@ class AutoMonitorService:
 
             statuses.append({
                 "camera_id": cam.id,
-                "camera_name": cam.camera_name or f"{cam.cs_id} - {cam.cp_id or 'CP01'}",
+                "camera_name": cam.camera_name or f"{cam.cs_id} - {cam.cp_id or 'BNS00000'}",
                 "cs_id": cam.cs_id,
-                "cp_id": cam.cp_id or "CP01",
+                "cp_id": cam.cp_id or "BNS00000",
                 "camera_type": cam.camera_type,
                 "is_active": cam.is_active,
                 "is_online": health_info.get("is_online", cam.is_active),
@@ -203,7 +203,7 @@ class AutoMonitorService:
             restored_count = 0
             seen_camera_keys = set()
             for snap in start_snapshots:
-                camera_key = f"{snap.cs_id}_{snap.cp_id or 'CP01'}"
+                camera_key = f"{snap.cs_id}_{snap.cp_id or 'BNS00000'}"
                 if camera_key in seen_camera_keys:
                     continue
                 seen_camera_keys.add(camera_key)
@@ -286,7 +286,7 @@ class AutoMonitorService:
             seen_keys = set()
             unique_cameras = []
             for cam in cameras:
-                key = f"{cam.cs_id}_{cam.cp_id or 'CP01'}"
+                key = f"{cam.cs_id}_{cam.cp_id or 'BNS00000'}"
                 if key not in seen_keys:
                     seen_keys.add(key)
                     unique_cameras.append(cam)
@@ -298,7 +298,7 @@ class AutoMonitorService:
 
     async def _inspect_camera_safe(self, camera: CCTVCamera, db: Session):
         """Wrapper that acquires per-camera lock before inspection."""
-        camera_key = f"{camera.cs_id}_{camera.cp_id or 'CP01'}"
+        camera_key = f"{camera.cs_id}_{camera.cp_id or 'BNS00000'}"
         lock = self._get_lock(camera_key)
         async with lock:
             await self._inspect_camera(camera, camera_key, db)
@@ -317,7 +317,7 @@ class AutoMonitorService:
         session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
         relative_path = storage_service.generate_relative_path(
-            cs_id=camera.cs_id, cp_id=camera.cp_id or "CP01",
+            cs_id=camera.cs_id, cp_id=camera.cp_id or "BNS00000",
             plate_number=detected_plate
         )
         await storage_service.save_image(image_bytes, relative_path)
@@ -332,7 +332,7 @@ class AutoMonitorService:
 
         entry_snapshot = CCTVSnapshot(
             cs_id=camera.cs_id,
-            cp_id=camera.cp_id or "CP01",
+            cp_id=camera.cp_id or "BNS00000",
             connector_id=1,
             session_id=session_id,
             plate_number=detected_plate,
@@ -406,7 +406,7 @@ class AutoMonitorService:
 
         exit_snapshot = CCTVSnapshot(
             cs_id=camera.cs_id,
-            cp_id=camera.cp_id or "CP01",
+            cp_id=camera.cp_id or "BNS00000",
             connector_id=1,
             session_id=session_id,
             plate_number=plate,
@@ -436,7 +436,7 @@ class AutoMonitorService:
             camera_type=CameraTypeEnum(camera.camera_type),
             stream_url=camera.stream_url,
             cs_id=camera.cs_id,
-            cp_id=camera.cp_id or "CP01",
+            cp_id=camera.cp_id or "BNS00000",
             username=camera.username,
             password=camera.password,
             ip_address=camera.ip_address,

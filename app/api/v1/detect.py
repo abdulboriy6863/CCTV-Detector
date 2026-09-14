@@ -22,8 +22,8 @@ router = APIRouter()
 @router.post("/upload", summary="Upload image for EV detection & plate recognition")
 async def detect_upload(
     file: UploadFile = File(...),
-    cs_id: str = Form("CS_DEFAULT"),
-    cp_id: str = Form("CP01"),
+    cs_id: str = Form("bluenetwrks"),
+    cp_id: str = Form("BNS00000"),
     db: Session = Depends(get_db)
 ):
     """

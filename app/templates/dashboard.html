@@ -623,11 +623,11 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Stansiya nomi (CS ID)</label>
-                        <input type="text" x-model="newCam.cs_id" placeholder="CS_TASHKENT_01" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                        <input type="text" x-model="newCam.cs_id" placeholder="bluenetwrks" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Zaryadka joyi (CP ID)</label>
-                        <input type="text" x-model="newCam.cp_id" placeholder="CP01" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                        <input type="text" x-model="newCam.cp_id" placeholder="BNS00000" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                     </div>
                 </div>
 
@@ -908,8 +908,8 @@
                 
                 addCamModal: false,
                 newCam: {
-                    cs_id: 'CS_TASHKENT_01',
-                    cp_id: 'CP01',
+                    cs_id: 'bluenetwrks',
+                    cp_id: 'BNS00000',
                     camera_name: '',
                     camera_type: 'RTSP',
                     stream_url: '',
@@ -1017,7 +1017,7 @@
                             await this.fetchSlots();
                             this.addCamModal = false;
                             this.newCam = {
-                                cs_id: 'CS_TASHKENT_01', cp_id: 'CP01',
+                                cs_id: 'bluenetwrks', cp_id: 'BNS00000',
                                 camera_name: '', camera_type: 'RTSP', stream_url: '',
                                 ip_address: '', port: 554, username: '', password: '', is_active: true
                             };
@@ -1073,8 +1073,8 @@
                             
                             const formData = new FormData();
                             formData.append('file', blob, 'cctv_live_snap.jpg');
-                            formData.append('cs_id', this.liveModal.slot.cs_id || 'CS_TASHKENT_01');
-                            formData.append('cp_id', this.liveModal.slot.cp_id || 'CP01');
+                            formData.append('cs_id', this.liveModal.slot.cs_id || 'bluenetwrks');
+                            formData.append('cp_id', this.liveModal.slot.cp_id || 'BNS00000');
                             
                             const detRes = await fetch('/api/v1/detect/upload', {
                                 method: 'POST',
@@ -1154,8 +1154,8 @@
                     
                     const formData = new FormData();
                     formData.append('file', file);
-                    formData.append('cs_id', 'CS_TASHKENT_01');
-                    formData.append('cp_id', 'CP01');
+                    formData.append('cs_id', 'bluenetwrks');
+                    formData.append('cp_id', 'BNS00000');
                     
                     try {
                         const res = await fetch('/api/v1/detect/upload', {

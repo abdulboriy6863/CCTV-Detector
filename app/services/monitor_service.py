@@ -1,6 +1,7 @@
 """Background CCTV monitor — periodic plate detection and parking session management."""
 import asyncio
 import logging
+import uuid
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -134,7 +135,7 @@ class AutoMonitorService:
                 .filter(CCTVSnapshot.event_type == EventTypeEnum.START.value)
                 .filter(CCTVSnapshot.detection_source == "CCTV_AUTO")
                 .filter(CCTVSnapshot.session_id.isnot(None))
-                .order_by(desc(CCTVSnapshot.created_at))
+                .order_by(desc(CCTVSnapshot.created_at), desc(CCTVSnapshot.id))
                 .all()
             )
 
@@ -252,7 +253,7 @@ class AutoMonitorService:
         db: Session
     ):
         """Record ONE START event in DB and update active_sessions state."""
-        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}"
+        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
         relative_path = storage_service.generate_relative_path(
             cs_id=camera.cs_id, cp_id=camera.cp_id or "CP01",

@@ -1,6 +1,7 @@
 """Detection API — upload image for plate recognition & EV classification."""
 import base64
 import logging
+import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -69,7 +70,7 @@ async def detect_upload(
             cs_id=cs_id,
             cp_id=cp_id,
             connector_id=1,
-            session_id=f"UPLOAD_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            session_id=f"UPLOAD_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}",
             plate_number=result.plate_number,
             event_type=EventTypeEnum.MANUAL.value,
             image_path=relative_path,

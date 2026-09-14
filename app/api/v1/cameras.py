@@ -184,6 +184,7 @@ async def test_camera(camera_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{camera_id}/stream", summary="Live continuous MJPEG video stream")
+@router.get("/{camera_id}/live", summary="Live continuous MJPEG video stream alias")
 async def stream_camera(camera_id: int, db: Session = Depends(get_db)):
     """
     Streams continuous live video (MJPEG) from CCTV RTSP/HTTP camera.

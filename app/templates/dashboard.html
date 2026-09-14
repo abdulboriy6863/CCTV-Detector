@@ -931,7 +931,7 @@
                 },
                 
                 init() {
-                    this.('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
+                    this.$watch('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
                     this.fetchStats();
                     this.fetchSlots();
                     this.fetchVehicles();
@@ -979,7 +979,7 @@
                 
                 async fetchVehicles() {
                     try {
-                        let url = ;
+                        let url = `/api/v1/vehicles?page=${this.page}&page_size=${this.pageSize}`;
                         if (this.filters.type === 'EV') url += '&is_ev=true';
                         else if (this.filters.type === 'REGULAR') url += '&vehicle_type=REGULAR';
                         

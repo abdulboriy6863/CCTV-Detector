@@ -215,7 +215,7 @@
                                                 :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'">
                                                 <span x-show="slot.is_ev">⚡</span>
                                                 <span x-text="slot.current_plate"></span>
-                                                <span x-show="slot.duration_formatted" class="text-[9px] opacity-90" x-text="'(' + slot.duration_formatted + ')'"></span>
+                                                <span x-show="slot.duration_formatted" class="text-[9px] opacity-90" x-text="'(' + formatDurationText(slot.duration_formatted) + ')'"></span>
                                             </span>
                                         </template>
                                         <template x-if="!slot.is_occupied && slot.is_online">
@@ -1061,13 +1061,27 @@
                     return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                 },
 
+                formatDurationText(text) {
+                    if (!text) return '';
+                    if (this.currentLang !== 'ko') {
+                        return text.replace(/^Chiqish:\s*/i, '').trim();
+                    }
+                    let t = text.replace(/^Chiqish:\s*/i, '');
+                    t = t.replace(/Jami\s*/gi, '총 ');
+                    t = t.replace(/(\d+)\s*soat/gi, '$1시간 ');
+                    t = t.replace(/(\d+)\s*daqiqa/gi, '$1분 ');
+                    t = t.replace(/(\d+)\s*soniya/gi, '$1초');
+                    t = t.replace(/to['’]xtab turdi/gi, '주차');
+                    return t.trim();
+                },
+
                 formatNote(item) {
                     if (!item) return '';
                     if (item.event_type === 'END') {
-                        if (item.notes && item.notes.startsWith('Chiqish: ')) {
-                            return item.notes.replace('Chiqish: ', '⏱️ ');
+                        if (item.notes) {
+                            return '⏱️ ' + this.formatDurationText(item.notes);
                         }
-                        return item.notes ? '⏱️ ' + item.notes : this.t('note_exit');
+                        return this.t('note_exit');
                     }
                     if (item.event_type === 'START') {
                         return this.t('note_entry');

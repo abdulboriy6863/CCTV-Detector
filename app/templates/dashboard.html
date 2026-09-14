@@ -181,7 +181,7 @@
                                     <span x-text="slots.length + ' ' + t('cameras_connected')"></span>
                                 </span>
                             </div>
-                            <p class="text-[11px] text-slate-400">RTSP va IP kameralar monitoring holati</p>
+                            <p class="text-[11px] text-slate-400" x-text="t('camera_mgmt_subtitle')"></p>
                         </div>
                     </div>
                     <button @click="addCamModal = true" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
@@ -219,14 +219,10 @@
                                             </span>
                                         </template>
                                         <template x-if="!slot.is_occupied && slot.is_online">
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                                🟢 Bo'sh
-                                            </span>
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="t('slot_vacant_badge')"></span>
                                         </template>
                                         <template x-if="!slot.is_online">
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-                                                🔴 OFFLINE
-                                            </span>
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300" x-text="t('slot_offline_badge')"></span>
                                         </template>
                                     </div>
                                     <p class="text-[10px] font-mono text-slate-400 truncate max-w-[220px] sm:max-w-xs" x-text="slot.stream_url"></p>
@@ -319,7 +315,7 @@
                                     <span class="text-2xl" x-text="uploadResult.data.is_ev ? '⚡' : '🚗'"></span>
                                     <div>
                                         <div class="font-mono font-black text-sm text-slate-900 dark:text-white" x-text="uploadResult.data.plate_number"></div>
-                                        <span class="text-[11px] font-bold" :class="uploadResult.data.is_ev ? 'text-sky-500' : 'text-slate-500'" x-text="uploadResult.data.is_ev ? '⚡ EV Tasdiqlandi' : '🚗 Oddiy avtomobil'"></span>
+                                        <span class="text-[11px] font-bold" :class="uploadResult.data.is_ev ? 'text-sky-500' : 'text-slate-500'" x-text="uploadResult.data.is_ev ? t('result_ev_confirmed') : t('result_regular_car')"></span>
                                     </div>
                                 </div>
                                 <div class="text-right">
@@ -349,7 +345,7 @@
                     </div>
                     <div>
                         <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
-                        <p class="text-xs text-slate-400 dark:text-slate-500">Stansiya va parkovka joylari bo'yicha kirish/chiqish tarixi</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500" x-text="t('history_subtitle')"></p>
                     </div>
                 </div>
                 
@@ -371,7 +367,7 @@
                     <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
                         <tr>
                             <th class="px-6 py-4" x-text="t('th_time')"></th>
-                            <th class="px-6 py-4">Stansiya / Joy</th>
+                            <th class="px-6 py-4" x-text="t('th_station_slot')"></th>
                             <th class="px-6 py-4" x-text="t('th_plate')"></th>
                             <th class="px-6 py-4" x-text="t('th_type')"></th>
                             <th class="px-6 py-4" x-text="t('th_confidence')"></th>
@@ -404,14 +400,10 @@
                                             <span x-text="item.plate_number || t('unrecognized')"></span>
                                         </div>
                                         <template x-if="item.event_type === 'START'">
-                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                                Kirish
-                                            </span>
+                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="t('event_start')"></span>
                                         </template>
                                         <template x-if="item.event_type === 'END'">
-                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-                                                Chiqish
-                                            </span>
+                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" x-text="t('event_end')"></span>
                                         </template>
                                     </div>
                                 </td>
@@ -419,12 +411,12 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <template x-if="item.is_ev">
                                         <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
-                                            <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> EV Avtomobil
+                                            <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> <span x-text="t('vehicle_ev')"></span>
                                         </span>
                                     </template>
                                     <template x-if="!item.is_ev">
                                         <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                            <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> Oddiy
+                                            <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> <span x-text="t('vehicle_regular')"></span>
                                         </span>
                                     </template>
                                 </td>
@@ -483,11 +475,11 @@
                 <!-- Station & Slot Inputs -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Stansiya nomi (CS ID)</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('station_id_label')"></label>
                         <input type="text" x-model="newCam.cs_id" placeholder="bluenetwrks" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Zaryadka joyi (CP ID)</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('slot_id_label')"></label>
                         <input type="text" x-model="newCam.cp_id" placeholder="BNS00000" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                     </div>
                 </div>
@@ -585,13 +577,13 @@
                         <div>
                             <div class="flex items-center space-x-2">
                                 <span class="text-sm font-black tracking-wider text-slate-900 dark:text-white" x-text="liveModal.aiResult.plate_number || t('unrecognized')"></span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="liveModal.aiResult.is_ev ? 'bg-sky-500 text-white' : 'bg-rose-500 text-white'" x-text="liveModal.aiResult.is_ev ? '⚡ EV Tasdiqlandi' : '🚗 Oddiy avtomobil'"></span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="liveModal.aiResult.is_ev ? 'bg-sky-500 text-white' : 'bg-rose-500 text-white'" x-text="liveModal.aiResult.is_ev ? t('result_ev_confirmed') : t('result_regular_car')"></span>
                             </div>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? 'Zaryadlash ruxsat etildi' : (liveModal.aiResult.success ? 'OGOHLANTIRISH: Noqonuniy to\'xtash!' : 'Raqam aniqlanmadi')"></p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? t('result_ev_allowed') : (liveModal.aiResult.success ? t('result_alert_illegal') : t('result_unrecognized'))"></p>
                         </div>
                     </div>
                     <div class="text-right" x-show="liveModal.aiResult.success">
-                        <span class="text-xs font-mono font-bold text-slate-600 dark:text-slate-300" x-text="((liveModal.aiResult.confidence || 0) * 100).toFixed(0) + '% ishonch'"></span>
+                        <span class="text-xs font-mono font-bold text-slate-600 dark:text-slate-300" x-text="((liveModal.aiResult.confidence || 0) * 100).toFixed(0) + '% ' + t('confidence_text')"></span>
                     </div>
                 </div>
             </template>
@@ -626,6 +618,7 @@
                 theme_light: "Yorug' rejimga o'tish",
                 theme_dark: "Qorong'i rejimga o'tish",
                 camera_mgmt_title: "Kameralar konfiguratsiyasi & Jonli CCTV",
+                camera_mgmt_subtitle: "RTSP va IP kameralar monitoring holati",
                 btn_test: "Jonli efir / Test",
                 stat_total: "Jami aniqlangan",
                 stat_ev: "Elektr avtomobil (EV)",
@@ -644,6 +637,8 @@
                 btn_add_camera: "Yangi Kamera Qo'shish",
                 btn_close: "Yopish",
                 add_camera_header: "Yangi CCTV Kamera va Parkovka Bog'lash",
+                station_id_label: "Stansiya nomi (CS ID)",
+                slot_id_label: "Zaryadka joyi (CP ID)",
                 cam_name_label: "Kamera nomi",
                 cam_name_ph: "Masalan: 1-ustun kamera",
                 cam_protocol_label: "Protokol turi",
@@ -658,11 +653,13 @@
                 btn_delete: "O'chirish",
                 no_cameras_msg: "Hozircha CCTV kamera ulanmagan.",
                 history_title: "Aniqlangan mashinalar jurnali",
+                history_subtitle: "Stansiya va parkovka joylari bo'yicha kirish/chiqish tarixi",
                 filter_all: "Barcha mashinalar",
                 filter_ev_only: "Faqat Elektr (EV)",
                 filter_regular_only: "Faqat Oddiy mashinalar",
                 btn_refresh: "Yangilash",
                 th_time: "Vaqt",
+                th_station_slot: "Stansiya / Joy",
                 th_plate: "Davlat raqami",
                 th_type: "Turi",
                 th_confidence: "Ishonch",
@@ -676,7 +673,23 @@
                 btn_ai_scan_now: "⚡ Hozirgi kadrni AI tahlil qilish",
                 confirm_delete_vehicle: "Haqiqatan ham ushbu yozuvni o'chirmoqchimisiz?",
                 confirm_delete_cam: "Haqiqatan ham ushbu kamerani o'chirmoqchimisiz?",
-                upload_img_only: "Faqat rasm fayllari yuklanishi mumkin."
+                upload_img_only: "Faqat rasm fayllari yuklanishi mumkin.",
+                event_start: "Kirish",
+                event_end: "Chiqish",
+                vehicle_ev: "EV Avtomobil",
+                vehicle_regular: "Oddiy",
+                slot_vacant_badge: "🟢 Bo'sh",
+                slot_offline_badge: "🔴 OFFLINE",
+                result_ev_confirmed: "⚡ EV Tasdiqlandi",
+                result_regular_car: "🚗 Oddiy avtomobil",
+                result_ev_allowed: "Zaryadlash ruxsat etildi",
+                result_alert_illegal: "OGOHLANTIRISH: Noqonuniy to'xtash!",
+                result_unrecognized: "Raqam aniqlanmadi",
+                confidence_text: "ishonch",
+                note_entry: "🚗 Kirish vaqti",
+                note_exit: "⏱️ Chiqish qayd etildi",
+                note_cctv_auto: "📹 CCTV Avto",
+                note_manual_upload: "📤 Qo'lda tahlil"
             },
             ko: {
                 app_subtitle: "전기차 충전구역 스마트 다중 CCTV 모니터링 시스템",
@@ -684,6 +697,7 @@
                 theme_light: "라이트 모드로 전환",
                 theme_dark: "다크 모드로 전환",
                 camera_mgmt_title: "카메라 구성 및 실시간 CCTV",
+                camera_mgmt_subtitle: "RTSP 및 IP 카메라 모니터링 현황",
                 btn_test: "실시간 / 테스트",
                 stat_total: "총 감지 차량",
                 stat_ev: "전기차 (EV) 감지",
@@ -702,6 +716,8 @@
                 btn_add_camera: "새 카메라 추가",
                 btn_close: "닫기",
                 add_camera_header: "새 CCTV 카메라 & 주차 베이 등록",
+                station_id_label: "충전소 ID (CS ID)",
+                slot_id_label: "충전기 ID (CP ID)",
                 cam_name_label: "카메라 이름",
                 cam_name_ph: "예: 1번 베이 카메라",
                 cam_protocol_label: "프로토콜 유형",
@@ -716,11 +732,13 @@
                 btn_delete: "삭제",
                 no_cameras_msg: "등록된 CCTV 카메라가 없습니다.",
                 history_title: "감지 이력 목록",
+                history_subtitle: "충전소 및 주차 베이별 입차/출차 기록",
                 filter_all: "전체 차량",
                 filter_ev_only: "전기차 (EV) 만",
                 filter_regular_only: "일반 차량 (내연기관)",
                 btn_refresh: "새로고침",
                 th_time: "시간",
+                th_station_slot: "충전소 / 베이",
                 th_plate: "차량 번호판",
                 th_type: "유형",
                 th_confidence: "신뢰도",
@@ -734,7 +752,23 @@
                 btn_ai_scan_now: "⚡ 현재 프레임 AI 번호판 분석",
                 confirm_delete_vehicle: "이 감지 기록을 삭제하시겠습니까?",
                 confirm_delete_cam: "정말 이 카메라를 삭제하시겠습니까?",
-                upload_img_only: "이미지 파일만 업로드 가능합니다."
+                upload_img_only: "이미지 파일만 업로드 가능합니다.",
+                event_start: "입차",
+                event_end: "출차",
+                vehicle_ev: "전기차 (EV)",
+                vehicle_regular: "일반차",
+                slot_vacant_badge: "🟢 빈자리",
+                slot_offline_badge: "🔴 오프라인",
+                result_ev_confirmed: "⚡ EV 확인됨",
+                result_regular_car: "🚗 일반 차량",
+                result_ev_allowed: "충전 구역 주차 가능",
+                result_alert_illegal: "경고: 불법 주차 감지!",
+                result_unrecognized: "번호판 미인식",
+                confidence_text: "신뢰도",
+                note_entry: "🚗 입차 시간",
+                note_exit: "⏱️ 출차 완료",
+                note_cctv_auto: "📹 CCTV 자동",
+                note_manual_upload: "📤 수동 분석"
             }
         };
 
@@ -1033,16 +1067,16 @@
                         if (item.notes && item.notes.startsWith('Chiqish: ')) {
                             return item.notes.replace('Chiqish: ', '⏱️ ');
                         }
-                        return item.notes ? '⏱️ ' + item.notes : '⏱️ Chiqish qayd etildi';
+                        return item.notes ? '⏱️ ' + item.notes : this.t('note_exit');
                     }
                     if (item.event_type === 'START') {
-                        return '🚗 Kirish vaqti';
+                        return this.t('note_entry');
                     }
                     if (item.detection_source === 'CCTV_AUTO') {
-                        return '📹 CCTV Avto';
+                        return this.t('note_cctv_auto');
                     }
                     if (item.detection_source === 'MANUAL_UPLOAD') {
-                        return "📤 Qo'lda tahlil";
+                        return this.t('note_manual_upload');
                     }
                     return item.notes || '';
                 }

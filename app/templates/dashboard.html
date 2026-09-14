@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCTV EV Detector | Blue Networks</title>
+    <title>CCTV EV Detector | Multi-Parking Smart Monitor</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -53,11 +53,11 @@
         }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 dark:bg-darkbg dark:text-slate-100 transition-colors duration-200 min-h-screen">
+<body class="bg-slate-100 text-slate-800 dark:bg-darkbg dark:text-slate-100 transition-colors duration-200 min-h-screen flex flex-col">
 
     <!-- Top Navbar -->
     <nav class="bg-white/90 dark:bg-darkcard/90 backdrop-blur-md shadow-sm border-b border-slate-200 dark:border-slate-700/80 sticky top-0 z-40">
-        <div class="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
                 <!-- Logo & Brand -->
                 <div class="flex items-center space-x-3">
@@ -67,7 +67,7 @@
                     <div>
                         <div class="flex items-center space-x-2">
                             <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">CCTV EV Detector</span>
-                            <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">v1.0</span>
+                            <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Multi-CCTV</span>
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400" x-text="t('app_subtitle')"></p>
                     </div>
@@ -75,66 +75,20 @@
 
                 <!-- Right Menu: Status, Theme, Settings, Language Switcher -->
                 <div class="flex items-center space-x-2 sm:space-x-3">
-                    <!-- CCTV Status Badge -->
-                    <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
-                        <span class="w-2 h-2 rounded-full" :class="cameras.length > 0 ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'"></span>
-                        <span class="text-slate-600 dark:text-slate-300" x-text="cameras.length + ' ' + t('cameras_connected')"></span>
+                    <!-- CCTV Active Count Badge -->
+                    <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                        <span class="w-2 h-2 rounded-full" :class="slots.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'"></span>
+                        <span class="text-slate-700 dark:text-slate-300 font-semibold" x-text="slots.length + ' ' + t('cameras_connected')"></span>
                     </div>
 
                     <!-- Theme Toggle -->
-                    <button @click="toggleTheme()" class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" :title="isDark ? t('theme_light') : t('theme_dark')">
+                    <button @click="toggleTheme()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition shadow-sm" :title="isDark ? t('theme_light') : t('theme_dark')">
                         <i class="fa-solid" :class="isDark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
                     </button>
 
-                    <!-- Settings Dropdown -->
-                    <div class="relative" x-data="{ open: false }">
-                        <button @click="open = !open" @click.outside="open = false" class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" :title="t('settings_title')">
-                            <i class="fa-solid fa-gear"></i>
-                        </button>
-
-                        <div x-show="open" x-cloak class="absolute right-0 mt-2 w-80 bg-white dark:bg-darkcard rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-4 z-50 text-sm">
-                            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
-                                <h3 class="font-bold text-slate-900 dark:text-white flex items-center">
-                                    <i class="fa-solid fa-sliders mr-2 text-brand"></i> <span x-text="t('settings_title')"></span>
-                                </h3>
-                                <button @click="open = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                                    <i class="fa-solid fa-xmark"></i>
-                                </button>
-                            </div>
-                            <div class="py-3 space-y-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('auto_monitor_label')"></label>
-                                    <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                                        <span class="text-xs text-slate-600 dark:text-slate-400" x-text="t('auto_monitor_desc')"></span>
-                                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" x-text="t('monitor_active')"></span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('ev_blue_threshold')"></label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="range" min="15" max="50" value="30" class="w-full accent-blue-600">
-                                        <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">30%</span>
-                                    </div>
-                                    <p class="text-[11px] text-slate-500 mt-1" x-text="t('ev_threshold_desc')"></p>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('alert_sound_label')"></label>
-                                    <label class="flex items-center space-x-2 cursor-pointer">
-                                        <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                                        <span class="text-xs text-slate-700 dark:text-slate-300" x-text="t('alert_visual_toggle')"></span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-end">
-                                <button @click="open = false" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition" x-text="t('btn_save_settings')">
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Language Switcher (UZ / KO) -->
                     <div class="relative" x-data="{ langOpen: false }">
-                        <button @click="langOpen = !langOpen" @click.outside="langOpen = false" class="h-9 px-2.5 flex items-center space-x-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition" :title="t('lang_title')">
+                        <button @click="langOpen = !langOpen" @click.outside="langOpen = false" class="h-9 px-2.5 flex items-center space-x-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition shadow-sm">
                             <span x-text="currentLang === 'uz' ? '🇺🇿 UZ' : '🇰🇷 KO'"></span>
                             <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
                         </button>
@@ -155,48 +109,48 @@
         </div>
     </nav>
 
-    <!-- Main Container (Full-Width Responsive Canvas) -->
-    <main class="max-w-[1680px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-[1780px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        <!-- Top Statistics Cards -->
+        <!-- Top Row: Real-time Statistics Cards (4 Cards) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Total Detections -->
             <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="t('stat_total')"></p>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400" x-text="t('stat_total')"></p>
                     <h3 class="text-2xl font-black mt-1 text-slate-900 dark:text-white" x-text="stats.total_detections">0</h3>
-                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_detections"></p>
+                    <p class="text-[11px] text-slate-400 mt-0.5"><span x-text="t('stat_today')"></span>: <span class="font-bold text-slate-700 dark:text-slate-300" x-text="stats.today_detections">0</span></p>
                 </div>
                 <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 flex items-center justify-center text-xl shadow-inner">
-                    <i class="fa-solid fa-camera"></i>
+                    <i class="fa-solid fa-car-rear"></i>
                 </div>
             </div>
 
             <!-- EV Detections -->
             <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400" x-text="t('stat_ev')"></p>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-sky-500" x-text="t('stat_ev')"></p>
                     <h3 class="text-2xl font-black mt-1 text-sky-600 dark:text-sky-400" x-text="stats.ev_count">0</h3>
-                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_ev"></p>
+                    <p class="text-[11px] text-slate-400 mt-0.5"><span x-text="t('stat_today')"></span>: <span class="font-bold text-sky-600 dark:text-sky-400" x-text="stats.today_ev">0</span></p>
                 </div>
                 <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center text-xl shadow-inner">
-                    <i class="fa-solid fa-bolt"></i>
+                    <i class="fa-solid fa-charging-station"></i>
                 </div>
             </div>
 
-            <!-- Regular Detections -->
+            <!-- Regular (Non-EV) Vehicles -->
             <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="t('stat_regular')"></p>
-                    <h3 class="text-2xl font-black mt-1 text-slate-700 dark:text-slate-200" x-text="stats.regular_count">0</h3>
-                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="t('stat_today') + ': ' + stats.today_regular"></p>
+                    <h3 class="text-2xl font-black mt-1 text-slate-800 dark:text-slate-200" x-text="stats.regular_count">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5"><span x-text="t('stat_today')"></span>: <span class="font-bold text-slate-700 dark:text-slate-300" x-text="stats.today_regular">0</span></p>
                 </div>
-                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 flex items-center justify-center text-xl shadow-inner">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 flex items-center justify-center text-xl shadow-inner">
                     <i class="fa-solid fa-gas-pump"></i>
                 </div>
             </div>
 
-            <!-- Today Alerts -->
+            <!-- Non-EV Parking Alerts -->
             <div class="bg-white dark:bg-darkcard p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between" :class="stats.today_alerts > 0 ? 'border-red-300 dark:border-red-900/50 bg-red-50/20' : ''">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400" x-text="t('stat_alerts')"></p>
@@ -209,360 +163,544 @@
             </div>
         </div>
 
-        <!-- Middle 2-Column Section: Cameras & Test Recognition (Matched Heights) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-
-            <!-- LEFT: Camera Configuration & Live CCTV (h-[340px] scrollable box) -->
-            <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 h-[340px] flex flex-col" x-data="{ addCamOpen: false }">
-                <div class="flex items-center justify-between mb-3 shrink-0">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm shadow-inner">
-                            <i class="fa-solid fa-video"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('camera_mgmt_title')"></h2>
-                            <p class="text-[11px] text-slate-400">RTSP va IP kameralar holati</p>
-                        </div>
+        <!-- SECTION: Multi-CCTV Monitoring Hub Header & View Switcher -->
+        <div class="bg-white dark:bg-darkcard p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shadow-inner">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white" x-text="t('multi_monitor_title')"></h2>
+                        <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                            <span x-text="t('auto_monitor_badge')"></span>
+                        </span>
                     </div>
-                    <button @click="addCamOpen = !addCamOpen" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm">
-                        <i class="fa-solid" :class="addCamOpen ? 'fa-xmark' : 'fa-plus'"></i>
-                        <span x-text="addCamOpen ? t('btn_close') : t('btn_add_camera')"></span>
+                    <p class="text-xs text-slate-400 dark:text-slate-500" x-text="t('multi_monitor_subtitle')"></p>
+                </div>
+            </div>
+
+            <!-- View Mode Switcher + Add Camera Button -->
+            <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
+                <!-- Grid / Tab Switcher -->
+                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                    <button @click="viewMode = 'grid'" class="px-3.5 py-1.5 rounded-lg transition flex items-center space-x-1.5"
+                        :class="viewMode === 'grid' ? 'bg-white dark:bg-darkcard text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'">
+                        <i class="fa-solid fa-table-cells-large"></i>
+                        <span x-text="t('view_grid')"></span>
+                    </button>
+                    <button @click="viewMode = 'tab'" class="px-3.5 py-1.5 rounded-lg transition flex items-center space-x-1.5"
+                        :class="viewMode === 'tab' ? 'bg-white dark:bg-darkcard text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <span x-text="t('view_tabs')"></span>
                     </button>
                 </div>
 
-                <!-- Scrollable Container for Add Form & Camera List -->
-                <div class="flex-1 overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
-                    <!-- Add Camera Form (Collapsible) -->
-                    <div x-show="addCamOpen" x-cloak class="mb-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-3" x-data="{ showAdvanced: false }">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500" x-text="t('add_camera_header')"></h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-0.5" x-text="t('cam_name_label')"></label>
-                                <input type="text" x-model="newCam.camera_name" :placeholder="t('cam_name_ph')" class="w-full text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-0.5" x-text="t('cam_ip_label')"></label>
-                                <div class="flex space-x-1.5">
-                                    <input type="text" x-model="newCam.ip_address" placeholder="192.168.0.16" class="w-2/3 text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
-                                    <input type="number" x-model.number="newCam.port" :placeholder="newCam.camera_type === 'RTSP' ? '554' : '80'" class="w-1/3 text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono" :title="t('cam_port_label')">
+                <!-- Add Camera Button -->
+                <button @click="addCamModal = true" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span x-text="t('btn_add_camera')"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW MODE 1: GRID VIEW (Multi-CCTV Responsive Grid) -->
+        <div x-show="viewMode === 'grid'" x-cloak class="space-y-4">
+            <!-- Camera Grid Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+                <template x-for="slot in slots" :key="slot.camera_id">
+                    <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border transition duration-200 overflow-hidden flex flex-col"
+                        :class="slot.is_occupied ? (slot.is_ev ? 'border-sky-300 dark:border-sky-800' : 'border-amber-300 dark:border-amber-800') : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
+                        
+                        <!-- Card Header: Station & Slot info -->
+                        <div class="p-3.5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+                            <div class="min-w-0 pr-2">
+                                <div class="flex items-center space-x-1.5 text-xs font-black text-slate-900 dark:text-white truncate">
+                                    <i class="fa-solid fa-charging-station text-blue-500 text-xs"></i>
+                                    <span x-text="slot.cs_id"></span>
+                                    <span class="text-slate-300 dark:text-slate-600">/</span>
+                                    <span class="text-blue-600 dark:text-blue-400 font-bold" x-text="slot.cp_id"></span>
                                 </div>
+                                <p class="text-[11px] text-slate-400 truncate" x-text="slot.camera_name"></p>
                             </div>
+
+                            <!-- Online / Offline Badge -->
                             <div>
-                                <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-0.5" x-text="t('cam_protocol_label')"></label>
-                                <select x-model="newCam.camera_type" @change="newCam.port = (newCam.camera_type === 'HTTP_SNAPSHOT' ? 80 : 554)" class="w-full text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
-                                    <option value="RTSP">RTSP Stream (Tavsiya etiladi)</option>
-                                    <option value="HTTP_SNAPSHOT">HTTP Snapshot</option>
-                                    <option value="ONVIF">ONVIF Protocol</option>
-                                </select>
+                                <template x-if="slot.is_online">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 inline-flex items-center space-x-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>ONLINE</span>
+                                    </span>
+                                </template>
+                                <template x-if="!slot.is_online">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 inline-flex items-center space-x-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                        <span>OFFLINE</span>
+                                    </span>
+                                </template>
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-0.5" x-text="t('cam_user_label') + ' / ' + t('cam_pass_label')"></label>
-                                <div class="flex space-x-1.5">
-                                    <input type="text" x-model="newCam.username" placeholder="admin" class="w-1/2 text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
-                                    <input type="password" x-model="newCam.password" placeholder="••••••••" class="w-1/2 text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                        </div>
+
+                        <!-- Card Video Stream / Snapshot Frame -->
+                        <div class="relative bg-black aspect-video overflow-hidden group cursor-pointer" @click="openLiveModal(slot)">
+                            <template x-if="slot.is_active && slot.is_online">
+                                <img :src="'/api/v1/cameras/' + slot.camera_id + '/live'" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="CCTV Stream">
+                            </template>
+                            <template x-if="!slot.is_online">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-slate-500 space-y-1">
+                                    <i class="fa-solid fa-video-slash text-2xl text-red-400"></i>
+                                    <span class="text-xs font-mono" x-text="slot.last_error || 'Signal Yo'q'"></span>
+                                </div>
+                            </template>
+
+                            <!-- Live Tag Overlay -->
+                            <div class="absolute top-2.5 left-2.5 flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                                <span>LIVE</span>
+                            </div>
+
+                            <!-- Expand Icon Overlay -->
+                            <div class="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md">
+                                <i class="fa-solid fa-expand text-xs"></i>
+                            </div>
+
+                            <!-- Bottom Status Banner Overlay -->
+                            <div class="absolute bottom-0 inset-x-0 p-2.5 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-center justify-between text-white">
+                                <!-- Vehicle Status -->
+                                <div>
+                                    <template x-if="slot.is_occupied">
+                                        <div class="flex items-center space-x-1.5">
+                                            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-extrabold shadow"
+                                                :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'">
+                                                <span x-show="slot.is_ev">⚡</span>
+                                                <span x-text="slot.current_plate"></span>
+                                            </span>
+                                        </div>
+                                    </template>
+                                    <template x-if="!slot.is_occupied">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600/90 text-white flex items-center space-x-1">
+                                            <i class="fa-solid fa-circle-check text-[9px]"></i>
+                                            <span x-text="t('slot_vacant')"></span>
+                                        </span>
+                                    </template>
+                                </div>
+
+                                <!-- Duration Timer -->
+                                <div x-show="slot.is_occupied" class="text-[11px] font-mono font-bold text-amber-300 flex items-center space-x-1">
+                                    <i class="fa-solid fa-stopwatch text-xs"></i>
+                                    <span x-text="slot.duration_formatted || '0 soniya'"></span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Optional Advanced URL Toggle -->
-                        <div>
-                            <button type="button" @click="showAdvanced = !showAdvanced" class="text-[10px] text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center space-x-1">
-                                <i class="fa-solid text-[8px]" :class="showAdvanced ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                                <span x-text="t('advanced_url_toggle')"></span>
-                            </button>
-                            <div x-show="showAdvanced" class="mt-1.5">
-                                <input type="text" x-model="newCam.stream_url" :placeholder="newCam.camera_type === 'RTSP' ? 'rtsp://192.168.0.16:554/stream1' : 'http://192.168.0.16/api/snapshot'" class="w-full text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end pt-1">
-                            <button @click="createCamera()" :disabled="isSavingCam || (!newCam.ip_address && !newCam.stream_url)" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition flex items-center space-x-1.5">
-                                <span x-show="!isSavingCam" x-text="t('btn_save_camera')"></span>
-                                <span x-show="isSavingCam" class="flex items-center space-x-1">
-                                    <i class="fa-solid fa-circle-notch fa-spin"></i>
-                                    <span>Tekshirilmoqda...</span>
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Camera List Items -->
-                    <template x-for="cam in cameras" :key="cam.id">
-                        <div class="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition">
-                            <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs shrink-0 shadow-inner" :class="cam.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-slate-200 text-slate-500'">
-                                    <i class="fa-solid fa-video"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-xs font-bold text-slate-900 dark:text-white truncate" x-text="cam.camera_name || t('unnamed_camera')"></span>
-                                        <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold" x-text="cam.camera_type"></span>
-                                    </div>
-                                    <p class="text-[10px] font-mono text-slate-400 truncate max-w-[200px] sm:max-w-xs" x-text="cam.stream_url"></p>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center space-x-1.5 shrink-0">
-                                <!-- Live Stream Button -->
-                                <button @click="openLiveModal(cam)" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition flex items-center space-x-1">
-                                    <i class="fa-solid fa-circle-play text-[11px]"></i>
-                                    <span class="hidden sm:inline" x-text="t('btn_test')"></span>
+                        <!-- Card Footer Controls -->
+                        <div class="p-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-white dark:bg-darkcard text-xs">
+                            <span class="text-[11px] font-mono text-slate-400" x-text="slot.camera_type"></span>
+                            
+                            <div class="flex items-center space-x-1.5">
+                                <button @click="openLiveModal(slot)" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-[11px] transition">
+                                    <i class="fa-solid fa-magnifying-glass mr-1"></i> <span x-text="t('btn_view')"></span>
                                 </button>
-                                <!-- Delete Button -->
-                                <button @click="deleteCamera(cam.id)" class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-500 flex items-center justify-center transition" :title="t('btn_delete')">
+                                <button @click="deleteCamera(slot.camera_id)" class="w-7 h-7 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 hover:text-red-500 flex items-center justify-center transition" :title="t('btn_delete')">
                                     <i class="fa-solid fa-trash-can text-xs"></i>
                                 </button>
                             </div>
                         </div>
-                    </template>
-                    <template x-if="cameras.length === 0">
-                        <div class="text-center py-10 text-slate-400 text-xs" x-text="t('no_cameras_msg')"></div>
-                    </template>
-                </div>
+                    </div>
+                </template>
             </div>
 
-            <!-- RIGHT: Test Upload & Recognition Box (h-[340px] matched box) -->
-            <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 h-[340px] flex flex-col">
-                <div class="flex items-center justify-between mb-3 shrink-0">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm shadow-inner">
-                            <i class="fa-solid fa-file-arrow-up"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('test_title')"></h2>
-                            <p class="text-[11px] text-slate-400" x-text="t('korean_plates_support')"></p>
-                        </div>
+            <!-- Empty State if no cameras -->
+            <template x-if="slots.length === 0">
+                <div class="bg-white dark:bg-darkcard rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
+                    <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center text-3xl shadow-inner">
+                        <i class="fa-solid fa-video"></i>
                     </div>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-base" x-text="t('no_cameras_msg')"></h3>
+                    <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Har bir zaryadlash ustuni yoki parkovka uchun CCTV kamerani qo'shing.</p>
+                    <button @click="addCamModal = true" class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition">
+                        <i class="fa-solid fa-plus mr-1"></i> <span x-text="t('btn_add_camera')"></span>
+                    </button>
                 </div>
+            </template>
+        </div>
 
-                <!-- Drag & Drop Box + Result Area (Scrollable if needed) -->
-                <div class="flex-1 flex flex-col overflow-y-auto pr-1.5 custom-scrollbar">
-                    <!-- Dropzone -->
-                    <div 
-                        class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer relative flex-1 flex flex-col items-center justify-center"
-                        @dragover.prevent="dragOver = true"
-                        @dragleave.prevent="dragOver = false"
-                        @drop.prevent="handleDrop($event)"
-                        :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
-                        @click="$refs.fileInput.click()"
-                    >
-                        <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect($event)">
+        <!-- VIEW MODE 2: TAB VIEW (Single CCTV Focused Viewer with Tabs) -->
+        <div x-show="viewMode === 'tab'" x-cloak class="space-y-4">
+            <!-- Tabs Navigation Bar -->
+            <div class="flex items-center space-x-2 overflow-x-auto pb-2 custom-scrollbar">
+                <template x-for="slot in slots" :key="slot.camera_id">
+                    <button @click="selectedSlotId = slot.camera_id" 
+                        class="px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center space-x-2 whitespace-nowrap transition shadow-sm"
+                        :class="selectedSlotId === slot.camera_id ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20' : 'bg-white dark:bg-darkcard text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300'">
+                        <span class="w-2 h-2 rounded-full" :class="slot.is_occupied ? (slot.is_ev ? 'bg-sky-400' : 'bg-amber-400') : 'bg-emerald-400'"></span>
+                        <span x-text="slot.cs_id + ' / ' + slot.cp_id"></span>
+                        <span class="text-[10px] opacity-75 font-normal" x-text="'(' + slot.camera_name + ')'"></span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Focused Tab CCTV Display -->
+            <template x-if="currentSlot">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                    <!-- Left: Big Player -->
+                    <div class="lg:col-span-2 bg-black rounded-2xl overflow-hidden shadow-xl border border-slate-800 aspect-video relative flex items-center justify-center">
+                        <img :src="'/api/v1/cameras/' + currentSlot.camera_id + '/live'" class="w-full h-full object-contain" alt="Focused CCTV Stream">
                         
-                        <div x-show="!isUploading">
-                            <div class="w-10 h-10 mx-auto rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 text-lg">
-                                <i class="fa-regular fa-image"></i>
-                            </div>
-                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
-                            <p class="text-[10px] text-slate-400 mt-0.5" x-text="t('dropzone_formats')"></p>
-                        </div>
-                        
-                        <div x-show="isUploading" class="py-3 flex flex-col items-center justify-center space-y-2">
-                            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600"></i>
-                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
-                            <p class="text-[10px] text-slate-400" x-text="t('analyzing_desc')"></p>
+                        <!-- Overlay Details -->
+                        <div class="absolute top-3 left-3 flex items-center space-x-2">
+                            <span class="px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold text-xs flex items-center space-x-1.5 shadow">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                <span>LIVE</span>
+                            </span>
+                            <span class="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white font-mono text-xs font-bold" x-text="currentSlot.camera_name"></span>
                         </div>
                     </div>
 
-                    <!-- Detection Live Result Card (Inline) -->
-                    <div x-show="uploadResult" x-cloak class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-xs font-bold text-slate-900 dark:text-white flex items-center">
-                                <i class="fa-solid fa-circle-check mr-1.5 text-emerald-500"></i> <span x-text="t('result_title')"></span>
-                            </h3>
-                            <span class="text-[10px] font-mono text-slate-400" x-text="uploadResult ? (uploadResult.processing_time_ms + ' ms') : ''"></span>
+                    <!-- Right: Slot Status & Controls -->
+                    <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4">
+                        <div class="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-slate-900 dark:text-white text-base" x-text="currentSlot.cs_id + ' - ' + currentSlot.cp_id"></h3>
+                                <p class="text-xs text-slate-400" x-text="currentSlot.camera_name"></p>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold"
+                                :class="currentSlot.is_occupied ? (currentSlot.is_ev ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300') : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'"
+                                x-text="currentSlot.is_occupied ? (currentSlot.is_ev ? '⚡ EV Band' : '🚗 Non-EV Band') : '🟢 Bo'sh'">
+                            </span>
                         </div>
 
-                        <!-- SUCCESS RESULT -->
-                        <template x-if="uploadResult && uploadResult.success && uploadResult.data">
-                            <div class="space-y-2">
-                                <!-- Plate Banner -->
-                                <div class="p-2.5 rounded-xl border flex items-center justify-between gap-2"
-                                    :class="uploadResult.data.is_ev ? 'bg-sky-50/60 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'">
-                                    <div class="flex items-center space-x-2">
-                                        <div class="px-2.5 py-1 rounded-lg border font-mono font-extrabold text-xs tracking-wider"
-                                             :class="uploadResult.data.is_ev ? 'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-900/60 dark:text-sky-200' : 'bg-slate-200 text-slate-900 border-slate-300 dark:bg-slate-700 dark:text-white'">
-                                            <span x-show="uploadResult.data.is_ev">⚡</span>
-                                            <span x-text="uploadResult.data.plate_number"></span>
-                                        </div>
+                        <!-- Occupant Details -->
+                        <template x-if="currentSlot.is_occupied">
+                            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-slate-400 font-semibold" x-text="t('recognized_plate_label')"></span>
+                                    <div class="px-3 py-1 rounded-lg font-mono font-black text-sm border shadow-sm"
+                                        :class="currentSlot.is_ev ? 'bg-sky-50 dark:bg-sky-950 border-sky-300 text-sky-900 dark:text-sky-200' : 'bg-slate-200 text-slate-900'">
+                                        <span x-show="currentSlot.is_ev">⚡</span>
+                                        <span x-text="currentSlot.current_plate"></span>
                                     </div>
-                                    <div>
-                                        <template x-if="uploadResult.data.is_ev">
-                                            <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-sky-500 text-white">⚡ EV (Elektr)</span>
-                                        </template>
-                                        <template x-if="!uploadResult.data.is_ev">
-                                            <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-700 text-white">🚗 Oddiy</span>
-                                        </template>
-                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-slate-400 font-semibold">To'xtab turish vaqti:</span>
+                                    <span class="font-mono font-bold text-amber-500 text-sm" x-text="currentSlot.duration_formatted"></span>
+                                </div>
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-slate-400">Kirish vaqti:</span>
+                                    <span class="font-mono text-slate-600 dark:text-slate-300" x-text="formatDate(currentSlot.entry_at)"></span>
                                 </div>
                             </div>
                         </template>
 
-                        <!-- ERROR RESULT -->
-                        <template x-if="uploadResult && !uploadResult.success">
-                            <div class="py-2 text-center space-y-0.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl p-2">
-                                <h4 class="font-bold text-xs text-slate-800 dark:text-slate-200" x-text="t('recognition_fail_title')"></h4>
-                                <p class="text-[10px] text-slate-400" x-text="uploadResult.message || t('recognition_fail_desc')"></p>
+                        <!-- Camera Specs -->
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                                <span class="text-slate-400">Stream URL:</span>
+                                <span class="font-mono text-slate-600 dark:text-slate-300 truncate max-w-[200px]" x-text="currentSlot.stream_url"></span>
                             </div>
-                        </template>
+                            <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                                <span class="text-slate-400">Protokol:</span>
+                                <span class="font-mono font-bold text-slate-600 dark:text-slate-300" x-text="currentSlot.camera_type"></span>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="pt-2 flex flex-col space-y-2">
+                            <button @click="openLiveModal(currentSlot)" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 shadow-sm transition">
+                                <i class="fa-solid fa-expand"></i>
+                                <span>Kattalashtirib ko'rish & AI Scan</span>
+                            </button>
+                        </div>
                     </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- MIDDLE SECTION: Upload Test Box -->
+        <div class="bg-white dark:bg-darkcard p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800" x-data="{ uploadBoxOpen: false }">
+            <div class="flex items-center justify-between cursor-pointer" @click="uploadBoxOpen = !uploadBoxOpen">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm shadow-inner">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white" x-text="t('test_title')"></h2>
+                        <p class="text-[11px] text-slate-400" x-text="t('korean_plates_support')"></p>
+                    </div>
+                </div>
+                <button class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center">
+                    <i class="fa-solid text-xs" :class="uploadBoxOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </button>
+            </div>
+
+            <!-- Collapsible Upload Box -->
+            <div x-show="uploadBoxOpen" x-cloak class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <div 
+                    class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/60 transition cursor-pointer flex flex-col items-center justify-center"
+                    @dragover.prevent="dragOver = true"
+                    @dragleave.prevent="dragOver = false"
+                    @drop.prevent="handleDrop()"
+                    :class="dragOver ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30' : ''"
+                    @click=".fileInput.click()"
+                >
+                    <input type="file" x-ref="fileInput" class="hidden" accept="image/*" @change="handleFileSelect()">
+                    
+                    <div x-show="!isUploading">
+                        <div class="w-10 h-10 mx-auto rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 text-lg">
+                            <i class="fa-regular fa-image"></i>
+                        </div>
+                        <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('dropzone_prompt')"></p>
+                        <p class="text-[10px] text-slate-400 mt-0.5" x-text="t('dropzone_formats')"></p>
+                    </div>
+                    
+                    <div x-show="isUploading" class="py-3 flex flex-col items-center justify-center space-y-2">
+                        <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600"></i>
+                        <p class="text-xs font-bold text-slate-700 dark:text-slate-200" x-text="t('analyzing_title')"></p>
+                        <p class="text-[10px] text-slate-400" x-text="t('analyzing_desc')"></p>
+                    </div>
+                </div>
+
+                <!-- Upload Detection Result -->
+                <div x-show="uploadResult" x-cloak class="p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700">
+                    <template x-if="uploadResult && uploadResult.success && uploadResult.data">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-2xl" x-text="uploadResult.data.is_ev ? '⚡' : '🚗'"></span>
+                                <div>
+                                    <div class="font-mono font-black text-sm text-slate-900 dark:text-white" x-text="uploadResult.data.plate_number"></div>
+                                    <span class="text-[11px] font-bold" :class="uploadResult.data.is_ev ? 'text-sky-500' : 'text-slate-500'" x-text="uploadResult.data.is_ev ? '⚡ EV Tasdiqlandi' : '🚗 Oddiy avtomobil'"></span>
+                                </div>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400" x-text="uploadResult.processing_time_ms + ' ms'"></span>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
 
-        <!-- BOTTOM FULL-WIDTH SECTION: Aniqlangan mashinalar jurnali -->
-        <div class="w-full">
-            <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden backdrop-blur-sm">
-                <div class="p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-inner">
-                            <i class="fa-solid fa-list-check"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
-                            <p class="text-xs text-slate-400 dark:text-slate-500">Avtoturargoh kirish, chiqish va AI aniqlash tarixi</p>
-                        </div>
+        <!-- BOTTOM FULL-WIDTH SECTION: Aniqlangan mashinalar jurnali (Events Table) -->
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+            <div class="p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-inner">
+                        <i class="fa-solid fa-list-check"></i>
                     </div>
-                    
-                    <div class="flex items-center space-x-3 w-full sm:w-auto">
-                        <select x-model="filters.type" @change="fetchVehicles()" class="text-xs px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
-                            <option value="" x-text="t('filter_all')"></option>
-                            <option value="EV" x-text="t('filter_ev_only')"></option>
-                            <option value="REGULAR" x-text="t('filter_regular_only')"></option>
-                        </select>
-                        <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
-                            <i class="fa-solid fa-rotate-right text-xs"></i>
-                        </button>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 dark:text-white" x-text="t('history_title')"></h2>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Stansiya va parkovka joylari bo'yicha kirish/chiqish tarixi</p>
                     </div>
                 </div>
+                
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <select x-model="filters.type" @change="fetchVehicles()" class="text-xs px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
+                        <option value="" x-text="t('filter_all')"></option>
+                        <option value="EV" x-text="t('filter_ev_only')"></option>
+                        <option value="REGULAR" x-text="t('filter_regular_only')"></option>
+                    </select>
+                    <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
+                        <i class="fa-solid fa-rotate-right text-xs"></i>
+                    </button>
+                </div>
+            </div>
 
-                <!-- Table with Generous Padding and No Overflow Issues -->
-                <div class="w-full overflow-x-auto">
-                    <table class="w-full text-left text-xs border-collapse min-w-[700px]">
-                        <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
-                            <tr>
-                                <th class="px-6 py-4" x-text="t('th_time')"></th>
-                                <th class="px-6 py-4" x-text="t('th_plate')"></th>
-                                <th class="px-6 py-4" x-text="t('th_type')"></th>
-                                <th class="px-6 py-4" x-text="t('th_confidence')"></th>
-                                <th class="px-6 py-4 text-right" x-text="t('th_actions')"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
-                            <template x-for="item in vehicles" :key="item.id">
-                                <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150">
-                                    <!-- Time & Event -->
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" x-text="formatDate(item.created_at)"></div>
-                                        <div class="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
-                                    </td>
-                                    <!-- License Plate -->
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="inline-flex items-center space-x-2.5">
-                                            <!-- Korean Styled License Plate Badge -->
-                                            <div class="px-3 py-1.5 rounded-xl border font-mono font-extrabold tracking-widest text-xs shadow-sm inline-flex items-center space-x-1.5"
-                                                 :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
-                                                <span x-show="item.is_ev" class="text-sky-500 text-xs">⚡</span>
-                                                <span x-text="item.plate_number || t('unrecognized')"></span>
-                                            </div>
-                                            <!-- Event Type Pill -->
-                                            <template x-if="item.event_type === 'START'">
-                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 inline-flex items-center space-x-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                    <span>Kirish</span>
-                                                </span>
-                                            </template>
-                                            <template x-if="item.event_type === 'END'">
-                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 inline-flex items-center space-x-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                                    <span>Chiqish</span>
-                                                </span>
-                                            </template>
+            <!-- Table -->
+            <div class="w-full overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse min-w-[760px]">
+                    <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
+                        <tr>
+                            <th class="px-6 py-4" x-text="t('th_time')"></th>
+                            <th class="px-6 py-4">Stansiya / Joy</th>
+                            <th class="px-6 py-4" x-text="t('th_plate')"></th>
+                            <th class="px-6 py-4" x-text="t('th_type')"></th>
+                            <th class="px-6 py-4" x-text="t('th_confidence')"></th>
+                            <th class="px-6 py-4 text-right" x-text="t('th_actions')"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        <template x-for="item in vehicles" :key="item.id">
+                            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150">
+                                <!-- Time & Event Note -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" x-text="formatDate(item.created_at)"></div>
+                                    <div class="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
+                                </td>
+                                <!-- Station & Slot -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        <i class="fa-solid fa-charging-station text-blue-500 text-[10px]"></i>
+                                        <span x-text="item.cs_id"></span>
+                                        <span class="text-slate-400">/</span>
+                                        <span class="text-blue-600 dark:text-blue-400" x-text="item.cp_id"></span>
+                                    </div>
+                                </td>
+                                <!-- License Plate -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="inline-flex items-center space-x-2.5">
+                                        <div class="px-3 py-1.5 rounded-xl border font-mono font-extrabold tracking-widest text-xs shadow-sm inline-flex items-center space-x-1.5"
+                                             :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
+                                            <span x-show="item.is_ev" class="text-sky-500 text-xs">⚡</span>
+                                            <span x-text="item.plate_number || t('unrecognized')"></span>
                                         </div>
-                                    </td>
-                                    <!-- Vehicle Type -->
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <template x-if="item.is_ev">
-                                            <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500/15 to-blue-500/15 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
-                                                <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> EV Avtomobil
+                                        <template x-if="item.event_type === 'START'">
+                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                                Kirish
                                             </span>
                                         </template>
-                                        <template x-if="!item.is_ev">
-                                            <div class="inline-flex items-center space-x-2">
-                                                <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                                    <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> Oddiy avtomobil
-                                                </span>
-                                                <template x-if="item.alert_sent">
-                                                    <span class="w-6 h-6 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xs shadow-sm" :title="t('alert_sent_tooltip')">
-                                                        <i class="fa-solid fa-triangle-exclamation"></i>
-                                                    </span>
-                                                </template>
-                                            </div>
+                                        <template x-if="item.event_type === 'END'">
+                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                                                Chiqish
+                                            </span>
                                         </template>
-                                    </td>
-                                    <!-- AI Confidence Progress -->
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center space-x-3">
-                                            <div class="w-24 bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-200/60 dark:border-slate-700/60">
-                                                <div class="h-2 rounded-full transition-all duration-300"
-                                                     :class="item.is_ev ? 'bg-sky-500' : 'bg-indigo-500'"
-                                                     :style="'width: ' + ((item.ai_confidence || 0) * 100) + '%'"></div>
-                                            </div>
-                                            <span class="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></span>
-                                        </div>
-                                    </td>
-                                    <!-- Actions -->
-                                    <td class="px-6 py-4 text-right whitespace-nowrap space-x-2">
-                                        <button @click="openImageModal(item.image_url)" class="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
-                                            <i class="fa-solid fa-image text-sm"></i>
-                                        </button>
-                                        <button @click="deleteVehicle(item.id)" class="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
-                                            <i class="fa-solid fa-trash-can text-sm"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                            <template x-if="vehicles.length === 0">
-                                <tr>
-                                    <td colspan="5" class="px-6 py-16 text-center text-slate-400">
-                                        <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 text-2xl shadow-inner">
-                                            <i class="fa-solid fa-car-side"></i>
-                                        </div>
-                                        <p class="text-sm font-semibold" x-text="t('no_history_msg')"></p>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </td>
+                                <!-- Vehicle Type -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <template x-if="item.is_ev">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
+                                            <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> EV Avtomobil
+                                        </span>
+                                    </template>
+                                    <template x-if="!item.is_ev">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                            <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> Oddiy
+                                        </span>
+                                    </template>
+                                </td>
+                                <!-- AI Confidence -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></span>
+                                </td>
+                                <!-- Actions -->
+                                <td class="px-6 py-4 text-right whitespace-nowrap space-x-1.5">
+                                    <button @click="openImageModal(item.image_url)" class="w-8 h-8 inline-flex items-center justify-center rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
+                                        <i class="fa-solid fa-image text-xs"></i>
+                                    </button>
+                                    <button @click="deleteVehicle(item.id)" class="w-8 h-8 inline-flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-if="vehicles.length === 0">
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-slate-400">
+                                    <p class="text-xs font-semibold" x-text="t('no_history_msg')"></p>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
 
-                <!-- Pagination Controls -->
-                <div class="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
-                    <button @click="prevPage()" :disabled="page === 1" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_prev')"></button>
-                    <span class="text-slate-500 font-mono text-xs font-semibold"><span class="font-bold text-slate-800 dark:text-slate-100 text-sm" x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
-                    <button @click="nextPage()" :disabled="page === totalPages" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm" x-text="t('btn_next')"></button>
-                </div>
+            <!-- Pagination -->
+            <div class="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 text-xs" x-show="totalPages > 1">
+                <button @click="prevPage()" :disabled="page === 1" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold text-slate-700 dark:text-slate-200 transition" x-text="t('btn_prev')"></button>
+                <span class="text-slate-500 font-mono text-xs font-semibold"><span class="font-bold text-slate-800 dark:text-slate-100" x-text="page"></span> / <span x-text="totalPages"></span> <span x-text="t('page_label')"></span></span>
+                <button @click="nextPage()" :disabled="page === totalPages" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold text-slate-700 dark:text-slate-200 transition" x-text="t('btn_next')"></button>
             </div>
         </div>
     </main>
 
-    <!-- CCTV Live Video Streaming Player Modal -->
-    <div x-show="liveModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-md">
-        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-3xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+    <!-- MODAL 1: ADD CAMERA / PARKING SLOT -->
+    <div x-show="addCamModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4" @click.outside="addCamModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-video"></i>
+                    </div>
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white" x-text="t('add_camera_header')"></h3>
+                </div>
+                <button @click="addCamModal = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <!-- Form -->
+            <div class="space-y-3 text-xs" x-data="{ showAdvanced: false }">
+                <!-- Station & Slot Inputs -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Stansiya nomi (CS ID)</label>
+                        <input type="text" x-model="newCam.cs_id" placeholder="CS_TASHKENT_01" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Zaryadka joyi (CP ID)</label>
+                        <input type="text" x-model="newCam.cp_id" placeholder="CP01" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_name_label')"></label>
+                    <input type="text" x-model="newCam.camera_name" :placeholder="t('cam_name_ph')" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="col-span-2">
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_ip_label')"></label>
+                        <input type="text" x-model="newCam.ip_address" placeholder="192.168.0.16" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_port_label')"></label>
+                        <input type="number" x-model.number="newCam.port" :placeholder="newCam.camera_type === 'RTSP' ? '554' : '80'" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_user_label')"></label>
+                        <input type="text" x-model="newCam.username" placeholder="admin" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_pass_label')"></label>
+                        <input type="password" x-model="newCam.password" placeholder="••••••••" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                    </div>
+                </div>
+
+                <!-- Advanced URL toggle -->
+                <div>
+                    <button type="button" @click="showAdvanced = !showAdvanced" class="text-[11px] text-slate-500 hover:text-blue-600 flex items-center space-x-1">
+                        <i class="fa-solid text-[9px]" :class="showAdvanced ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        <span x-text="t('advanced_url_toggle')"></span>
+                    </button>
+                    <div x-show="showAdvanced" class="mt-1.5">
+                        <input type="text" x-model="newCam.stream_url" placeholder="rtsp://192.168.0.16:554/stream1" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end space-x-2">
+                <button @click="addCamModal = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs" x-text="t('btn_close')"></button>
+                <button @click="createCamera()" :disabled="isSavingCam || (!newCam.ip_address && !newCam.stream_url)" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+                    <span x-show="!isSavingCam" x-text="t('btn_save_camera')"></span>
+                    <span x-show="isSavingCam" class="flex items-center space-x-1">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <span>Ulanmoqda...</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CCTV LIVE VIDEO EXPANDED VIEWER & AI SCAN -->
+    <div x-show="liveModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md">
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-4xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-700 space-y-4">
             <!-- Modal Header -->
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center text-sm">
+                    <div class="w-9 h-9 rounded-xl bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center text-sm">
                         <i class="fa-solid fa-video"></i>
                     </div>
                     <div>
                         <div class="flex items-center space-x-2">
-                            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white" x-text="liveModal.camera?.camera_name || t('unnamed_camera')"></h3>
+                            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white" x-text="(liveModal.slot?.cs_id || '') + ' - ' + (liveModal.slot?.cp_id || '') + ' (' + (liveModal.slot?.camera_name || t('unnamed_camera')) + ')'"></h3>
                             <span class="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white uppercase tracking-wider">
                                 <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                                <span x-text="t('live_badge')"></span>
+                                <span>LIVE</span>
                             </span>
                         </div>
-                        <p class="text-[11px] font-mono text-slate-400" x-text="liveModal.camera?.stream_url"></p>
+                        <p class="text-[11px] font-mono text-slate-400" x-text="liveModal.slot?.stream_url"></p>
                     </div>
                 </div>
                 <button @click="closeLiveModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
@@ -570,29 +708,25 @@
                 </button>
             </div>
             
-            <!-- Video Stream Container -->
-            <div class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-slate-800 shadow-inner">
-                <template x-if="liveModal.open && liveModal.camera">
-                    <img :src="'/api/v1/cameras/' + liveModal.camera.id + '/stream'" class="w-full h-full object-contain" alt="Live CCTV Video">
+            <!-- Video Stream Player -->
+            <div class="relative rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-slate-800 shadow-inner">
+                <template x-if="liveModal.open && liveModal.slot">
+                    <img :src="'/api/v1/cameras/' + liveModal.slot.camera_id + '/live'" class="w-full h-full object-contain" alt="Live CCTV Video">
                 </template>
             </div>
 
-            <!-- Instant AI Scan Result Panel (if scanned) -->
+            <!-- Instant AI Scan Result Panel -->
             <template x-if="liveModal.aiResult">
-                <div class="p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in" :class="liveModal.aiResult.is_ev ? 'bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800' : (liveModal.aiResult.success ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700')">
+                <div class="p-3.5 rounded-xl border flex items-center justify-between gap-3"
+                    :class="liveModal.aiResult.is_ev ? 'bg-sky-50 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800' : (liveModal.aiResult.success ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700')">
                     <div class="flex items-center space-x-3">
                         <div class="text-2xl" x-text="liveModal.aiResult.is_ev ? '⚡' : (liveModal.aiResult.success ? '🚨' : '❓')"></div>
                         <div>
                             <div class="flex items-center space-x-2">
                                 <span class="text-sm font-black tracking-wider text-slate-900 dark:text-white" x-text="liveModal.aiResult.plate_number || t('unrecognized')"></span>
-                                <template x-if="liveModal.aiResult.is_ev">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500 text-white">⚡ EV (Elektr)</span>
-                                </template>
-                                <template x-if="!liveModal.aiResult.is_ev && liveModal.aiResult.success">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white">🚗 Oddiy (Benzin/Dizel)</span>
-                                </template>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="liveModal.aiResult.is_ev ? 'bg-sky-500 text-white' : 'bg-rose-500 text-white'" x-text="liveModal.aiResult.is_ev ? '⚡ EV Tasdiqlandi' : '🚗 Oddiy avtomobil'"></span>
                             </div>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? 'EV zaryadlashga ruxsat etildi' : (liveModal.aiResult.success ? 'OGOHLANTIRISH: Noqonuniy to\'xtash!' : (liveModal.aiResult.message || t('recognition_fail_desc')) )"></p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? 'Zaryadlash ruxsat etildi' : (liveModal.aiResult.success ? 'OGOHLANTIRISH: Noqonuniy to'xtash!' : 'Raqam aniqlanmadi')"></p>
                         </div>
                     </div>
                     <div class="text-right" x-show="liveModal.aiResult.success">
@@ -601,22 +735,18 @@
                 </div>
             </template>
 
-            <template x-if="liveModal.aiError">
-                <div class="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-xs font-semibold" x-text="liveModal.aiError"></div>
-            </template>
-
-            <!-- Action Controls -->
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                <button @click="scanLiveFrame()" :disabled="liveModal.aiLoading" class="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 shadow-sm transition">
+            <!-- Modal Action Buttons -->
+            <div class="flex items-center justify-between pt-2">
+                <button @click="scanLiveFrame()" :disabled="liveModal.aiLoading" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
                     <i class="fa-solid" :class="liveModal.aiLoading ? 'fa-circle-notch fa-spin' : 'fa-wand-magic-sparkles'"></i>
                     <span x-text="liveModal.aiLoading ? 'AI Tahlil qilinmoqda...' : t('btn_ai_scan_now')"></span>
                 </button>
-                <button @click="closeLiveModal()" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition" x-text="t('btn_close')"></button>
+                <button @click="closeLiveModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition" x-text="t('btn_close')"></button>
             </div>
         </div>
     </div>
 
-    <!-- Image Fullscreen Preview Modal -->
+    <!-- MODAL 3: Image Fullscreen Preview -->
     <div x-show="previewImage.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
         <div class="relative max-w-4xl w-full">
             <button @click="previewImage.open = false" class="absolute -top-10 right-0 text-white text-2xl hover:text-slate-300">
@@ -630,24 +760,20 @@
     <script>
         const translations = {
             uz: {
-                app_subtitle: "Elektr avtomobil zaryadlash hududi aqlli CCTV monitoring tizimi",
+                app_subtitle: "Elektr avtomobil zaryadlash hududi aqlli ko'p kamerali monitoring tizimi",
                 cameras_connected: "ta kamera ulangan",
                 theme_light: "Yorug' rejimga o'tish",
                 theme_dark: "Qorong'i rejimga o'tish",
-                settings_title: "Tizim sozlamalari",
-                auto_monitor_label: "CCTV Avtomatik Monitoring",
-                auto_monitor_desc: "Davriy kadr olish va tahlil",
-                monitor_active: "Faol (15 soniya)",
-                ev_blue_threshold: "EV Ko'k Raqam Sezgirligi",
-                ev_threshold_desc: "Raqam fonida 30% dan ko'p ko'k rang bo'lsa EV deb tasniflanadi",
-                alert_sound_label: "Non-EV Ogohlantirish Signali",
-                alert_visual_toggle: "Aniqlanganda ekranda qizil ogohlantirish ko'rsatish",
-                btn_save_settings: "Sozlamalarni saqlash",
-                lang_title: "Tilni tanlash",
+                multi_monitor_title: "Markaziy CCTV Monitoring Paneli",
+                multi_monitor_subtitle: "Barcha zaryadlash stansiyalari va parkovka joylarini real vaqtda kuzatish",
+                auto_monitor_badge: "AVTO MONITORING FAOL",
+                view_grid: "To'r Ko'rinish (Grid)",
+                view_tabs: "Tab Ko'rinish (Single)",
+                slot_vacant: "Bo'sh (Vacant)",
                 stat_total: "Jami aniqlangan",
                 stat_ev: "Elektr avtomobil (EV)",
-                stat_regular: "Oddiy avtomobil (Benzin/Dizel)",
-                stat_alerts: "Noto'g'ri to'xtash ogohlantirishlari",
+                stat_regular: "Oddiy avtomobil",
+                stat_alerts: "Noto'g'ri to'xtashlar",
                 stat_today: "Bugun",
                 stat_alert_desc: "EV zaryadlash joyiga qo'yilgan oddiy mashinalar",
                 test_title: "Avtomobil rasmini test qilish & aniqlash",
@@ -657,24 +783,10 @@
                 analyzing_title: "AI orqali raqam o'qilmoqda va EV tahlil qilinmoqda...",
                 analyzing_desc: "YOLOv8 + OCR + HSV rang tahlili jarayonda",
                 result_title: "Aniqlash va tasniflash natijasi",
-                alert_banner_title: "OGOHLANTIRISH: Oddiy avtomobil (Non-EV) aniqlandi!",
-                alert_banner_desc: "Bu joy faqat elektr avtomobillar (EV) zaryadlash uchun ajratilgan. Jarima qo'llanilishi mumkin.",
-                ev_banner_title: "Elektr avtomobil (EV) tasdiqlandi",
-                ev_banner_desc: "Koreya ko'k rangli zaryadlash raqami muvaffaqiyatli aniqlandi",
-                ev_allowed_tag: "Zaryadlash ruxsat etilgan",
                 recognized_plate_label: "Aniqlangan davlat raqami",
-                vehicle_type_label: "Avtomobil turi",
-                type_ev: "Elektr avtomobil (EV)",
-                type_regular: "Oddiy avtomobil",
-                plate_crop_label: "Aniqlangan raqam qismi (AI Crop)",
-                ai_confidence_label: "AI Ishonch darajasi",
-                plate_color_label: "Raqam foni rangi",
-                recognition_fail_title: "Raqam aniqlanmadi",
-                recognition_fail_desc: "Rasmda Koreya davlat raqami topilmadi.",
-                camera_mgmt_title: "CCTV Kameralarni boshqarish",
-                btn_add_camera: "Kamera qo'shish",
+                btn_add_camera: "Yangi Kamera Qo'shish",
                 btn_close: "Yopish",
-                add_camera_header: "Yangi CCTV Kamera qo'shish",
+                add_camera_header: "Yangi CCTV Kamera va Parkovka Bog'lash",
                 cam_name_label: "Kamera nomi",
                 cam_name_ph: "Masalan: 1-ustun kamera",
                 cam_protocol_label: "Protokol turi",
@@ -685,9 +797,9 @@
                 advanced_url_toggle: "Maxsus Stream URL (ixtiyoriy)",
                 btn_save_camera: "Kamerani saqlash va faollashtirish",
                 unnamed_camera: "Nomsiz kamera",
-                btn_test: "Jonli ko'rish (Live)",
+                btn_view: "Ko'rish",
                 btn_delete: "O'chirish",
-                no_cameras_msg: "Hozircha CCTV kamera qo'shilmagan. Yuqoridagi 'Kamera qo'shish' tugmasidan foydalaning.",
+                no_cameras_msg: "Hozircha CCTV kamera ulanmagan.",
                 history_title: "Aniqlangan mashinalar jurnali",
                 filter_all: "Barcha mashinalar",
                 filter_ev_only: "Faqat Elektr (EV)",
@@ -699,35 +811,27 @@
                 th_confidence: "Ishonch",
                 th_actions: "Amallar",
                 unrecognized: "Noma'lum",
-                alert_sent_tooltip: "Ogohlantirish yuborildi",
                 view_image: "Rasmni ko'rish",
                 no_history_msg: "Hozircha avtomobil ma'lumotlari mavjud emas.",
                 btn_prev: "Oldingi",
                 btn_next: "Keyingi",
                 page_label: "sahifa",
-                modal_test_title: "CCTV Jonli Video Oqimi (Live Stream)",
-                live_badge: "JONLI / LIVE",
                 btn_ai_scan_now: "⚡ Hozirgi kadrni AI tahlil qilish",
-                capturing_stream_msg: "Jonli video oqimiga ulanmoqda...",
                 confirm_delete_vehicle: "Haqiqatan ham ushbu yozuvni o'chirmoqchimisiz?",
                 confirm_delete_cam: "Haqiqatan ham ushbu kamerani o'chirmoqchimisiz?",
                 upload_img_only: "Faqat rasm fayllari yuklanishi mumkin."
             },
             ko: {
-                app_subtitle: "전기차 충전구역 스마트 차량 감지 시스템",
+                app_subtitle: "전기차 충전구역 스마트 다중 CCTV 모니터링 시스템",
                 cameras_connected: "개 카메라 연결됨",
                 theme_light: "라이트 모드로 전환",
                 theme_dark: "다크 모드로 전환",
-                settings_title: "시스템 환경 설정",
-                auto_monitor_label: "CCTV 자동 모니터링",
-                auto_monitor_desc: "주기적 캡처 & 감지",
-                monitor_active: "활성화됨 (15초)",
-                ev_blue_threshold: "EV 파란색 번호판 감지 기준",
-                ev_threshold_desc: "번호판 내 하늘색 비율이 30% 이상 시 EV로 판별",
-                alert_sound_label: "비-EV(일반차) 경고음/알림",
-                alert_visual_toggle: "감지 시 화면 시각 경고 표시",
-                btn_save_settings: "설정 적용",
-                lang_title: "언어 변경",
+                multi_monitor_title: "통합 CCTV 모니터링 허브",
+                multi_monitor_subtitle: "모든 충전소 및 주차 베이 실시간 모니터링",
+                auto_monitor_badge: "자동 모니터링 가동 중",
+                view_grid: "그리드 뷰 (Grid)",
+                view_tabs: "탭 뷰 (Single)",
+                slot_vacant: "비어있음 (공석)",
                 stat_total: "총 감지 차량",
                 stat_ev: "전기차 (EV) 감지",
                 stat_regular: "일반 차량 (내연기관)",
@@ -741,25 +845,11 @@
                 analyzing_title: "AI 번호판 인식 및 EV 분류 중...",
                 analyzing_desc: "YOLOv8 + OCR + HSV 색상 분석 수행 중",
                 result_title: "인식 및 분류 결과",
-                alert_banner_title: "경고: 일반 차량(내연기관) 감지됨!",
-                alert_banner_desc: "본 구역은 전기차 충전 전용 주차구역입니다. 주차 방해 시 과태료가 부과될 수 있습니다.",
-                ev_banner_title: "전기차 (EV) 확인 완료",
-                ev_banner_desc: "파란색 전용 번호판 인식 성공",
-                ev_allowed_tag: "충전 가능",
                 recognized_plate_label: "인식된 번호판",
-                vehicle_type_label: "차량 유형",
-                type_ev: "전기차 (EV)",
-                type_regular: "일반 차량",
-                plate_crop_label: "검출된 번호판 영역 (AI Crop)",
-                ai_confidence_label: "AI 신뢰도",
-                plate_color_label: "번호판 배경 색상",
-                recognition_fail_title: "번호판 인식 실패",
-                recognition_fail_desc: "이미지에서 한국 번호판을 찾을 수 없습니다.",
-                camera_mgmt_title: "CCTV 카메라 연결 관리",
-                btn_add_camera: "카메라 추가",
+                btn_add_camera: "새 카메라 추가",
                 btn_close: "닫기",
-                add_camera_header: "새 CCTV 카메라 등록",
-                cam_name_label: "카amera 이름",
+                add_camera_header: "새 CCTV 카메라 & 주차 베이 등록",
+                cam_name_label: "카메라 이름",
                 cam_name_ph: "예: 1번 베이 카메라",
                 cam_protocol_label: "프로토콜 유형",
                 cam_ip_label: "카메라 IP 주소",
@@ -769,9 +859,9 @@
                 advanced_url_toggle: "맞춤 스트림 URL (선택사항)",
                 btn_save_camera: "카메라 저장 및 활성화",
                 unnamed_camera: "이름 없음",
-                btn_test: "실시간 라이브 보기",
+                btn_view: "상세보기",
                 btn_delete: "삭제",
-                no_cameras_msg: "등록된 CCTV 카메라가 없습니다. 상단 '카메라 추가' 버튼을 눌러 등록하세요.",
+                no_cameras_msg: "등록된 CCTV 카메라가 없습니다.",
                 history_title: "감지 이력 목록",
                 filter_all: "전체 차량",
                 filter_ev_only: "전기차 (EV) 만",
@@ -783,16 +873,12 @@
                 th_confidence: "신뢰도",
                 th_actions: "작업",
                 unrecognized: "미인식",
-                alert_sent_tooltip: "경고 발송됨",
                 view_image: "사진 보기",
                 no_history_msg: "기록된 차량 감지 데이터가 없습니다.",
                 btn_prev: "이전",
                 btn_next: "다음",
                 page_label: "페이지",
-                modal_test_title: "CCTV 실시간 라이브 영상 스트림",
-                live_badge: "실시간 LIVE",
                 btn_ai_scan_now: "⚡ 현재 프레임 AI 번호판 분석",
-                capturing_stream_msg: "실시간 비디오 스트림 연결 중...",
                 confirm_delete_vehicle: "이 감지 기록을 삭제하시겠습니까?",
                 confirm_delete_cam: "정말 이 카메라를 삭제하시겠습니까?",
                 upload_img_only: "이미지 파일만 업로드 가능합니다."
@@ -804,7 +890,11 @@
                 isDark: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
                 currentLang: localStorage.getItem('app_lang') || 'uz',
                 
+                viewMode: 'grid', // 'grid' or 'tab'
+                selectedSlotId: null,
+
                 stats: { total_detections: 0, ev_count: 0, regular_count: 0, today_detections: 0, today_ev: 0, today_regular: 0, today_alerts: 0 },
+                slots: [],
                 
                 dragOver: false,
                 isUploading: false,
@@ -816,7 +906,7 @@
                 pageSize: 6,
                 filters: { type: '' },
                 
-                cameras: [],
+                addCamModal: false,
                 newCam: {
                     cs_id: 'CS_TASHKENT_01',
                     cp_id: 'CP01',
@@ -830,21 +920,28 @@
                     is_active: true
                 },
 
-                liveModal: { open: false, camera: null, aiLoading: false, aiResult: null, aiError: null },
+                liveModal: { open: false, slot: null, aiLoading: false, aiResult: null, aiError: null },
                 previewImage: { open: false, url: '' },
                 isSavingCam: false,
+
+                get currentSlot() {
+                    if (!this.slots.length) return null;
+                    if (!this.selectedSlotId) return this.slots[0];
+                    return this.slots.find(s => s.camera_id === this.selectedSlotId) || this.slots[0];
+                },
                 
                 init() {
-                    this.$watch('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
+                    this.('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
                     this.fetchStats();
+                    this.fetchSlots();
                     this.fetchVehicles();
-                    this.fetchCameras();
                     
-                    // Auto-refresh stats & log every 15s
+                    // Live polling every 5s for smooth slot updates
                     setInterval(() => {
+                        this.fetchSlots();
                         this.fetchStats();
                         if (this.page === 1) this.fetchVehicles();
-                    }, 15000);
+                    }, 5000);
                 },
 
                 t(key) {
@@ -867,10 +964,22 @@
                         if (res.ok) this.stats = await res.json();
                     } catch (e) { console.error("Stats fetch error:", e); }
                 },
+
+                async fetchSlots() {
+                    try {
+                        const res = await fetch('/api/v1/cameras/slots-status');
+                        if (res.ok) {
+                            this.slots = await res.json();
+                            if (!this.selectedSlotId && this.slots.length) {
+                                this.selectedSlotId = this.slots[0].camera_id;
+                            }
+                        }
+                    } catch (e) { console.error("Slots fetch error:", e); }
+                },
                 
                 async fetchVehicles() {
                     try {
-                        let url = `/api/v1/vehicles?page=${this.page}&page_size=${this.pageSize}`;
+                        let url = ;
                         if (this.filters.type === 'EV') url += '&is_ev=true';
                         else if (this.filters.type === 'REGULAR') url += '&vehicle_type=REGULAR';
                         
@@ -882,13 +991,6 @@
                         }
                     } catch (e) { console.error("Vehicles fetch error:", e); }
                 },
-                
-                async fetchCameras() {
-                    try {
-                        const res = await fetch('/api/v1/cameras');
-                        if (res.ok) this.cameras = await res.json();
-                    } catch (e) { console.error("Cameras fetch error:", e); }
-                },
 
                 async createCamera() {
                     try {
@@ -896,7 +998,7 @@
                         if (!this.newCam.port) {
                             this.newCam.port = this.newCam.camera_type === 'RTSP' ? 554 : 80;
                         }
-                        if (!this.showAdvanced || !this.newCam.stream_url) {
+                        if (!this.newCam.stream_url) {
                             if (this.newCam.ip_address) {
                                 if (this.newCam.camera_type === 'RTSP') {
                                     this.newCam.stream_url = `rtsp://${this.newCam.ip_address}:${this.newCam.port}/stream1`;
@@ -912,8 +1014,8 @@
                             body: JSON.stringify(this.newCam)
                         });
                         if (res.ok) {
-                            await this.fetchCameras();
-                            this.addCamOpen = false;
+                            await this.fetchSlots();
+                            this.addCamModal = false;
                             this.newCam = {
                                 cs_id: 'CS_TASHKENT_01', cp_id: 'CP01',
                                 camera_name: '', camera_type: 'RTSP', stream_url: '',
@@ -932,10 +1034,10 @@
                     }
                 },
 
-                openLiveModal(cam) {
+                openLiveModal(slot) {
                     this.liveModal = {
                         open: true,
-                        camera: cam,
+                        slot: slot,
                         aiLoading: false,
                         aiResult: null,
                         aiError: null
@@ -945,7 +1047,7 @@
                 closeLiveModal() {
                     this.liveModal = {
                         open: false,
-                        camera: null,
+                        slot: null,
                         aiLoading: false,
                         aiResult: null,
                         aiError: null
@@ -953,15 +1055,14 @@
                 },
 
                 async scanLiveFrame() {
-                    if (!this.liveModal.camera) return;
+                    if (!this.liveModal.slot) return;
                     this.liveModal.aiLoading = true;
                     this.liveModal.aiResult = null;
                     this.liveModal.aiError = null;
                     try {
-                        const res = await fetch(`/api/v1/cameras/${this.liveModal.camera.id}/test`, { method: 'POST' });
+                        const res = await fetch(`/api/v1/cameras/${this.liveModal.slot.camera_id}/test`, { method: 'POST' });
                         const data = await res.json();
                         if (data.success && data.image_base64) {
-                            // Convert base64 to Blob and send to detect endpoint
                             const byteCharacters = atob(data.image_base64);
                             const byteNumbers = new Array(byteCharacters.length);
                             for (let i = 0; i < byteCharacters.length; i++) {
@@ -972,8 +1073,8 @@
                             
                             const formData = new FormData();
                             formData.append('file', blob, 'cctv_live_snap.jpg');
-                            formData.append('cs_id', this.liveModal.camera.cs_id || 'CS_TASHKENT_01');
-                            formData.append('cp_id', this.liveModal.camera.cp_id || 'CP01');
+                            formData.append('cs_id', this.liveModal.slot.cs_id || 'CS_TASHKENT_01');
+                            formData.append('cp_id', this.liveModal.slot.cp_id || 'CP01');
                             
                             const detRes = await fetch('/api/v1/detect/upload', {
                                 method: 'POST',
@@ -989,6 +1090,7 @@
                                 }
                                 this.fetchStats();
                                 this.fetchVehicles();
+                                this.fetchSlots();
                             } else {
                                 this.liveModal.aiError = 'AI tahlil xatosi yuz berdi';
                             }
@@ -1006,7 +1108,7 @@
                     if (!confirm(this.t('confirm_delete_cam'))) return;
                     try {
                         await fetch(`/api/v1/cameras/${id}`, { method: 'DELETE' });
-                        this.fetchCameras();
+                        this.fetchSlots();
                     } catch (e) { console.error(e); }
                 },
                 
@@ -1028,6 +1130,7 @@
                         await fetch(`/api/v1/vehicles/${id}`, { method: 'DELETE' });
                         this.fetchVehicles();
                         this.fetchStats();
+                        this.fetchSlots();
                     } catch (e) { console.error(e); }
                 },
                 
@@ -1063,6 +1166,7 @@
                         
                         this.fetchStats();
                         this.fetchVehicles();
+                        this.fetchSlots();
                     } catch (e) {
                         this.uploadResult = { success: false, message: 'Server communication error' };
                         console.error(e);
@@ -1078,7 +1182,7 @@
                 
                 formatDate(dateStr) {
                     if (!dateStr) return '';
-                    const d = new Date(dateStr);
+                    const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T'));
                     return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                 },
 

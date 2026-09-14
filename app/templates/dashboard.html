@@ -249,7 +249,7 @@
                             </div>
                             <div>
                                 <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-0.5" x-text="t('cam_protocol_label')"></label>
-                                <select x-model="newCam.camera_type" class="w-full text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                                <select x-model="newCam.camera_type" @change="newCam.port = (newCam.camera_type === 'HTTP_SNAPSHOT' ? 80 : 554)" class="w-full text-xs p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
                                     <option value="RTSP">RTSP Stream (Tavsiya etiladi)</option>
                                     <option value="HTTP_SNAPSHOT">HTTP Snapshot</option>
                                     <option value="ONVIF">ONVIF Protocol</option>

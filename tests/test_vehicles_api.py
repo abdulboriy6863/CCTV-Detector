@@ -98,7 +98,10 @@ class TestVehiclesAPI(unittest.TestCase):
         content = res.content.decode("utf-8-sig")
         self.assertIn("52어0586", content)
         self.assertIn("58버6091", content)
-        self.assertIn("Stansiya", content)
+        self.assertIn("충전소 ID", content)
+        self.assertIn("차량 번호판", content)
+        self.assertNotIn("Stansiya", content)
+        self.assertNotIn("Kirish", content)
 
 
 if __name__ == "__main__":

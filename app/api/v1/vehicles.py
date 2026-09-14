@@ -1,6 +1,7 @@
 """Vehicle log API — list, view, export, delete detected vehicles."""
 import csv
 import io
+import re
 from datetime import datetime, date
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,7 +23,6 @@ def _parse_date_bounds(start_date_str: Optional[str], end_date_str: Optional[str
     to_dt = None
     if start_date_str:
         try:
-            # Handle YYYY-MM-DD or full ISO
             clean_str = start_date_str.split("T")[0]
             from_dt = datetime.strptime(f"{clean_str} 00:00:00", "%Y-%m-%d %H:%M:%S")
         except ValueError:
@@ -34,6 +34,25 @@ def _parse_date_bounds(start_date_str: Optional[str], end_date_str: Optional[str
         except ValueError:
             pass
     return from_dt, to_dt
+
+
+def _format_korean_notes(notes: Optional[str], event_type: str) -> str:
+    """Format stored duration and note strings cleanly into pure Korean."""
+    if not notes:
+        return "출차 완료" if event_type == "END" else ("입차 기록" if event_type == "START" else "-")
+    t = notes
+    if "boshlandi" in t.lower() or event_type == "START":
+        return "입차 (주차 시작)"
+    t = re.sub(r"^Chiqish:\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"^Kirish:\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"Jami\s*", "총 ", t, flags=re.IGNORECASE)
+    t = re.sub(r"(\d+)\s*soat", r"\1시간 ", t, flags=re.IGNORECASE)
+    t = re.sub(r"(\d+)\s*daqiqa", r"\1분 ", t, flags=re.IGNORECASE)
+    t = re.sub(r"(\d+)\s*soniya", r"\1초", t, flags=re.IGNORECASE)
+    t = re.sub(r"to['’]xtab turdi", "주차", t, flags=re.IGNORECASE)
+    t = re.sub(r"To['’]xtab turish:\s*", "총 ", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s+", " ", t)
+    return t.strip() or ("출차 완료" if event_type == "END" else "입차 기록")
 
 
 @router.get("", summary="List detected vehicles with filtering")
@@ -92,7 +111,7 @@ def list_vehicles(
     }
 
 
-@router.get("/export", summary="Export vehicles log as CSV/Excel")
+@router.get("/export", summary="Export vehicles log as CSV/Excel in clean Korean")
 def export_vehicles_csv(
     plate_number: Optional[str] = Query(None),
     vehicle_type: Optional[str] = Query(None),
@@ -123,43 +142,46 @@ def export_vehicles_csv(
 
     # Build CSV with UTF-8 BOM for Excel
     output = io.StringIO()
-    # Write UTF-8 BOM
     output.write("\ufeff")
     writer = csv.writer(output)
 
-    # Header row
+    # Pure Korean Header row
     writer.writerow([
         "ID",
-        "Vaqt / 시간 (KST)",
-        "Stansiya / 충전소 (CS ID)",
-        "Zaryadka Joyi / 베이 (CP ID)",
-        "Davlat Raqami / 차량 번호판",
-        "Hodisa / 이벤트",
-        "Turi / 차량 유형",
-        "EV Tasdiqlandi / 전기차 여부",
-        "Ishonch / 정확도",
-        "Izoh / 비고",
-        "Aniqlash Manbai / 감지 소스"
+        "감지 일시 (KST)",
+        "충전소 ID (CS ID)",
+        "충전기 ID (CP ID)",
+        "차량 번호판",
+        "구분",
+        "차량 유형",
+        "전기차 여부",
+        "인식 정확도",
+        "주차 시간 및 비고",
+        "감지 방식"
     ])
 
     for item in items:
-        event_label = "Kirish (입차)" if item.event_type == "START" else ("Chiqish (출차)" if item.event_type == "END" else item.event_type)
-        type_label = "EV (전기차)" if item.is_ev else ("Oddiy (일반차)" if item.vehicle_type == "REGULAR" else item.vehicle_type)
+        event_label = "입차" if item.event_type == "START" else ("출차" if item.event_type == "END" else item.event_type)
+        type_label = "전기차 (EV)" if item.is_ev else ("일반차" if item.vehicle_type == "REGULAR" else item.vehicle_type)
+        ev_label = "전기차" if item.is_ev else "일반차"
         conf_str = f"{(item.ai_confidence * 100):.0f}%" if item.ai_confidence is not None else "-"
         time_str = item.created_at.strftime("%Y-%m-%d %H:%M:%S") if item.created_at else ""
+        notes_ko = _format_korean_notes(item.notes, item.event_type)
+        
+        src_label = "CCTV 자동" if item.detection_source == "CCTV_AUTO" else ("수동 업로드" if item.detection_source == "MANUAL_UPLOAD" else (item.detection_source or "-"))
 
         writer.writerow([
             item.id,
             time_str,
             item.cs_id or "bluenetwrks",
             item.cp_id or "BNS00000",
-            item.plate_number or "Noma'lum",
+            item.plate_number or "미인식",
             event_label,
             type_label,
-            "Ha (예)" if item.is_ev else "Yo'q (아니오)",
+            ev_label,
             conf_str,
-            item.notes or "",
-            item.detection_source or ""
+            notes_ko,
+            src_label
         ])
 
     csv_data = output.getvalue().encode("utf-8-sig")

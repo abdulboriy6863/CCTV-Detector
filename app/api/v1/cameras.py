@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.snapshot import CCTVCamera
-from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse
+from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum
+from app.services.camera_service import camera_service
 
 router = APIRouter()
 
@@ -26,10 +27,9 @@ def list_cameras(
 
 
 @router.post("", response_model=CameraResponse, summary="Add camera")
-def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
+async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
     stream_url = camera_in.stream_url
     if not stream_url and camera_in.ip_address:
-        from app.schemas.snapshot import CameraTypeEnum
         if camera_in.camera_type == CameraTypeEnum.RTSP:
             port_val = camera_in.port or 554
             stream_url = f"rtsp://{camera_in.ip_address}:{port_val}/stream1"
@@ -38,12 +38,30 @@ def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
             port_str = f":{port_val}" if port_val != 80 else ""
             stream_url = f"http://{camera_in.ip_address}{port_str}/api/snapshot"
 
+    final_stream_url = stream_url or f"rtsp://{camera_in.ip_address or '127.0.0.1'}:554/stream1"
+
+    # Validate reachability of the camera before saving to DB
+    is_reachable, reachability_msg = await camera_service.check_camera_reachability(
+        camera_type=camera_in.camera_type,
+        stream_url=final_stream_url,
+        username=camera_in.username,
+        password=camera_in.password,
+        ip_address=camera_in.ip_address,
+        port=camera_in.port or (554 if camera_in.camera_type == CameraTypeEnum.RTSP else 80),
+        timeout_seconds=3.0
+    )
+    if not is_reachable:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Kameraga ulanib bo'lmadi: {reachability_msg}"
+        )
+
     cam = CCTVCamera(
         cs_id=camera_in.cs_id,
         cp_id=camera_in.cp_id,
         camera_name=camera_in.camera_name,
         camera_type=camera_in.camera_type.value,
-        stream_url=stream_url or f"rtsp://{camera_in.ip_address or '127.0.0.1'}:554/stream1",
+        stream_url=final_stream_url,
         ip_address=camera_in.ip_address,
         port=camera_in.port or (554 if camera_in.camera_type.value == "RTSP" else 80),
         username=camera_in.username,
@@ -59,11 +77,37 @@ def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{camera_id}", response_model=CameraResponse, summary="Update camera")
-def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = Depends(get_db)):
+async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = Depends(get_db)):
     cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
     if not cam:
         raise HTTPException(status_code=404, detail="Camera not found")
+
     update_data = camera_in.model_dump(exclude_unset=True)
+
+    # If stream_url or ip_address changed, validate reachability
+    test_type = CameraTypeEnum(update_data.get('camera_type', cam.camera_type))
+    test_ip = update_data.get('ip_address', cam.ip_address)
+    test_port = update_data.get('port', cam.port)
+    test_url = update_data.get('stream_url', cam.stream_url)
+    test_user = update_data.get('username', cam.username)
+    test_pass = update_data.get('password', cam.password)
+
+    if 'ip_address' in update_data or 'stream_url' in update_data:
+        is_reachable, reachability_msg = await camera_service.check_camera_reachability(
+            camera_type=test_type,
+            stream_url=test_url,
+            username=test_user,
+            password=test_pass,
+            ip_address=test_ip,
+            port=test_port,
+            timeout_seconds=3.0
+        )
+        if not is_reachable:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Kameraga ulanib bo'lmadi: {reachability_msg}"
+            )
+
     if 'camera_type' in update_data and update_data['camera_type']:
         update_data['camera_type'] = update_data['camera_type'].value
     for key, value in update_data.items():

@@ -510,6 +510,67 @@ class CameraService:
         }
         self.enable_mock_fallback = enable_mock_fallback
 
+    async def check_camera_reachability(
+        self,
+        camera_type: CameraTypeEnum,
+        stream_url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        port: Optional[int] = None,
+        timeout_seconds: float = 3.0
+    ) -> Tuple[bool, str]:
+        """
+        Tests if a camera IP/URL is reachable and returns (is_ok, message).
+        1. Fast TCP socket connection check on IP:Port.
+        2. Real frame grab test via adapter (without mock fallback).
+        """
+        import socket
+        from urllib.parse import urlparse
+
+        target_ip = ip_address
+        target_port = port or (554 if camera_type == CameraTypeEnum.RTSP else 80)
+
+        if not target_ip and stream_url:
+            parsed = urlparse(stream_url if "://" in stream_url else f"rtsp://{stream_url}")
+            target_ip = parsed.hostname
+            target_port = parsed.port or target_port
+
+        if not target_ip:
+            return False, "IP manzil yoki Stream URL ko'rsatilmadi"
+
+        # 1. Fast socket reachability test
+        def _check_socket():
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(timeout_seconds)
+                s.connect((target_ip, target_port))
+                s.close()
+                return True, "Port ochiq"
+            except socket.timeout:
+                return False, f"IP {target_ip}:{target_port} ga ulanish vaqti tugadi (Timeout). Qurilma tarmoqda mavjud emas."
+            except Exception as e:
+                return False, f"IP {target_ip}:{target_port} ga ulanib bo'lmadi: {e}"
+
+        socket_ok, socket_msg = await asyncio.to_thread(_check_socket)
+        if not socket_ok:
+            return False, socket_msg
+
+        # 2. Protocol frame capture test (direct adapter without fallback)
+        adapter = self.adapters.get(camera_type, self.adapters[CameraTypeEnum.RTSP])
+        res = await adapter.capture(
+            stream_url=stream_url,
+            username=username,
+            password=password,
+            ip_address=target_ip,
+            port=target_port
+        )
+        if not res.success:
+            err_detail = res.error_message or "Video oqimini ochib bo'lmadi"
+            return False, f"Kameraga ulanib bo'lmadi: {err_detail}"
+
+        return True, "Kamera muvaffaqiyatli ulandi"
+
     async def capture_snapshot(
         self,
         camera_type: CameraTypeEnum,

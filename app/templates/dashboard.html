@@ -276,7 +276,12 @@
                         </div>
 
                         <div class="flex justify-end pt-1">
-                            <button @click="createCamera(); addCamOpen = false" :disabled="!newCam.ip_address && !newCam.stream_url" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition" x-text="t('btn_save_camera')">
+                            <button @click="createCamera()" :disabled="isSavingCam || (!newCam.ip_address && !newCam.stream_url)" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition flex items-center space-x-1.5">
+                                <span x-show="!isSavingCam" x-text="t('btn_save_camera')"></span>
+                                <span x-show="isSavingCam" class="flex items-center space-x-1">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                    <span>Tekshirilmoqda...</span>
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -827,6 +832,7 @@
 
                 liveModal: { open: false, camera: null, aiLoading: false, aiResult: null, aiError: null },
                 previewImage: { open: false, url: '' },
+                isSavingCam: false,
                 
                 init() {
                     this.$watch('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
@@ -886,6 +892,7 @@
 
                 async createCamera() {
                     try {
+                        this.isSavingCam = true;
                         if (!this.newCam.stream_url && this.newCam.ip_address) {
                             if (this.newCam.camera_type === 'RTSP') {
                                 this.newCam.stream_url = `rtsp://${this.newCam.ip_address}:${this.newCam.port || 554}/stream1`;
@@ -903,14 +910,24 @@
                             body: JSON.stringify(this.newCam)
                         });
                         if (res.ok) {
-                            this.fetchCameras();
+                            await this.fetchCameras();
+                            this.addCamOpen = false;
                             this.newCam = {
                                 cs_id: 'CS_TASHKENT_01', cp_id: 'CP01',
                                 camera_name: '', camera_type: 'RTSP', stream_url: '',
                                 ip_address: '', port: 554, username: '', password: '', is_active: true
                             };
+                        } else {
+                            const errData = await res.json().catch(() => ({}));
+                            const msg = errData.detail || "Kameraga ulanib bo'lmadi! IP manzil va sozlamalarni tekshiring.";
+                            alert("❌ Xatolik: " + msg);
                         }
-                    } catch (e) { console.error("Create camera error:", e); }
+                    } catch (e) {
+                        console.error("Create camera error:", e);
+                        alert("❌ Ulanish xatosi: " + e.message);
+                    } finally {
+                        this.isSavingCam = false;
+                    }
                 },
 
                 openLiveModal(cam) {

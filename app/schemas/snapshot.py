@@ -126,7 +126,32 @@ class CameraResponse(CameraBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ===== Stats Schema =====
+# ===== Stats & Realtime Slot Status Schemas =====
+
+class SlotStatusResponse(BaseModel):
+    """Real-time occupancy and stream status of a CCTV-monitored parking slot."""
+    camera_id: int
+    camera_name: str
+    cs_id: str
+    cp_id: str
+    camera_type: str = "RTSP"
+    is_active: bool = True
+    is_online: bool = True
+    stream_url: Optional[str] = None
+    live_stream_url: Optional[str] = None
+    is_occupied: bool = False
+    current_plate: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    is_ev: bool = False
+    plate_color: Optional[str] = None
+    session_id: Optional[str] = None
+    entry_at: Optional[datetime] = None
+    last_seen_at: Optional[datetime] = None
+    duration_seconds: int = 0
+    duration_formatted: Optional[str] = None
+    last_image_url: Optional[str] = None
+    last_error: Optional[str] = None
+
 
 class DashboardStats(BaseModel):
     total_detections: int = 0
@@ -137,3 +162,4 @@ class DashboardStats(BaseModel):
     today_regular: int = 0
     today_alerts: int = 0
     active_cameras: int = 0
+

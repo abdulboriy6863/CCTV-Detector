@@ -251,8 +251,8 @@
                                             </span>
                                         </div>
 
-                                        <!-- Battery Bar (if SOC available) -->
-                                        <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined">
+                                        <!-- Battery Bar (if DC SoC > 0 available) -->
+                                        <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
                                             <div class="p-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 space-y-1">
                                                 <div class="flex items-center justify-between text-[10px] font-bold">
                                                     <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
@@ -263,6 +263,22 @@
                                                 </div>
                                                 <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                                                     <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <!-- AC Slow Charging Status (when SoC is 0 or not reported) -->
+                                        <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
+                                            <div class="p-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 space-y-1">
+                                                <div class="flex items-center justify-between text-[10px] font-bold">
+                                                    <span class="text-sky-600 dark:text-sky-400 flex items-center space-x-1">
+                                                        <i class="fa-solid fa-bolt text-sky-500 animate-pulse"></i>
+                                                        <span>충전 진행 중 (완속)</span>
+                                                    </span>
+                                                    <span class="font-mono text-sky-600 dark:text-sky-400" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
+                                                </div>
+                                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                                    <div class="bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 h-full rounded-full animate-pulse" style="width: 100%"></div>
                                                 </div>
                                             </div>
                                         </template>
@@ -532,7 +548,7 @@
                                 </td>
                                 <!-- 6. Battery & Charging -->
                                 <td class="px-4 py-3 whitespace-nowrap">
-                                    <template x-if="item.battery_soc !== null && item.battery_soc !== undefined && item.battery_soc >= 0">
+                                    <template x-if="item.battery_soc !== null && item.battery_soc !== undefined && item.battery_soc > 0">
                                         <div>
                                             <template x-if="item.battery_soc >= 100">
                                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">🟢 100% (완충)</span>
@@ -546,7 +562,13 @@
                                             </template>
                                         </div>
                                     </template>
-                                    <template x-if="item.battery_soc === null || item.battery_soc === undefined || item.battery_soc < 0">
+                                    <template x-if="(!item.battery_soc || item.battery_soc <= 0) && item.charge_power_kw > 0">
+                                        <span class="font-mono font-bold text-xs text-sky-600 dark:text-sky-400 flex items-center space-x-1">
+                                            <i class="fa-solid fa-bolt text-sky-500 text-[10px] animate-pulse"></i>
+                                            <span x-text="item.charge_power_kw + ' kW'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="(!item.battery_soc || item.battery_soc <= 0) && (!item.charge_power_kw || item.charge_power_kw <= 0)">
                                         <span class="text-slate-400 font-mono text-xs">—</span>
                                     </template>
                                 </td>

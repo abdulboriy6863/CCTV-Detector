@@ -190,7 +190,8 @@ class ChargerService:
                     charging_start_time = tx_row[1]
                     if tx_row[2] is not None:
                         try:
-                            battery_soc = int(tx_row[2])
+                            val = int(tx_row[2])
+                            battery_soc = val if val > 0 else None
                         except (ValueError, TypeError):
                             battery_soc = None
                     # currentPower is in Watts or kW

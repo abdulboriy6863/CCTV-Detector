@@ -195,152 +195,138 @@
                     </button>
                 </div>
 
-                <!-- Scrollable Container for Camera Items -->
-                <div class="flex-1 overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
-                    <template x-for="slot in slots" :key="slot.camera_id">
-                        <div class="p-3 rounded-xl border transition duration-200"
-                            :class="slot.violation_level === 'danger' ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/60 shadow-sm' : (slot.violation_level === 'warning' ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900/60 shadow-sm' : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/80 dark:border-slate-800 hover:border-slate-300')">
-                            
-                            <!-- Header: Station/Slot ID + Camera Name + Status & Actions -->
-                            <div class="flex items-center justify-between gap-2 pb-2 border-b border-slate-200/60 dark:border-slate-700/50">
-                                <div class="flex items-center space-x-2 min-w-0">
-                                    <div class="w-2.5 h-2.5 rounded-full shrink-0"
-                                        :class="slot.is_online ? 'bg-emerald-500' : 'bg-rose-500'"></div>
-                                    <div class="font-bold text-xs text-slate-900 dark:text-white truncate flex items-center space-x-1.5">
-                                        <span class="font-mono text-blue-600 dark:text-blue-400" x-text="slot.cs_id + '/' + slot.cp_id"></span>
-                                        <span class="text-[11px] text-slate-400 font-normal truncate" x-text="'(' + (slot.camera_name || t('unnamed_camera')) + ')'"></span>
-                                    </div>
-                                </div>
+                <!-- Scrollable Container for Mini Live Video Grid -->
+                <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <template x-for="slot in slots" :key="slot.camera_id">
+                            <div class="rounded-xl border bg-white/80 dark:bg-slate-900/60 overflow-hidden flex flex-col transition duration-200 hover:shadow-md"
+                                :class="slot.violation_level === 'danger' ? 'border-rose-400 dark:border-rose-800 shadow-rose-500/10' : (slot.violation_level === 'warning' ? 'border-amber-400 dark:border-amber-800 shadow-amber-500/10' : 'border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500')">
                                 
-                                <div class="flex items-center space-x-1.5 shrink-0">
-                                    <!-- Live Stream & Test Button -->
-                                    <button @click="openLiveModal(slot)" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition flex items-center space-x-1">
-                                        <i class="fa-solid fa-circle-play text-[10px]"></i>
-                                        <span x-text="t('btn_test')"></span>
-                                    </button>
-                                    <!-- Delete Button -->
-                                    <button @click="deleteCamera(slot.camera_id)" class="w-6 h-6 rounded-lg bg-slate-200/60 dark:bg-slate-700 hover:bg-rose-100 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-500 flex items-center justify-center transition" :title="t('btn_delete')">
-                                        <i class="fa-solid fa-trash-can text-[10px]"></i>
-                                    </button>
+                                <!-- Top Mini Header: Stream Status + Camera Name / Slot + Actions -->
+                                <div class="px-2.5 py-1.5 bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200/60 dark:border-slate-700/50 flex items-center justify-between gap-1.5 shrink-0">
+                                    <div class="flex items-center space-x-1.5 min-w-0">
+                                        <div class="flex items-center space-x-1 shrink-0 px-1.5 py-0.5 rounded bg-black/40 text-[9px] font-bold tracking-wider"
+                                            :class="slot.is_online ? 'text-emerald-400' : 'text-rose-400'">
+                                            <span class="w-1.5 h-1.5 rounded-full" :class="slot.is_online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'"></span>
+                                            <span x-text="slot.is_online ? 'LIVE' : 'OFFLINE'"></span>
+                                        </div>
+                                        <div class="font-bold text-xs text-slate-800 dark:text-white truncate flex items-center space-x-1">
+                                            <span x-text="slot.camera_name || ('CCTV ' + slot.camera_id)"></span>
+                                            <span class="text-[10px] text-slate-400 font-mono" x-text="'(' + slot.cs_id + '/' + slot.cp_id + ')'"></span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-1 shrink-0">
+                                        <button @click="openLiveModal(slot)" class="w-6 h-6 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition" title="Kattalashtirish / AI Test">
+                                            <i class="fa-solid fa-expand text-[10px]"></i>
+                                        </button>
+                                        <button @click="deleteCamera(slot.camera_id)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-500 flex items-center justify-center transition" :title="t('btn_delete')">
+                                            <i class="fa-solid fa-trash-can text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Video Stream Display (Click to open full modal) -->
+                                <div class="relative bg-black w-full aspect-video sm:h-28 overflow-hidden group cursor-pointer" @click="openLiveModal(slot)">
+                                    <template x-if="slot.is_online">
+                                        <img :src="'/api/v1/cameras/' + slot.camera_id + '/live'" 
+                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                             alt="Live Stream"
+                                             loading="lazy" />
+                                    </template>
+                                    <template x-if="!slot.is_online">
+                                        <div class="w-full h-full flex flex-col items-center justify-center text-slate-500 text-xs">
+                                            <i class="fa-solid fa-video-slash text-base mb-1 text-slate-600"></i>
+                                            <span class="text-[10px]">Signal yo'q (Offline)</span>
+                                        </div>
+                                    </template>
+
+                                    <!-- Quick Overlay Badges on Top of Video -->
+                                    <div class="absolute bottom-1 left-1 right-1 flex items-center justify-between pointer-events-none px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px]">
+                                        <div class="flex items-center space-x-1 truncate">
+                                            <template x-if="slot.is_occupied">
+                                                <span class="font-mono font-bold px-1.5 py-0.2 rounded text-[10px]"
+                                                    :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'"
+                                                    x-text="(slot.is_ev ? '⚡ ' : '') + slot.current_plate"></span>
+                                            </template>
+                                            <template x-if="!slot.is_occupied">
+                                                <span class="text-emerald-400 font-bold text-[10px] flex items-center space-x-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                    <span>Bo'sh (Vacant)</span>
+                                                </span>
+                                            </template>
+                                        </div>
+
+                                        <!-- Charger Connector Mini Pill -->
+                                        <span class="font-bold text-[9px] px-1.5 py-0.2 rounded shrink-0"
+                                            :class="slot.is_charging ? 'bg-emerald-500/80 text-white' : (slot.battery_soc >= 100 ? 'bg-purple-500/80 text-white' : 'bg-slate-700/80 text-slate-300')"
+                                            x-text="slot.connector_status_kr || '사용 가능'"></span>
+                                    </div>
+                                    
+                                    <!-- Hover Expand Hint Icon -->
+                                    <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                        <div class="w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+                                            <i class="fa-solid fa-up-right-and-down-left-from-center text-xs"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Telemetry & Charging Info Underneath -->
+                                <div class="p-2 space-y-1.5 text-xs bg-slate-50/50 dark:bg-slate-900/40 flex-1 flex flex-col justify-between">
+                                    <template x-if="slot.is_occupied">
+                                        <div class="space-y-1">
+                                            <!-- Battery SoC / AC Power info -->
+                                            <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
+                                                <div class="space-y-0.5">
+                                                    <div class="flex items-center justify-between text-[10px] font-bold">
+                                                        <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
+                                                            <i class="fa-solid fa-battery-three-quarters text-emerald-500"></i>
+                                                            <span>SoC (배터리)</span>
+                                                        </span>
+                                                        <span class="font-mono text-emerald-600 dark:text-emerald-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
+                                                    </div>
+                                                    <div class="w-full bg-slate-200 dark:bg-slate-700 h-1 rounded-full overflow-hidden">
+                                                        <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
+                                                <div class="flex items-center justify-between text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                                                    <span class="flex items-center space-x-1">
+                                                        <i class="fa-solid fa-bolt text-sky-500 animate-pulse"></i>
+                                                        <span>AC 완속 충전</span>
+                                                    </span>
+                                                    <span class="font-mono" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
+                                                </div>
+                                            </template>
+
+                                            <!-- Dual Timers -->
+                                            <div class="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                                                <span>🅿️ <strong class="text-slate-700 dark:text-slate-200 font-mono" x-text="slot.duration_formatted || '0분'"></strong></span>
+                                                <span x-show="slot.is_charging || slot.charging_duration_seconds > 0">⚡ <strong class="text-emerald-600 dark:text-emerald-400 font-mono" x-text="slot.charging_duration_formatted || '0분'"></strong></span>
+                                            </div>
+
+                                            <!-- Violation Badge (if warning or danger) -->
+                                            <template x-if="slot.violation_type !== 'NORMAL_CHARGING' && slot.violation_type !== 'NONE' && slot.violation_type !== 'PREPARING'">
+                                                <div class="px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 truncate"
+                                                    :class="slot.violation_level === 'danger' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-slate-950'">
+                                                    <i class="fa-solid fa-triangle-exclamation text-[9px] shrink-0"></i>
+                                                    <span class="truncate" x-text="slot.violation_label_kr"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="!slot.is_occupied">
+                                        <div class="flex items-center justify-between text-[11px] py-1 text-slate-500 dark:text-slate-400">
+                                            <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">🟢 Bo'sh / Foydalanishga tayyor</span>
+                                            <span class="text-[10px] font-mono text-slate-400" x-text="slot.connector_status_kr || '사용 가능'"></span>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
+                        </template>
+                    </div>
 
-                            <!-- Body: Vehicle & Live Charger Information -->
-                            <div class="pt-2 space-y-2">
-                                <!-- When Occupied -->
-                                <template x-if="slot.is_occupied">
-                                    <div class="space-y-1.5">
-                                        <div class="flex items-center justify-between flex-wrap gap-1.5">
-                                            <!-- Plate Number & Vehicle Type Badge -->
-                                            <div class="flex items-center space-x-1.5">
-                                                <span class="px-2.5 py-1 rounded-lg font-mono font-extrabold text-xs tracking-wider shadow-sm inline-flex items-center space-x-1"
-                                                    :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'">
-                                                    <span x-show="slot.is_ev">⚡</span>
-                                                    <span x-text="slot.current_plate"></span>
-                                                </span>
-                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold"
-                                                    :class="slot.is_ev ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
-                                                    x-text="slot.is_ev ? '전기차 (EV)' : '일반차'"></span>
-                                            </div>
-
-                                            <!-- Charger Live Status Badge -->
-                                            <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center space-x-1"
-                                                :class="slot.is_charging ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : (slot.battery_soc >= 100 ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300')">
-                                                <i class="fa-solid" :class="slot.is_charging ? 'fa-bolt text-emerald-600' : 'fa-plug'"></i>
-                                                <span x-text="slot.connector_status_kr || '사용 가능'"></span>
-                                            </span>
-                                        </div>
-
-                                        <!-- Battery Bar (if DC SoC > 0 available) -->
-                                        <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
-                                            <div class="p-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 space-y-1">
-                                                <div class="flex items-center justify-between text-[10px] font-bold">
-                                                    <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
-                                                        <i class="fa-solid fa-battery-three-quarters text-emerald-500"></i>
-                                                        <span>배터리 (SoC)</span>
-                                                    </span>
-                                                    <span class="font-mono text-emerald-600 dark:text-emerald-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
-                                                </div>
-                                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                                    <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
-                                                </div>
-                                            </div>
-                                        </template>
-
-                                        <!-- AC Slow Charging Status (when SoC is 0 or not reported) -->
-                                        <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
-                                            <div class="p-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 space-y-1">
-                                                <div class="flex items-center justify-between text-[10px] font-bold">
-                                                    <span class="text-sky-600 dark:text-sky-400 flex items-center space-x-1">
-                                                        <i class="fa-solid fa-bolt text-sky-500 animate-pulse"></i>
-                                                        <span>충전 진행 중 (완속)</span>
-                                                    </span>
-                                                    <span class="font-mono text-sky-600 dark:text-sky-400" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
-                                                </div>
-                                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                                    <div class="bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 h-full rounded-full animate-pulse" style="width: 100%"></div>
-                                                </div>
-                                            </div>
-                                        </template>
-
-                                        <!-- Dual Timers -->
-                                        <div class="flex items-center justify-between text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-white/60 dark:bg-slate-900/40 px-2 py-1 rounded-lg border border-slate-200/40 dark:border-slate-700/40">
-                                            <span>🅿️ 주차: <strong class="text-slate-700 dark:text-slate-200 font-mono" x-text="slot.duration_formatted || '0분'"></strong></span>
-                                            <span x-show="slot.is_charging || slot.charging_duration_seconds > 0">⚡ 충전: <strong class="text-emerald-600 dark:text-emerald-400 font-mono" x-text="slot.charging_duration_formatted || '0분'"></strong></span>
-                                        </div>
-
-                                        <!-- Violation Banner (if any) -->
-                                        <template x-if="slot.violation_type !== 'NORMAL_CHARGING' && slot.violation_type !== 'NONE' && slot.violation_type !== 'PREPARING'">
-                                            <div class="px-2 py-1 rounded-lg text-[10px] font-bold flex items-center space-x-1.5"
-                                                :class="slot.violation_level === 'danger' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-slate-950'">
-                                                <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
-                                                <span x-text="slot.violation_label_kr"></span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <!-- When Not Occupied by CCTV Vision -->
-                                <template x-if="!slot.is_occupied">
-                                    <div class="py-1">
-                                        <template x-if="slot.is_charging || slot.connector_status === 'CHARGING'">
-                                            <div class="flex items-center justify-between text-xs">
-                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 flex items-center space-x-1">
-                                                    <span>⚡ 충전 진행 중 (차량 점유)</span>
-                                                </span>
-                                                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center space-x-1">
-                                                    <i class="fa-solid fa-bolt text-emerald-500"></i>
-                                                    <span x-text="'충전기: ' + (slot.connector_status_kr || '충전 중')"></span>
-                                                </span>
-                                            </div>
-                                        </template>
-                                        <template x-if="!slot.is_charging && slot.connector_status === 'PREPARING'">
-                                            <div class="flex items-center justify-between text-xs">
-                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 flex items-center space-x-1">
-                                                    <span>🔌 케이블 연결/준비 중</span>
-                                                </span>
-                                                <span class="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center space-x-1">
-                                                    <i class="fa-solid fa-plug text-amber-500"></i>
-                                                    <span x-text="'충전기: ' + (slot.connector_status_kr || '준비 중')"></span>
-                                                </span>
-                                            </div>
-                                        </template>
-                                        <template x-if="!slot.is_charging && slot.connector_status !== 'PREPARING' && slot.connector_status !== 'CHARGING'">
-                                            <div class="flex items-center justify-between text-xs">
-                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center space-x-1">
-                                                    <span>🟢 빈자리 (주차/충전 가능)</span>
-                                                </span>
-                                                <span class="text-[10px] text-slate-400 font-mono flex items-center space-x-1">
-                                                    <i class="fa-solid fa-plug-circle-check text-blue-500"></i>
-                                                    <span x-text="'충전기: ' + (slot.connector_status_kr || '사용 가능')"></span>
-                                                </span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
                     <template x-if="slots.length === 0">
                         <div class="text-center py-14 text-slate-400 text-xs">
                             <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center text-xl shadow-inner">

@@ -240,54 +240,7 @@
                                         </div>
                                     </template>
 
-                                    <!-- Quick Overlay Badges on Top of Video -->
-                                    <div class="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-[11px]">
-                                        <div class="flex items-center space-x-1.5 truncate">
-                                            <!-- When vehicle detected by camera -->
-                                            <template x-if="slot.is_occupied">
-                                                <span class="font-mono font-bold px-1.5 py-0.5 rounded text-[11px]"
-                                                    :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'"
-                                                    x-text="(slot.is_ev ? '⚡ ' : '🚗 ') + slot.current_plate"></span>
-                                            </template>
 
-                                            <!-- When not detected by camera, but DB charging -->
-                                            <template x-if="!slot.is_occupied && (slot.is_charging || slot.connector_status === 'CHARGING')">
-                                                <span class="text-sky-400 font-bold text-[11px] flex items-center space-x-1">
-                                                    <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
-                                                    <span x-text="t('slot_charging_occupied')"></span>
-                                                </span>
-                                            </template>
-
-                                            <!-- When not detected by camera, preparing/cable connected -->
-                                            <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status === 'PREPARING'">
-                                                <span class="text-amber-400 font-bold text-[11px] flex items-center space-x-1">
-                                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                                                    <span x-text="t('slot_cable_connected')"></span>
-                                                </span>
-                                            </template>
-
-                                            <!-- When not detected by camera, faulted/unavailable -->
-                                            <template x-if="!slot.is_occupied && !slot.is_charging && (slot.connector_status === 'FAULTED' || slot.connector_status === 'UNAVAILABLE')">
-                                                <span class="text-rose-400 font-bold text-[11px] flex items-center space-x-1">
-                                                    <span class="w-2 h-2 rounded-full bg-rose-400"></span>
-                                                    <span x-text="t('slot_faulted')"></span>
-                                                </span>
-                                            </template>
-
-                                            <!-- When completely vacant -->
-                                            <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status !== 'PREPARING' && slot.connector_status !== 'FAULTED' && slot.connector_status !== 'UNAVAILABLE'">
-                                                <span class="text-emerald-400 font-bold text-[11px] flex items-center space-x-1">
-                                                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                                    <span x-text="t('slot_vacant')"></span>
-                                                </span>
-                                            </template>
-                                        </div>
-
-                                        <!-- Charger Connector Mini Pill -->
-                                        <span class="font-bold text-[10px] px-2 py-0.5 rounded-md shrink-0"
-                                            :class="slot.is_charging ? 'bg-emerald-500/90 text-white' : (slot.battery_soc >= 100 ? 'bg-purple-500/90 text-white' : (slot.connector_status === 'PREPARING' ? 'bg-amber-500 text-slate-950' : 'bg-slate-700/90 text-slate-200'))"
-                                            x-text="getConnectorLabel(slot)"></span>
-                                    </div>
                                     
                                     <!-- Hover Expand Hint Icon -->
                                     <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">

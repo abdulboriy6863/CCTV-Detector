@@ -234,24 +234,6 @@ class ChargerService:
                     if charging_start_time:
                         charging_duration_seconds = max(0, int((now - charging_start_time).total_seconds()))
 
-                    # Smart Real-time Telemetry Interpolation (between 5-min CSMS OCPP MeterValues)
-                    meter_ts = tx_row[8] if len(tx_row) > 8 else None
-                    ref_ts = None
-                    if isinstance(meter_ts, datetime) and meter_ts.year >= 2020:
-                        ref_ts = meter_ts
-                    elif isinstance(charging_start_time, datetime) and charging_start_time.year >= 2020:
-                        ref_ts = charging_start_time
-
-                    if ref_ts and is_charging and charge_power_kw > 0:
-                        dt_seconds = max(0, int((now - ref_ts).total_seconds()))
-                        if 0 < dt_seconds <= 600:
-                            delta_energy_kwh = (charge_power_kw * dt_seconds) / 3600.0
-                            avg_pack_kwh = 72.0  # Average EV battery capacity in Korea (Ioniq 5 / EV6 / Model Y)
-                            delta_soc = (delta_energy_kwh / avg_pack_kwh) * 100.0
-                            if battery_soc is not None and battery_soc > 0:
-                                estimated_soc = min(99, int(round(battery_soc + delta_soc)))
-                                battery_soc = max(battery_soc, estimated_soc)
-
                     connector_status = "CHARGING"
                     connector_status_kr = "충전 중"
                     connector_status_uz = "Zaryadlanmoqda"

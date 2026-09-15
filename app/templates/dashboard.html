@@ -319,12 +319,12 @@
                                                     </div>
                                                 </template>
 
-                                                <!-- AC Slow Charging -->
+                                                <!-- AC / DC Charging without SoC -->
                                                 <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
                                                     <div class="flex items-center justify-between text-[10px] font-bold text-sky-600 dark:text-sky-400">
                                                         <span class="flex items-center space-x-1">
                                                             <i class="fa-solid fa-bolt text-sky-500 animate-pulse"></i>
-                                                            <span x-text="t('lbl_ac_charging')"></span>
+                                                            <span x-text="slot.charge_power_kw > 15 ? t('lbl_dc_charging') : t('lbl_ac_charging')"></span>
                                                         </span>
                                                         <span class="font-mono" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
                                                     </div>
@@ -931,6 +931,7 @@
                 lbl_parking_time: "To'xtash",
                 lbl_charge_time: "Zaryad",
                 lbl_battery_soc: "Batareya (SoC)",
+                lbl_dc_charging: "DC Tezkor zaryad",
                 lbl_ac_charging: "AC Sekin zaryad",
                 lbl_signal_lost: "Signal yo'q (Oflayn)",
                 battery_full: "100% (To'ldi)",
@@ -1033,6 +1034,7 @@
                 lbl_parking_time: "주차",
                 lbl_charge_time: "충전",
                 lbl_battery_soc: "배터리 (SoC)",
+                lbl_dc_charging: "DC 급속 충전",
                 lbl_ac_charging: "AC 완속 충전",
                 lbl_signal_lost: "신호 없음 (오프라인)",
                 battery_full: "100% (완충)",

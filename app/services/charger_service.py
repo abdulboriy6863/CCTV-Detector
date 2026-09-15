@@ -159,15 +159,17 @@ class ChargerService:
             csms_session = db
 
         try:
-            # 1. Resolve numerical cp_pk if available
+            # 1. Resolve numerical cp_pk and serial if available
             cp_pk = None
+            cp_code = effective_cp_id
             try:
                 cp_lookup = csms_session.execute(
-                    text("SELECT id FROM TINF_CP WHERE cpId = :cp_id OR CAST(id AS CHAR) = :cp_id LIMIT 1"),
+                    text("SELECT id, cpId, chargePointModel, chargeBoxSerialNumber FROM TINF_CP WHERE cpId = :cp_id OR CAST(id AS CHAR) = :cp_id OR chargeBoxSerialNumber = :cp_id LIMIT 1"),
                     {"cp_id": effective_cp_id}
-                ).fetchone()
+                ).mappings().fetchone()
                 if cp_lookup:
-                    cp_pk = cp_lookup[0]
+                    cp_pk = cp_lookup.get("id")
+                    cp_code = cp_lookup.get("cpId") or cp_lookup.get("chargeBoxSerialNumber") or effective_cp_id
             except Exception:
                 pass
 
@@ -200,12 +202,17 @@ class ChargerService:
             # 3. Query active live transaction (TINF_CURRENT_TX)
             try:
                 tx_query = text("""
-                    SELECT transactionId, startTimestamp, soc, currentPower, chargePower, sessionId
+                    SELECT transactionId, startTimestamp, soc, chargePower, currentPower, currentA, sessionId, chargeBoxSerialNumber
                     FROM TINF_CURRENT_TX
-                    WHERE cpId = :cp_id OR cpId = :cp_code
+                    WHERE cpId = :cp_id OR chargeBoxSerialNumber = :cp_code OR sessionId = :cp_code OR chargeBoxSerialNumber = :raw_cp_id
+                    ORDER BY startTimestamp DESC
                     LIMIT 1
                 """)
-                tx_row = csms_session.execute(tx_query, {"cp_id": target_id, "cp_code": effective_cp_id}).fetchone()
+                tx_row = csms_session.execute(tx_query, {
+                    "cp_id": target_id,
+                    "cp_code": cp_code,
+                    "raw_cp_id": effective_cp_id
+                }).fetchone()
                 if tx_row:
                     is_charging = True
                     charging_start_time = tx_row[1]
@@ -215,9 +222,12 @@ class ChargerService:
                             battery_soc = val if val > 0 else None
                         except (ValueError, TypeError):
                             battery_soc = None
-                    # currentPower is in Watts or kW
+
+                    # tx_row[3] is chargePower (active charging power in kW or W)
                     raw_pwr = float(tx_row[3] or 0.0)
                     charge_power_kw = raw_pwr / 1000.0 if raw_pwr > 100 else raw_pwr
+
+                    # tx_row[4] is currentPower (accumulated energy in kWh or Wh)
                     raw_energy = float(tx_row[4] or 0.0)
                     charged_energy_kwh = raw_energy / 1000.0 if raw_energy > 500 else raw_energy
 
@@ -228,9 +238,11 @@ class ChargerService:
                     connector_status_uz = "Zaryadlanmoqda"
                 elif connector_status == "CHARGING":
                     is_charging = True
+                    connector_status_kr = "충전 중"
                     connector_status_uz = "Zaryadlanmoqda"
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error querying TINF_CURRENT_TX for {effective_cp_id}: {e}")
+
 
         finally:
             if csms_session is not db:

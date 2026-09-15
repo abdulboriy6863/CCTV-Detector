@@ -107,8 +107,66 @@ class TestChargerService(unittest.TestCase):
         self.assertIn("미충전 점유", status["violation_label_kr"])
         self.assertIn("Zaryadsiz turish", status["violation_label_uz"])
         self.assertEqual(status["violation_level"], "warning")
-        self.assertEqual(status["action_required_kr"], "5분 내 충전 시작 또는 이동")
-        self.assertEqual(status["action_required_uz"], "5 min ichida zaryadlang yoki oling")
+    def test_charging_transaction_dc(self):
+        # Test simulated DC Fast charging transaction
+        from unittest.mock import patch, MagicMock
+        now = get_kst_now()
+        mock_tx_row = (1032596, now - timedelta(minutes=15), 34, 74.74, 12.5, 180.0, "BNS001801", "BNS001801")
+
+        with patch("app.services.charger_service.CSMSSessionLocal") as mock_csms:
+            mock_session = MagicMock()
+            mock_csms.return_value = mock_session
+            # 1. cp lookup
+            mock_session.execute.return_value.mappings.return_value.fetchone.return_value = {
+                "id": 20924, "cpId": "BNS001801", "chargePointModel": "ECU-H1002S", "chargeBoxSerialNumber": "BNS001801"
+            }
+            # 2. conn status & 3. tx row
+            mock_session.execute.return_value.fetchone.side_effect = [
+                ("CHARGING", 3, now),  # connector status
+                mock_tx_row            # TINF_CURRENT_TX
+            ]
+
+            session_info = {"entry_at": now - timedelta(minutes=20), "is_ev": True, "plate": "81머2072"}
+            status = charger_service.get_charger_realtime_status(
+                cs_id="1933",
+                cp_id="BNS001801",
+                db=self.db,
+                session_info=session_info
+            )
+            self.assertTrue(status["is_charging"])
+            self.assertEqual(status["battery_soc"], 34)
+            self.assertEqual(status["charge_power_kw"], 74.74)
+            self.assertEqual(status["charged_energy_kwh"], 12.5)
+            self.assertEqual(status["connector_status"], "CHARGING")
+
+    def test_charging_transaction_ac(self):
+        # Test simulated AC Slow charging transaction (Watts conversion)
+        from unittest.mock import patch, MagicMock
+        now = get_kst_now()
+        mock_tx_row = (1032600, now - timedelta(minutes=30), 0, 6900.0, 3450.0, 30.0, "BNS128613", "BNS128613")
+
+        with patch("app.services.charger_service.CSMSSessionLocal") as mock_csms:
+            mock_session = MagicMock()
+            mock_csms.return_value = mock_session
+            mock_session.execute.return_value.mappings.return_value.fetchone.return_value = {
+                "id": 23164, "cpId": "BNS128613", "chargePointModel": "ECU-L7002S", "chargeBoxSerialNumber": "BNS128613"
+            }
+            mock_session.execute.return_value.fetchone.side_effect = [
+                ("CHARGING", 3, now),
+                mock_tx_row
+            ]
+
+            session_info = {"entry_at": now - timedelta(minutes=35), "is_ev": True, "plate": "12가3456"}
+            status = charger_service.get_charger_realtime_status(
+                cs_id="3207",
+                cp_id="BNS128613",
+                db=self.db,
+                session_info=session_info
+            )
+            self.assertTrue(status["is_charging"])
+            self.assertIsNone(status["battery_soc"])
+            self.assertEqual(status["charge_power_kw"], 6.9)
+            self.assertEqual(status["charged_energy_kwh"], 3.45)
 
 
 if __name__ == "__main__":

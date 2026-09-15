@@ -52,8 +52,8 @@ def format_duration_kr(seconds: int) -> str:
 class ChargerService:
     """CSMS Charger validation and real-time charging status resolution."""
 
-    NOT_CHARGING_GRACE_SECONDS = 15 * 60
-    OVERSTAY_GRACE_SECONDS = 15 * 60
+    NOT_CHARGING_GRACE_SECONDS = 5 * 60  # 5 minutes
+    OVERSTAY_GRACE_SECONDS = 5 * 60      # 5 minutes after 100% or completion
 
     def validate_station_and_charger(
         self,
@@ -223,7 +223,10 @@ class ChargerService:
             if not is_ev:
                 violation_type = "NON_EV_PARKED"
                 violation_label_kr = "일반차 불법 주차"
+                violation_label_uz = "Oddiy avtomobil (No-EV)"
                 violation_level = "danger"
+                action_required_kr = "즉시 이동 주차 필요"
+                action_required_uz = "Darhol joyni bo'shating"
 
             # Violation Case 2: EV parked, but NOT charging after grace period
             elif not is_charging:
@@ -231,11 +234,19 @@ class ChargerService:
                     violation_type = "NOT_CHARGING"
                     idle_mins = parking_seconds // 60
                     violation_label_kr = f"미충전 점유 ({idle_mins}분)"
+                    violation_label_uz = f"Zaryadsiz turish ({idle_mins} min)"
                     violation_level = "warning"
+                    action_required_kr = "5분 내 충전 시작 또는 이동"
+                    action_required_uz = "5 min ichida zaryadlang yoki oling"
                 else:
                     violation_type = "PREPARING"
-                    violation_label_kr = "충전 대기 중"
+                    rem_secs = max(0, self.NOT_CHARGING_GRACE_SECONDS - parking_seconds)
+                    rem_mins = (rem_secs + 59) // 60
+                    violation_label_kr = f"충전 대기 중 ({rem_mins}분 남음)"
+                    violation_label_uz = f"Kutilmoqda ({rem_mins} min qoldi)"
                     violation_level = "info"
+                    action_required_kr = "—"
+                    action_required_uz = "—"
 
             # Violation Case 3: 100% full or charging ended, but car remains parked
             elif battery_soc is not None and battery_soc >= 100:
@@ -244,27 +255,42 @@ class ChargerService:
                 if parking_seconds > (charging_duration_seconds + self.OVERSTAY_GRACE_SECONDS):
                     overstay_seconds = parking_seconds - charging_duration_seconds
                     violation_type = "OVERSTAY"
-                    over_mins = overstay_seconds // 60
+                    over_mins = max(1, overstay_seconds // 60)
                     violation_label_kr = f"완충 후 초과 점유 ({over_mins}분)"
+                    violation_label_uz = f"100% dan oshiqcha ({over_mins} min)"
                     violation_level = "danger"
+                    action_required_kr = "완충 차량 이동 주차 필요"
+                    action_required_uz = "100% to'ldi, mashinani oling"
                 else:
                     violation_type = "NORMAL_CHARGING"
-                    violation_label_kr = "완충됨"
+                    violation_label_kr = "완충됨 (출차 대기)"
+                    violation_label_uz = "100% to'ldi (Kutilmoqda)"
                     violation_level = "info"
+                    action_required_kr = "—"
+                    action_required_uz = "—"
             else:
                 violation_type = "NORMAL_CHARGING"
                 violation_label_kr = "정상 충전 중"
+                violation_label_uz = "Zaryadlanmoqda"
                 violation_level = "info"
+                action_required_kr = "—"
+                action_required_uz = "—"
         else:
             if is_charging:
                 # If charger is active even without CCTV car detection yet
                 violation_type = "NORMAL_CHARGING"
                 violation_label_kr = "충전 중"
+                violation_label_uz = "Zaryadlanmoqda"
                 violation_level = "info"
+                action_required_kr = "—"
+                action_required_uz = "—"
             else:
                 violation_type = "NONE"
                 violation_label_kr = "주차 구역 비어있음"
+                violation_label_uz = "Bo'sh"
                 violation_level = "info"
+                action_required_kr = "—"
+                action_required_uz = "—"
 
         return {
             "cs_id": cs_id,
@@ -282,7 +308,10 @@ class ChargerService:
             "overstay_formatted": format_duration_kr(overstay_seconds) if overstay_seconds > 0 else "0분",
             "violation_type": violation_type,
             "violation_label_kr": violation_label_kr,
+            "violation_label_uz": violation_label_uz,
             "violation_level": violation_level,
+            "action_required_kr": action_required_kr,
+            "action_required_uz": action_required_uz,
         }
 
 

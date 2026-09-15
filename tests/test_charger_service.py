@@ -52,8 +52,9 @@ class TestChargerService(unittest.TestCase):
 
     def test_non_ev_violation(self):
         now = get_kst_now()
+        # Non-EV vehicle: immediate violation even at 0 or 1 minute
         session_info = {
-            "entry_at": now - timedelta(minutes=5),
+            "entry_at": now - timedelta(minutes=1),
             "is_ev": False,
             "plate": "12가3456"
         }
@@ -65,13 +66,16 @@ class TestChargerService(unittest.TestCase):
         )
         self.assertEqual(status["violation_type"], "NON_EV_PARKED")
         self.assertEqual(status["violation_label_kr"], "일반차 불법 주차")
+        self.assertEqual(status["violation_label_uz"], "Oddiy avtomobil (No-EV)")
         self.assertEqual(status["violation_level"], "danger")
+        self.assertEqual(status["action_required_kr"], "즉시 이동 주차 필요")
+        self.assertEqual(status["action_required_uz"], "Darhol joyni bo'shating")
 
     def test_ev_not_charging_grace_period(self):
         now = get_kst_now()
-        # Parked 5 minutes ago (within 15 min grace period)
+        # Parked 2 minutes ago (within 5 min grace period)
         session_info = {
-            "entry_at": now - timedelta(minutes=5),
+            "entry_at": now - timedelta(minutes=2),
             "is_ev": True,
             "plate": "81머2072"
         }
@@ -82,14 +86,14 @@ class TestChargerService(unittest.TestCase):
             session_info=session_info
         )
         self.assertEqual(status["violation_type"], "PREPARING")
-        self.assertEqual(status["violation_label_kr"], "충전 대기 중")
+        self.assertIn("충전 대기 중", status["violation_label_kr"])
         self.assertEqual(status["violation_level"], "info")
 
-    def test_ev_not_charging_violation_after_grace_period(self):
+    def test_ev_not_charging_violation_after_5_mins(self):
         now = get_kst_now()
-        # Parked 20 minutes ago (exceeded 15 min grace period)
+        # Parked 6 minutes ago (exceeded 5 min grace period)
         session_info = {
-            "entry_at": now - timedelta(minutes=20),
+            "entry_at": now - timedelta(minutes=6),
             "is_ev": True,
             "plate": "81머2072"
         }
@@ -101,7 +105,10 @@ class TestChargerService(unittest.TestCase):
         )
         self.assertEqual(status["violation_type"], "NOT_CHARGING")
         self.assertIn("미충전 점유", status["violation_label_kr"])
+        self.assertIn("Zaryadsiz turish", status["violation_label_uz"])
         self.assertEqual(status["violation_level"], "warning")
+        self.assertEqual(status["action_required_kr"], "5분 내 충전 시작 또는 이동")
+        self.assertEqual(status["action_required_uz"], "5 min ichida zaryadlang yoki oling")
 
 
 if __name__ == "__main__":

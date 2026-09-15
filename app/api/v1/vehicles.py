@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
 from app.core.database import get_db
-from app.models.snapshot import CCTVSnapshot
+from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.schemas.snapshot import SnapshotResponse, VehicleTypeEnum
-from app.services.storage_service import storage_service
+from app.services.monitor_service import auto_monitor_service
+from app.services.charger_service import charger_service
 
 router = APIRouter()
 
@@ -61,6 +62,7 @@ def list_vehicles(
     vehicle_type: Optional[str] = Query(None),
     is_ev: Optional[bool] = Query(None),
     cs_id: Optional[str] = Query(None),
+    violation_filter: Optional[str] = Query(None, description="ALL, NON_EV, NOT_CHARGING, OVERSTAY, NORMAL"),
     start_date: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
     from_date: Optional[datetime] = Query(None),
@@ -80,6 +82,12 @@ def list_vehicles(
     if cs_id:
         query = query.filter(CCTVSnapshot.cs_id == cs_id)
 
+    # Violation quick filters
+    if violation_filter == "NON_EV":
+        query = query.filter(CCTVSnapshot.is_ev.is_(False))
+    elif violation_filter == "EV":
+        query = query.filter(CCTVSnapshot.is_ev.is_(True))
+
     # Date filtering
     dt_from, dt_to = _parse_date_bounds(start_date, end_date)
     if dt_from:
@@ -96,11 +104,55 @@ def list_vehicles(
     offset = (page - 1) * page_size
     items = query.order_by(desc(CCTVSnapshot.created_at)).offset(offset).limit(page_size).all()
 
+    # Pre-fetch camera names map
+    cameras = db.query(CCTVCamera).all()
+    cam_name_map = {}
+    for idx, cam in enumerate(cameras, start=1):
+        cam_key = (cam.cs_id, cam.cp_id or "BNS00000")
+        cam_name = cam.camera_name or f"CCTV {idx}"
+        cam_name_map[cam_key] = cam_name
+
     results = []
     for snap in items:
         item = SnapshotResponse.model_validate(snap)
         item.image_url = f"/api/v1/vehicles/{snap.id}/image"
         item.download_url = f"/api/v1/vehicles/{snap.id}/download"
+        
+        # Camera name resolution
+        cam_key = (snap.cs_id, snap.cp_id or "BNS00000")
+        item.camera_name = cam_name_map.get(cam_key, f"CCTV ({snap.cp_id or '1'})")
+
+        # Determine violation & action labels
+        if not snap.is_ev:
+            item.violation_type = "NON_EV_PARKED"
+            item.violation_label_kr = "일반차 불법 주차"
+            item.violation_label_uz = "Oddiy avtomobil (No-EV)"
+            item.action_required_kr = "즉시 이동 주차 필요" if snap.event_type != "END" else "출차 완료"
+            item.action_required_uz = "Darhol joyni bo'shating" if snap.event_type != "END" else "Chiqib ketgan"
+            item.action_required = item.action_required_kr
+        else:
+            # Active session correlation
+            session_key = f"{snap.cs_id}_{snap.cp_id or 'BNS00000'}"
+            active_s = auto_monitor_service.active_sessions.get(session_key)
+            if active_s and active_s.get("session_id") == snap.session_id and snap.event_type != "END":
+                chg_status = charger_service.get_charger_realtime_status(
+                    cs_id=snap.cs_id, cp_id=snap.cp_id, db=db, session_info=active_s
+                )
+                item.battery_soc = chg_status.get("battery_soc")
+                item.charge_power_kw = chg_status.get("charge_power_kw")
+                item.violation_type = chg_status.get("violation_type", "NORMAL_CHARGING")
+                item.violation_label_kr = chg_status.get("violation_label_kr", "정상")
+                item.violation_label_uz = chg_status.get("violation_label_uz", "Normal")
+                item.action_required_kr = chg_status.get("action_required_kr", "—")
+                item.action_required_uz = chg_status.get("action_required_uz", "—")
+            else:
+                item.violation_type = "NORMAL_CHARGING"
+                item.violation_label_kr = "정상"
+                item.violation_label_uz = "Normal"
+                item.action_required_kr = "출차 완료" if snap.event_type == "END" else "—"
+                item.action_required_uz = "Chiqib ketgan" if snap.event_type == "END" else "—"
+            item.action_required = item.action_required_kr
+
         results.append(item)
 
     return {
@@ -140,24 +192,33 @@ def export_vehicles_csv(
 
     items = query.order_by(desc(CCTVSnapshot.created_at)).limit(5000).all()
 
+    # Pre-fetch camera names map
+    cameras = db.query(CCTVCamera).all()
+    cam_name_map = {}
+    for idx, cam in enumerate(cameras, start=1):
+        cam_key = (cam.cs_id, cam.cp_id or "BNS00000")
+        cam_name = cam.camera_name or f"CCTV {idx}"
+        cam_name_map[cam_key] = cam_name
+
     # Build CSV with UTF-8 BOM for Excel
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
 
-    # Pure Korean Header row
+    # Pure Korean Header row matching compact table
     writer.writerow([
         "ID",
         "감지 일시 (KST)",
-        "충전소 ID (CS ID)",
         "충전기 ID (CP ID)",
+        "CCTV 명칭",
         "차량 번호판",
         "구분",
         "차량 유형",
         "전기차 여부",
         "인식 정확도",
-        "주차 시간 및 비고",
-        "감지 방식"
+        "위반 상태",
+        "조치 필요 사항",
+        "주차 시간 및 비고"
     ])
 
     for item in items:
@@ -167,21 +228,29 @@ def export_vehicles_csv(
         conf_str = f"{(item.ai_confidence * 100):.0f}%" if item.ai_confidence is not None else "-"
         time_str = item.created_at.strftime("%Y-%m-%d %H:%M:%S") if item.created_at else ""
         notes_ko = _format_korean_notes(item.notes, item.event_type)
-        
-        src_label = "CCTV 자동" if item.detection_source == "CCTV_AUTO" else ("수동 업로드" if item.detection_source == "MANUAL_UPLOAD" else (item.detection_source or "-"))
+        cam_key = (item.cs_id, item.cp_id or "BNS00000")
+        cctv_name = cam_name_map.get(cam_key, f"CCTV ({item.cp_id or '1'})")
+
+        if not item.is_ev:
+            viol_label = "일반차 불법 주차"
+            act_label = "즉시 이동 주차 필요" if item.event_type != "END" else "출차 완료"
+        else:
+            viol_label = "정상"
+            act_label = "출차 완료" if item.event_type == "END" else "—"
 
         writer.writerow([
             item.id,
             time_str,
-            item.cs_id or "bluenetwrks",
             item.cp_id or "BNS00000",
+            cctv_name,
             item.plate_number or "미인식",
             event_label,
             type_label,
             ev_label,
             conf_str,
-            notes_ko,
-            src_label
+            viol_label,
+            act_label,
+            notes_ko
         ])
 
     csv_data = output.getvalue().encode("utf-8-sig")

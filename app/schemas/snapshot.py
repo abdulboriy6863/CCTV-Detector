@@ -71,6 +71,15 @@ class SnapshotResponse(BaseModel):
     detection_source: Optional[str] = "MANUAL_UPLOAD"
     raw_ocr_text: Optional[str] = None
     plate_region_image: Optional[str] = None
+    camera_name: Optional[str] = None
+    battery_soc: Optional[int] = None
+    charge_power_kw: Optional[float] = None
+    violation_type: Optional[str] = None
+    violation_label_kr: Optional[str] = None
+    violation_label_uz: Optional[str] = None
+    action_required_kr: Optional[str] = None
+    action_required_uz: Optional[str] = None
+    action_required: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -163,7 +172,10 @@ class SlotStatusResponse(BaseModel):
     overstay_formatted: Optional[str] = "0분"
     violation_type: str = "NONE"
     violation_label_kr: str = "정상"
+    violation_label_uz: str = "Normal"
     violation_level: str = "info"
+    action_required_kr: Optional[str] = "—"
+    action_required_uz: Optional[str] = "—"
 
 
 class DashboardStats(BaseModel):

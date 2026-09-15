@@ -81,6 +81,11 @@
                         <span class="text-slate-700 dark:text-slate-300 font-semibold" x-text="slots.length + ' ' + t('cameras_connected')"></span>
                     </div>
 
+                    <!-- Sound Alarm Mute / Unmute Toggle -->
+                    <button @click="toggleSound()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition shadow-sm" :title="isMuted ? t('sound_muted') : t('sound_enabled')">
+                        <i class="fa-solid" :class="isMuted ? 'fa-volume-xmark text-slate-400' : 'fa-volume-high text-emerald-500'"></i>
+                    </button>
+
                     <!-- Theme Toggle -->
                     <button @click="toggleTheme()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition shadow-sm" :title="isDark ? t('theme_light') : t('theme_dark')">
                         <i class="fa-solid" :class="isDark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
@@ -446,89 +451,145 @@
                         <span x-text="t('btn_export_csv')"></span>
                     </button>
 
-                    <!-- Type Filter Select -->
+                    <!-- Type & Violation Filter Select -->
                     <select x-model="filters.type" @change="page = 1; fetchVehicles()" class="h-9 text-xs px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer">
                         <option value="" x-text="t('filter_all')"></option>
+                        <option value="NON_EV" x-text="t('filter_non_ev')"></option>
+                        <option value="NOT_CHARGING" x-text="t('filter_not_charging')"></option>
+                        <option value="OVERSTAY" x-text="t('filter_overstay')"></option>
                         <option value="EV" x-text="t('filter_ev_only')"></option>
                         <option value="REGULAR" x-text="t('filter_regular_only')"></option>
                     </select>
 
                     <!-- Refresh Button -->
-                    <button @click="fetchVehicles()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
-                        <i class="fa-solid fa-rotate-right text-xs"></i>
+                    <button @click="refreshAll()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition shadow-sm" :title="t('btn_refresh')">
+                        <i class="fa-solid fa-rotate-right text-xs" :class="{ 'fa-spin': isRefreshing }"></i>
                     </button>
                 </div>
             </div>
 
             <!-- Table -->
             <div class="w-full overflow-x-auto">
-                <table class="w-full text-left text-xs border-collapse min-w-[760px]">
+                <table class="w-full text-left text-xs border-collapse min-w-[960px]">
                     <thead class="bg-slate-50/80 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold">
                         <tr>
-                            <th class="px-6 py-4" x-text="t('th_time')"></th>
-                            <th class="px-6 py-4" x-text="t('th_station_slot')"></th>
-                            <th class="px-6 py-4" x-text="t('th_plate')"></th>
-                            <th class="px-6 py-4" x-text="t('th_type')"></th>
-                            <th class="px-6 py-4" x-text="t('th_confidence')"></th>
-                            <th class="px-6 py-4 text-right" x-text="t('th_actions')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_time')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_charger_id')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_cctv_name')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_plate')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_type')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_battery')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_violation')"></th>
+                            <th class="px-4 py-3.5" x-text="t('th_action')"></th>
+                            <th class="px-4 py-3.5 text-right" x-text="t('th_actions')"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
                         <template x-for="item in vehicles" :key="item.id">
-                            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150">
-                                <!-- Time & Event Note -->
-                                <td class="px-6 py-4 whitespace-nowrap">
+                            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition duration-150"
+                                :class="{'bg-rose-50/40 dark:bg-rose-950/20': item.violation_type === 'NON_EV_PARKED' || item.violation_type === 'OVERSTAY', 'bg-amber-50/30 dark:bg-amber-950/10': item.violation_type === 'NOT_CHARGING'}">
+                                <!-- 1. Time & Note -->
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" x-text="formatDate(item.created_at)"></div>
-                                    <div class="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
+                                    <div class="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500" x-text="formatNote(item)"></div>
                                 </td>
-                                <!-- Station & Slot -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        <i class="fa-solid fa-charging-station text-blue-500 text-[10px]"></i>
-                                        <span x-text="item.cs_id"></span>
-                                        <span class="text-slate-400">/</span>
-                                        <span class="text-blue-600 dark:text-blue-400" x-text="item.cp_id"></span>
-                                    </div>
+                                <!-- 2. Charger ID -->
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs" x-text="item.cp_id || 'BNS00000'"></span>
                                 </td>
-                                <!-- License Plate -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="inline-flex items-center space-x-2.5">
-                                        <div class="px-3 py-1.5 rounded-xl border font-mono font-extrabold tracking-widest text-xs shadow-sm inline-flex items-center space-x-1.5"
+                                <!-- 3. CCTV Name -->
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-700 dark:text-slate-300 text-xs whitespace-nowrap" x-text="item.camera_name || 'CCTV 1'"></span>
+                                </td>
+                                <!-- 4. License Plate & Event Tag -->
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <div class="inline-flex items-center space-x-2">
+                                        <div class="px-2.5 py-1 rounded-xl border font-mono font-extrabold tracking-wider text-xs shadow-sm inline-flex items-center space-x-1"
                                              :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
                                             <span x-show="item.is_ev" class="text-sky-500 text-xs">⚡</span>
                                             <span x-text="item.plate_number || t('unrecognized')"></span>
                                         </div>
                                         <template x-if="item.event_type === 'START'">
-                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="t('event_start')"></span>
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="t('event_start')"></span>
                                         </template>
                                         <template x-if="item.event_type === 'END'">
-                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" x-text="t('event_end')"></span>
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" x-text="t('event_end')"></span>
                                         </template>
                                     </div>
                                 </td>
-                                <!-- Vehicle Type -->
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <!-- 5. Vehicle Type -->
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <template x-if="item.is_ev">
-                                        <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
-                                            <i class="fa-solid fa-bolt mr-1.5 text-sky-500"></i> <span x-text="t('vehicle_ev')"></span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40">
+                                            <i class="fa-solid fa-bolt mr-1 text-sky-500 text-[10px]"></i> <span x-text="t('vehicle_ev')"></span>
                                         </span>
                                     </template>
                                     <template x-if="!item.is_ev">
-                                        <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                            <i class="fa-solid fa-car mr-1.5 text-slate-400"></i> <span x-text="t('vehicle_regular')"></span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                            <i class="fa-solid fa-car mr-1 text-slate-400 text-[10px]"></i> <span x-text="t('vehicle_regular')"></span>
                                         </span>
                                     </template>
                                 </td>
-                                <!-- AI Confidence -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs" x-text="item.ai_confidence ? (item.ai_confidence * 100).toFixed(0) + '%' : '-'"></span>
+                                <!-- 6. Battery & Charging -->
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <template x-if="item.battery_soc !== null && item.battery_soc !== undefined && item.battery_soc >= 0">
+                                        <div>
+                                            <template x-if="item.battery_soc >= 100">
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">🟢 100% (완충)</span>
+                                            </template>
+                                            <template x-if="item.battery_soc < 100">
+                                                <span class="font-mono font-bold text-xs text-sky-600 dark:text-sky-400 flex items-center space-x-1">
+                                                    <i class="fa-solid fa-bolt text-sky-500 text-[10px]"></i>
+                                                    <span x-text="item.battery_soc + '%'"></span>
+                                                    <span class="text-[10px] text-slate-400 font-normal" x-show="item.charge_power_kw" x-text="'(' + item.charge_power_kw + ' kW)'"></span>
+                                                </span>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="item.battery_soc === null || item.battery_soc === undefined || item.battery_soc < 0">
+                                        <span class="text-slate-400 font-mono text-xs">—</span>
+                                    </template>
                                 </td>
-                                <!-- Actions -->
-                                <td class="px-6 py-4 text-right whitespace-nowrap space-x-1.5">
-                                    <button @click="openImageModal(item.image_url)" class="w-8 h-8 inline-flex items-center justify-center rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
+                                <!-- 7. Violation Status -->
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <template x-if="item.violation_type === 'NON_EV_PARKED'">
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300/50 flex items-center space-x-1 w-fit">
+                                            <span>🚨</span>
+                                            <span x-text="currentLang === 'ko' ? item.violation_label_kr : (item.violation_label_uz || item.violation_label_kr)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="item.violation_type === 'NOT_CHARGING'">
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/50 flex items-center space-x-1 w-fit">
+                                            <span>⚠️</span>
+                                            <span x-text="currentLang === 'ko' ? item.violation_label_kr : (item.violation_label_uz || item.violation_label_kr)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="item.violation_type === 'OVERSTAY'">
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border border-red-300/50 flex items-center space-x-1 w-fit">
+                                            <span>🛑</span>
+                                            <span x-text="currentLang === 'ko' ? item.violation_label_kr : (item.violation_label_uz || item.violation_label_kr)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="item.violation_type !== 'NON_EV_PARKED' && item.violation_type !== 'NOT_CHARGING' && item.violation_type !== 'OVERSTAY'">
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/50 flex items-center space-x-1 w-fit">
+                                            <span>🟢</span>
+                                            <span x-text="currentLang === 'ko' ? (item.violation_label_kr || '정상') : (item.violation_label_uz || 'Normal')"></span>
+                                        </span>
+                                    </template>
+                                </td>
+                                <!-- 8. Action Required / Alert -->
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="font-bold text-xs"
+                                          :class="item.violation_type === 'NON_EV_PARKED' || item.violation_type === 'OVERSTAY' ? 'text-rose-600 dark:text-rose-400 font-extrabold' : (item.violation_type === 'NOT_CHARGING' ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-400')"
+                                          x-text="currentLang === 'ko' ? (item.action_required_kr || item.action_required || '—') : (item.action_required_uz || item.action_required || '—')">
+                                    </span>
+                                </td>
+                                <!-- 9. Actions -->
+                                <td class="px-4 py-3 text-right whitespace-nowrap space-x-1.5">
+                                    <button @click="openImageModal(item.image_url)" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 transition shadow-sm" :title="t('view_image')">
                                         <i class="fa-solid fa-image text-xs"></i>
                                     </button>
-                                    <button @click="deleteVehicle(item.id)" class="w-8 h-8 inline-flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
+                                    <button @click="deleteVehicle(item.id)" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-500 dark:text-rose-400 transition shadow-sm" :title="t('btn_delete')">
                                         <i class="fa-solid fa-trash-can text-xs"></i>
                                     </button>
                                 </td>
@@ -536,7 +597,7 @@
                         </template>
                         <template x-if="vehicles.length === 0">
                             <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-slate-400">
+                                <td colspan="9" class="px-6 py-12 text-center text-slate-400">
                                     <p class="text-xs font-semibold" x-text="t('no_history_msg')"></p>
                                 </td>
                             </tr>
@@ -756,15 +817,23 @@
                 lbl_date_range: "Sana:",
                 btn_export_csv: "Excel / CSV",
                 filter_all: "Barcha mashinalar",
-                filter_ev_only: "Faqat Elektr (EV)",
+                filter_non_ev: "🚨 Faqat No-EV (Oddiy)",
+                filter_not_charging: "⚠️ 5 min Zaryadsizlar",
+                filter_overstay: "🛑 100% to'lgandan keyin",
+                filter_ev_only: "⚡ Barcha EV mashinalar",
                 filter_regular_only: "Faqat Oddiy mashinalar",
                 btn_refresh: "Yangilash",
                 th_time: "Vaqt",
-                th_station_slot: "Stansiya / Joy",
+                th_charger_id: "Charger ID",
+                th_cctv_name: "CCTV Nomi",
                 th_plate: "Davlat raqami",
                 th_type: "Turi",
-                th_confidence: "Ishonch",
+                th_battery: "Zaryad & Batareya",
+                th_violation: "Holat / Qoidabuzarlik",
+                th_action: "Harakat / Ogohlantirish",
                 th_actions: "Amallar",
+                sound_enabled: "Ovoz yoqilgan",
+                sound_muted: "Ovoz o'chirilgan",
                 unrecognized: "Noma'lum",
                 view_image: "Rasmni ko'rish",
                 no_history_msg: "Hozircha avtomobil ma'lumotlari mavjud emas.",
@@ -803,10 +872,14 @@
                 stat_total: "총 감지 차량",
                 stat_ev: "전기차 (EV) 감지",
                 stat_regular: "일반 차량 (내연기관)",
-                stat_alerts: "일반차 주차 경고",
-                stat_today: "오늘",
-                stat_alert_desc: "EV 구역 무단 주차 알림",
-                test_title: "차량 사진 테스트 & 인식",
+                stat_today_total: "오늘 감지",
+                stat_today_ev: "오늘 전기차",
+                stat_today_regular: "오늘 일반차",
+                stat_today_alerts: "오늘 위반 경고",
+                stat_today_badge: "오늘",
+                stat_total_badge: "전체",
+                upload_title: "차량 이미지 빠른 분석 (테스트)",
+                upload_subtitle: "번호판 인식, 한국어 규격 검증 및 EV 판별",
                 korean_plates_support: "한국 번호판 지원",
                 dropzone_prompt: "차량 이미지를 드래그하거나 클릭하여 업로드",
                 dropzone_formats: "JPG, PNG 파일 지원 (한국 EV 및 일반 번호판 자동 판별)",
@@ -833,19 +906,27 @@
                 btn_delete: "삭제",
                 no_cameras_msg: "등록된 CCTV 카메라가 없습니다.",
                 history_title: "감지 이력 목록",
-                history_subtitle: "충전소 및 주차 베이별 입차/출차 기록",
+                history_subtitle: "충전기별 실시간 번호판, 충전 상태 및 위반 현황",
                 lbl_date_range: "날짜:",
                 btn_export_csv: "Excel / CSV",
                 filter_all: "전체 차량",
-                filter_ev_only: "전기차 (EV) 만",
+                filter_non_ev: "🚨 일반차 불법 주차",
+                filter_not_charging: "⚠️ 5분 미충전 점유",
+                filter_overstay: "🛑 완충 후 초과 점유",
+                filter_ev_only: "⚡ 전기차 (EV) 전체",
                 filter_regular_only: "일반 차량 (내연기관)",
                 btn_refresh: "새로고침",
                 th_time: "시간",
-                th_station_slot: "충전소 / 베이",
+                th_charger_id: "충전기 ID",
+                th_cctv_name: "CCTV 명칭",
                 th_plate: "차량 번호판",
                 th_type: "유형",
-                th_confidence: "신뢰도",
-                th_actions: "작업",
+                th_battery: "충전 및 배터리",
+                th_violation: "위반 상태",
+                th_action: "조치 필요 사항",
+                th_actions: "관리",
+                sound_enabled: "경보음 켜짐",
+                sound_muted: "경보음 음소거",
                 unrecognized: "미인식",
                 view_image: "사진 보기",
                 no_history_msg: "기록된 차량 감지 데이터가 없습니다.",
@@ -879,6 +960,9 @@
             return {
                 isDark: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
                 currentLang: localStorage.getItem('app_lang') || 'ko',
+                isMuted: localStorage.getItem('app_muted') === 'true',
+                isRefreshing: false,
+                knownAlertKeys: new Set(),
 
                 stats: { total_detections: 0, ev_count: 0, regular_count: 0, today_detections: 0, today_ev: 0, today_regular: 0, today_alerts: 0 },
                 slots: [],
@@ -943,6 +1027,32 @@
                 toggleTheme() {
                     this.isDark = !this.isDark;
                 },
+
+                toggleSound() {
+                    this.isMuted = !this.isMuted;
+                    localStorage.setItem('app_muted', this.isMuted);
+                    if (!this.isMuted) {
+                        this.playAlarmSound();
+                    }
+                },
+
+                playAlarmSound() {
+                    if (this.isMuted) return;
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+                        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.3);
+                    } catch (e) {}
+                },
                 
                 async fetchStats() {
                     try {
@@ -956,25 +1066,64 @@
                         const res = await fetch('/api/v1/cameras/slots-status');
                         if (res.ok) {
                             this.slots = await res.json();
+                            let hasNewViolation = false;
+                            for (const s of this.slots) {
+                                if (s.is_occupied && s.violation_type && s.violation_type !== 'NONE' && s.violation_type !== 'NORMAL_CHARGING') {
+                                    const alertKey = `${s.camera_id}_${s.session_id}_${s.violation_type}`;
+                                    if (!this.knownAlertKeys.has(alertKey)) {
+                                        this.knownAlertKeys.add(alertKey);
+                                        hasNewViolation = true;
+                                    }
+                                }
+                            }
+                            if (hasNewViolation) {
+                                this.playAlarmSound();
+                            }
                         }
                     } catch (e) { console.error("Slots fetch error:", e); }
                 },
                 
-                async fetchVehicles() {
+                async fetchVehicles(manual = false) {
                     try {
+                        if (manual) this.isRefreshing = true;
                         let url = `/api/v1/vehicles?page=${this.page}&page_size=${this.pageSize}`;
                         if (this.filters.type === 'EV') url += '&is_ev=true';
                         else if (this.filters.type === 'REGULAR') url += '&vehicle_type=REGULAR';
+                        else if (this.filters.type === 'NON_EV') url += '&violation_filter=NON_EV';
+                        else if (this.filters.type === 'NOT_CHARGING' || this.filters.type === 'OVERSTAY') url += '&is_ev=true';
+                        
                         if (this.filters.startDate) url += `&start_date=${this.filters.startDate}`;
                         if (this.filters.endDate) url += `&end_date=${this.filters.endDate}`;
                         
                         const res = await fetch(url);
                         if (res.ok) {
                             const data = await res.json();
-                            this.vehicles = data.items;
+                            let items = data.items;
+                            if (this.filters.type === 'NOT_CHARGING') {
+                                items = items.filter(x => x.violation_type === 'NOT_CHARGING');
+                            } else if (this.filters.type === 'OVERSTAY') {
+                                items = items.filter(x => x.violation_type === 'OVERSTAY');
+                            }
+                            this.vehicles = items;
                             this.totalVehicles = data.total;
                         }
-                    } catch (e) { console.error("Vehicles fetch error:", e); }
+                    } catch (e) {
+                        console.error("Vehicles fetch error:", e);
+                    } finally {
+                        if (manual) {
+                            setTimeout(() => { this.isRefreshing = false; }, 300);
+                        }
+                    }
+                },
+
+                async refreshAll() {
+                    this.isRefreshing = true;
+                    await Promise.all([
+                        this.fetchStats(),
+                        this.fetchSlots(),
+                        this.fetchVehicles(true)
+                    ]);
+                    setTimeout(() => { this.isRefreshing = false; }, 300);
                 },
 
                 exportCSV() {
@@ -982,6 +1131,7 @@
                     const params = [];
                     if (this.filters.type === 'EV') params.push('is_ev=true');
                     else if (this.filters.type === 'REGULAR') params.push('vehicle_type=REGULAR');
+                    else if (this.filters.type === 'NON_EV') params.push('is_ev=false');
                     if (this.filters.startDate) params.push(`start_date=${this.filters.startDate}`);
                     if (this.filters.endDate) params.push(`end_date=${this.filters.endDate}`);
                     url += params.join('&');

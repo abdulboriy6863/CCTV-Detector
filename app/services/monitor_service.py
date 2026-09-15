@@ -165,7 +165,10 @@ class AutoMonitorService:
                 "overstay_formatted": charger_info.get("overstay_formatted", "0분"),
                 "violation_type": charger_info.get("violation_type", "NONE"),
                 "violation_label_kr": charger_info.get("violation_label_kr", "정상"),
+                "violation_label_uz": charger_info.get("violation_label_uz", "Normal"),
                 "violation_level": charger_info.get("violation_level", "info"),
+                "action_required_kr": charger_info.get("action_required_kr", "—"),
+                "action_required_uz": charger_info.get("action_required_uz", "—"),
             })
 
         return statuses

@@ -374,8 +374,11 @@ class DetectionPipeline:
                 if best_candidate and best_score >= 0.50:
                     break
 
-            # 4. Build Final Result
-            if best_candidate:
+            # 4. Build Final Result with Strict Confidence Threshold
+            MIN_CONFIDENCE_THRESHOLD = 0.45
+            MIN_TOTAL_SCORE = 0.35
+
+            if best_candidate and best_candidate["confidence"] >= MIN_CONFIDENCE_THRESHOLD and best_score >= MIN_TOTAL_SCORE:
                 result.success = True
                 result.plate_number = best_candidate["plate_number"]
                 result.confidence = best_candidate["confidence"]
@@ -394,12 +397,14 @@ class DetectionPipeline:
 
                 ev_emoji = "⚡" if result.is_ev else "🚗"
                 logger.info(
-                    f"{ev_emoji} Detected: {result.plate_number} | "
+                    f"{ev_emoji} Detected: {result.plate_number} (Conf: {result.confidence:.2f}) | "
                     f"Type: {result.vehicle_type} | Color: {result.plate_color} | "
                     f"From: {best_candidate['source']} | Time: {(time.time()-start_time)*1000:.1f}ms"
                 )
             else:
-                result.error_message = "Rasmda Koreya davlat raqami topilmadi"
+                if best_candidate:
+                    logger.debug(f"Rejected low confidence plate candidate '{best_candidate.get('plate_number')}' (conf: {best_candidate.get('confidence'):.4f}, score: {best_score:.4f})")
+                result.error_message = "Rasmda Koreya davlat raqami topilmadi yoki ishonchlilik darajasi yetarli emas"
 
         except Exception as e:
             logger.error(f"Detection pipeline error: {e}", exc_info=True)

@@ -481,9 +481,9 @@ class AutoMonitorService:
         active = self.active_sessions.get(camera_key)
 
         # ----------------------------------------------------
-        # SCENARIO 1: No plate recognized in this frame
+        # SCENARIO 1: No plate recognized in this frame (or confidence too low)
         # ----------------------------------------------------
-        if not det_result.success or not det_result.plate_number:
+        if not det_result.success or not det_result.plate_number or det_result.confidence < 0.45:
             if active:
                 active["missed_cycles"] = active.get("missed_cycles", 0) + 1
                 active["pending_new_plate"] = None

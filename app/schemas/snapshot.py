@@ -162,6 +162,7 @@ class SlotStatusResponse(BaseModel):
     last_error: Optional[str] = None
     connector_status: Optional[str] = "AVAILABLE"
     connector_status_kr: Optional[str] = "사용 가능"
+    connector_status_uz: Optional[str] = "Mavjud (Bo'sh)"
     is_charging: bool = False
     battery_soc: Optional[int] = None
     charge_power_kw: float = 0.0

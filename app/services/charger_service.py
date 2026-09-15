@@ -30,6 +30,20 @@ CONNECTOR_STATUS_KR = {
     "OFFLINE": "오프라인",
 }
 
+# Uzbek connector status mapping
+CONNECTOR_STATUS_UZ = {
+    "AVAILABLE": "Mavjud (Bo'sh)",
+    "PREPARING": "Ulanmoqda / Tayyor",
+    "CHARGING": "Zaryadlanmoqda",
+    "SUSPENDEDEV": "100% To'ldi",
+    "SUSPENDEDEVSE": "Vaqtincha to'xtatildi",
+    "FINISHING": "Tugallanmoqda",
+    "RESERVED": "Band qilingan",
+    "UNAVAILABLE": "Mavjud emas",
+    "FAULTED": "Nosoz / Ta'mirda",
+    "OFFLINE": "Oflayn",
+}
+
 def format_duration_kr(seconds: int) -> str:
     """Format duration in seconds to standard Korean string."""
     if seconds <= 0:
@@ -122,6 +136,7 @@ class ChargerService:
         # Defaults
         connector_status = "AVAILABLE"
         connector_status_kr = "사용 가능"
+        connector_status_uz = "Mavjud (Bo'sh)"
         is_charging = False
         battery_soc: Optional[int] = None
         charge_power_kw: float = 0.0
@@ -131,7 +146,10 @@ class ChargerService:
         overstay_seconds = 0
         violation_type = "NONE"
         violation_label_kr = "정상"
+        violation_label_uz = "Normal"
         violation_level = "info"
+        action_required_kr = "—"
+        action_required_uz = "—"
 
         # Check in CSMS Production DB
         csms_session = None
@@ -169,12 +187,15 @@ class ChargerService:
                     raw_stat = str(conn_row[0]).upper().strip()
                     connector_status = raw_stat if raw_stat else "AVAILABLE"
                     connector_status_kr = CONNECTOR_STATUS_KR.get(connector_status, connector_status)
+                    connector_status_uz = CONNECTOR_STATUS_UZ.get(connector_status, connector_status)
                 else:
                     connector_status = "AVAILABLE"
                     connector_status_kr = "사용 가능"
+                    connector_status_uz = "Mavjud (Bo'sh)"
             except Exception:
                 connector_status = "AVAILABLE"
                 connector_status_kr = "사용 가능"
+                connector_status_uz = "Mavjud (Bo'sh)"
 
             # 3. Query active live transaction (TINF_CURRENT_TX)
             try:
@@ -204,8 +225,10 @@ class ChargerService:
                         charging_duration_seconds = max(0, int((now - charging_start_time).total_seconds()))
                     connector_status = "CHARGING"
                     connector_status_kr = "충전 중"
+                    connector_status_uz = "Zaryadlanmoqda"
                 elif connector_status == "CHARGING":
                     is_charging = True
+                    connector_status_uz = "Zaryadlanmoqda"
             except Exception:
                 pass
 
@@ -253,6 +276,7 @@ class ChargerService:
             elif battery_soc is not None and battery_soc >= 100:
                 connector_status = "SUSPENDEDEV"
                 connector_status_kr = "완충 (100%)"
+                connector_status_uz = "100% To'ldi"
                 if parking_seconds > (charging_duration_seconds + self.OVERSTAY_GRACE_SECONDS):
                     overstay_seconds = parking_seconds - charging_duration_seconds
                     violation_type = "OVERSTAY"
@@ -298,6 +322,7 @@ class ChargerService:
             "cp_id": effective_cp_id,
             "connector_status": connector_status,
             "connector_status_kr": connector_status_kr,
+            "connector_status_uz": connector_status_uz,
             "is_charging": is_charging,
             "battery_soc": battery_soc,
             "charge_power_kw": round(charge_power_kw, 2),

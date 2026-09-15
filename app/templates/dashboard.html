@@ -216,7 +216,7 @@
                                         </div>
                                     </div>
                                     <div class="flex items-center space-x-1 shrink-0">
-                                        <button @click="openLiveModal(slot)" class="w-6 h-6 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition" title="Kattalashtirish / AI Test">
+                                        <button @click="openLiveModal(slot)" class="w-6 h-6 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition" :title="t('btn_zoom_hint')">
                                             <i class="fa-solid fa-expand text-[10px]"></i>
                                         </button>
                                         <button @click="deleteCamera(slot.camera_id)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-500 flex items-center justify-center transition" :title="t('btn_delete')">
@@ -236,30 +236,57 @@
                                     <template x-if="!slot.is_online">
                                         <div class="w-full h-full flex flex-col items-center justify-center text-slate-500 text-xs">
                                             <i class="fa-solid fa-video-slash text-base mb-1 text-slate-600"></i>
-                                            <span class="text-[10px]">Signal yo'q (Offline)</span>
+                                            <span class="text-[10px]" x-text="t('lbl_signal_lost')"></span>
                                         </div>
                                     </template>
 
                                     <!-- Quick Overlay Badges on Top of Video -->
                                     <div class="absolute bottom-1 left-1 right-1 flex items-center justify-between pointer-events-none px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px]">
                                         <div class="flex items-center space-x-1 truncate">
+                                            <!-- When vehicle detected by camera -->
                                             <template x-if="slot.is_occupied">
                                                 <span class="font-mono font-bold px-1.5 py-0.2 rounded text-[10px]"
                                                     :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'"
-                                                    x-text="(slot.is_ev ? '⚡ ' : '') + slot.current_plate"></span>
+                                                    x-text="(slot.is_ev ? '⚡ ' : '🚗 ') + slot.current_plate"></span>
                                             </template>
-                                            <template x-if="!slot.is_occupied">
+
+                                            <!-- When not detected by camera, but DB charging -->
+                                            <template x-if="!slot.is_occupied && (slot.is_charging || slot.connector_status === 'CHARGING')">
+                                                <span class="text-sky-400 font-bold text-[10px] flex items-center space-x-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+                                                    <span x-text="t('slot_charging_occupied')"></span>
+                                                </span>
+                                            </template>
+
+                                            <!-- When not detected by camera, preparing/cable connected -->
+                                            <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status === 'PREPARING'">
+                                                <span class="text-amber-400 font-bold text-[10px] flex items-center space-x-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                                    <span x-text="t('slot_cable_connected')"></span>
+                                                </span>
+                                            </template>
+
+                                            <!-- When not detected by camera, faulted/unavailable -->
+                                            <template x-if="!slot.is_occupied && !slot.is_charging && (slot.connector_status === 'FAULTED' || slot.connector_status === 'UNAVAILABLE')">
+                                                <span class="text-rose-400 font-bold text-[10px] flex items-center space-x-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                                                    <span x-text="t('slot_faulted')"></span>
+                                                </span>
+                                            </template>
+
+                                            <!-- When completely vacant -->
+                                            <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status !== 'PREPARING' && slot.connector_status !== 'FAULTED' && slot.connector_status !== 'UNAVAILABLE'">
                                                 <span class="text-emerald-400 font-bold text-[10px] flex items-center space-x-1">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                                    <span>Bo'sh (Vacant)</span>
+                                                    <span x-text="t('slot_vacant')"></span>
                                                 </span>
                                             </template>
                                         </div>
 
                                         <!-- Charger Connector Mini Pill -->
                                         <span class="font-bold text-[9px] px-1.5 py-0.2 rounded shrink-0"
-                                            :class="slot.is_charging ? 'bg-emerald-500/80 text-white' : (slot.battery_soc >= 100 ? 'bg-purple-500/80 text-white' : 'bg-slate-700/80 text-slate-300')"
-                                            x-text="slot.connector_status_kr || '사용 가능'"></span>
+                                            :class="slot.is_charging ? 'bg-emerald-500/80 text-white' : (slot.battery_soc >= 100 ? 'bg-purple-500/80 text-white' : (slot.connector_status === 'PREPARING' ? 'bg-amber-500/80 text-slate-950' : 'bg-slate-700/80 text-slate-300'))"
+                                            x-text="getConnectorLabel(slot)"></span>
                                     </div>
                                     
                                     <!-- Hover Expand Hint Icon -->
@@ -272,15 +299,16 @@
 
                                 <!-- Telemetry & Charging Info Underneath -->
                                 <div class="p-2 space-y-1.5 text-xs bg-slate-50/50 dark:bg-slate-900/40 flex-1 flex flex-col justify-between">
+                                    <!-- 1. When camera detected vehicle -->
                                     <template x-if="slot.is_occupied">
                                         <div class="space-y-1">
-                                            <!-- Battery SoC / AC Power info -->
+                                            <!-- Battery SoC (DC) -->
                                             <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
                                                 <div class="space-y-0.5">
                                                     <div class="flex items-center justify-between text-[10px] font-bold">
                                                         <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
                                                             <i class="fa-solid fa-battery-three-quarters text-emerald-500"></i>
-                                                            <span>SoC (배터리)</span>
+                                                            <span x-text="t('lbl_battery_soc')"></span>
                                                         </span>
                                                         <span class="font-mono text-emerald-600 dark:text-emerald-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
                                                     </div>
@@ -289,11 +317,13 @@
                                                     </div>
                                                 </div>
                                             </template>
+
+                                            <!-- AC Slow Charging -->
                                             <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
                                                 <div class="flex items-center justify-between text-[10px] font-bold text-sky-600 dark:text-sky-400">
                                                     <span class="flex items-center space-x-1">
                                                         <i class="fa-solid fa-bolt text-sky-500 animate-pulse"></i>
-                                                        <span>AC 완속 충전</span>
+                                                        <span x-text="t('lbl_ac_charging')"></span>
                                                     </span>
                                                     <span class="font-mono" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
                                                 </div>
@@ -301,25 +331,75 @@
 
                                             <!-- Dual Timers -->
                                             <div class="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                                                <span>🅿️ <strong class="text-slate-700 dark:text-slate-200 font-mono" x-text="slot.duration_formatted || '0분'"></strong></span>
-                                                <span x-show="slot.is_charging || slot.charging_duration_seconds > 0">⚡ <strong class="text-emerald-600 dark:text-emerald-400 font-mono" x-text="slot.charging_duration_formatted || '0분'"></strong></span>
+                                                <span>🅿️ <span x-text="t('lbl_parking_time') + ':'"></span> <strong class="text-slate-700 dark:text-slate-200 font-mono" x-text="formatDurationDisplay(slot.duration_formatted)"></strong></span>
+                                                <span x-show="slot.is_charging || slot.charging_duration_seconds > 0">⚡ <span x-text="t('lbl_charge_time') + ':'"></span> <strong class="text-emerald-600 dark:text-emerald-400 font-mono" x-text="formatDurationDisplay(slot.charging_duration_formatted)"></strong></span>
                                             </div>
 
-                                            <!-- Violation Badge (if warning or danger) -->
+                                            <!-- Violation Banner -->
                                             <template x-if="slot.violation_type !== 'NORMAL_CHARGING' && slot.violation_type !== 'NONE' && slot.violation_type !== 'PREPARING'">
                                                 <div class="px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 truncate"
                                                     :class="slot.violation_level === 'danger' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-slate-950'">
                                                     <i class="fa-solid fa-triangle-exclamation text-[9px] shrink-0"></i>
-                                                    <span class="truncate" x-text="slot.violation_label_kr"></span>
+                                                    <span class="truncate" x-text="getViolationLabel(slot)"></span>
                                                 </div>
                                             </template>
                                         </div>
                                     </template>
 
-                                    <template x-if="!slot.is_occupied">
-                                        <div class="flex items-center justify-between text-[11px] py-1 text-slate-500 dark:text-slate-400">
-                                            <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">🟢 Bo'sh / Foydalanishga tayyor</span>
-                                            <span class="text-[10px] font-mono text-slate-400" x-text="slot.connector_status_kr || '사용 가능'"></span>
+                                    <!-- 2. When camera did NOT detect vehicle, but DB says charging -->
+                                    <template x-if="!slot.is_occupied && (slot.is_charging || slot.connector_status === 'CHARGING')">
+                                        <div class="space-y-1">
+                                            <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
+                                                <div class="space-y-0.5">
+                                                    <div class="flex items-center justify-between text-[10px] font-bold">
+                                                        <span class="text-sky-600 dark:text-sky-400 flex items-center space-x-1">
+                                                            <i class="fa-solid fa-battery-three-quarters"></i>
+                                                            <span x-text="t('lbl_battery_soc')"></span>
+                                                        </span>
+                                                        <span class="font-mono text-sky-600 dark:text-sky-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
+                                                    </div>
+                                                    <div class="w-full bg-slate-200 dark:bg-slate-700 h-1 rounded-full overflow-hidden">
+                                                        <div class="bg-gradient-to-r from-sky-500 to-blue-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <div class="flex items-center justify-between text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                                                <span class="flex items-center space-x-1">
+                                                    <i class="fa-solid fa-bolt animate-pulse text-sky-500"></i>
+                                                    <span x-text="t('slot_charging_desc')"></span>
+                                                </span>
+                                                <span class="font-mono text-[10px]" x-text="slot.charge_power_kw > 0 ? (slot.charge_power_kw + ' kW') : getConnectorLabel(slot)"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- 3. When camera did NOT detect vehicle, cable preparing -->
+                                    <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status === 'PREPARING'">
+                                        <div class="flex items-center justify-between text-[11px] py-0.5 text-amber-600 dark:text-amber-400">
+                                            <span class="text-[10px] font-medium flex items-center space-x-1">
+                                                <i class="fa-solid fa-plug text-amber-500"></i>
+                                                <span x-text="t('slot_cable_connected')"></span>
+                                            </span>
+                                            <span class="text-[10px] font-mono text-slate-400" x-text="getConnectorLabel(slot)"></span>
+                                        </div>
+                                    </template>
+
+                                    <!-- 4. When camera did NOT detect vehicle, faulted/unavailable -->
+                                    <template x-if="!slot.is_occupied && !slot.is_charging && (slot.connector_status === 'FAULTED' || slot.connector_status === 'UNAVAILABLE')">
+                                        <div class="flex items-center justify-between text-[11px] py-0.5 text-rose-600 dark:text-rose-400">
+                                            <span class="text-[10px] font-medium flex items-center space-x-1">
+                                                <i class="fa-solid fa-wrench text-rose-500"></i>
+                                                <span x-text="t('slot_faulted')"></span>
+                                            </span>
+                                            <span class="text-[10px] font-mono text-slate-400" x-text="getConnectorLabel(slot)"></span>
+                                        </div>
+                                    </template>
+
+                                    <!-- 5. When completely vacant -->
+                                    <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status !== 'PREPARING' && slot.connector_status !== 'FAULTED' && slot.connector_status !== 'UNAVAILABLE'">
+                                        <div class="flex items-center justify-between text-[11px] py-0.5 text-slate-500 dark:text-slate-400">
+                                            <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400" x-text="t('slot_vacant_full')"></span>
+                                            <span class="text-[10px] font-mono text-slate-400" x-text="getConnectorLabel(slot)"></span>
                                         </div>
                                     </template>
                                 </div>
@@ -537,7 +617,7 @@
                                     <template x-if="item.battery_soc !== null && item.battery_soc !== undefined && item.battery_soc > 0">
                                         <div>
                                             <template x-if="item.battery_soc >= 100">
-                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">🟢 100% (완충)</span>
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="'🟢 ' + t('battery_full')"></span>
                                             </template>
                                             <template x-if="item.battery_soc < 100">
                                                 <span class="font-mono font-bold text-xs text-sky-600 dark:text-sky-400 flex items-center space-x-1">
@@ -563,25 +643,25 @@
                                     <template x-if="item.violation_type === 'NON_EV_PARKED'">
                                         <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300/50 flex items-center space-x-1 w-fit">
                                             <span>🚨</span>
-                                            <span x-text="currentLang === 'ko' ? item.violation_label_kr : (item.violation_label_uz || item.violation_label_kr)"></span>
+                                            <span x-text="getViolationLabel(item)"></span>
                                         </span>
                                     </template>
                                     <template x-if="item.violation_type === 'NOT_CHARGING'">
                                         <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/50 flex items-center space-x-1 w-fit">
                                             <span>⚠️</span>
-                                            <span x-text="currentLang === 'ko' ? item.violation_label_kr : (item.violation_label_uz || item.violation_label_kr)"></span>
+                                            <span x-text="getViolationLabel(item)"></span>
                                         </span>
                                     </template>
                                     <template x-if="item.violation_type === 'OVERSTAY'">
                                         <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border border-red-300/50 flex items-center space-x-1 w-fit">
                                             <span>🛑</span>
-                                            <span x-text="currentLang === 'ko' ? item.violation_label_kr : (item.violation_label_uz || item.violation_label_kr)"></span>
+                                            <span x-text="getViolationLabel(item)"></span>
                                         </span>
                                     </template>
                                     <template x-if="item.violation_type !== 'NON_EV_PARKED' && item.violation_type !== 'NOT_CHARGING' && item.violation_type !== 'OVERSTAY'">
                                         <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/50 flex items-center space-x-1 w-fit">
                                             <span>🟢</span>
-                                            <span x-text="currentLang === 'ko' ? (item.violation_label_kr || '정상') : (item.violation_label_uz || 'Normal')"></span>
+                                            <span x-text="getViolationLabel(item)"></span>
                                         </span>
                                     </template>
                                 </td>
@@ -589,7 +669,7 @@
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <span class="font-bold text-xs"
                                           :class="item.violation_type === 'NON_EV_PARKED' || item.violation_type === 'OVERSTAY' ? 'text-rose-600 dark:text-rose-400 font-extrabold' : (item.violation_type === 'NOT_CHARGING' ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-400')"
-                                          x-text="currentLang === 'ko' ? (item.action_required_kr || item.action_required || '—') : (item.action_required_uz || item.action_required || '—')">
+                                          x-text="getActionLabel(item)">
                                     </span>
                                 </td>
                                 <!-- 9. Actions -->
@@ -697,7 +777,7 @@
                     <span x-show="!isSavingCam" x-text="t('btn_save_camera')"></span>
                     <span x-show="isSavingCam" class="flex items-center space-x-1">
                         <i class="fa-solid fa-circle-notch fa-spin"></i>
-                        <span>Ulanmoqda...</span>
+                        <span x-text="t('connecting_status')"></span>
                     </span>
                 </button>
             </div>
@@ -760,7 +840,7 @@
             <div class="flex items-center justify-between pt-2">
                 <button @click="scanLiveFrame()" :disabled="liveModal.aiLoading" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition">
                     <i class="fa-solid" :class="liveModal.aiLoading ? 'fa-circle-notch fa-spin' : 'fa-wand-magic-sparkles'"></i>
-                    <span x-text="liveModal.aiLoading ? 'AI Tahlil qilinmoqda...' : t('btn_ai_scan_now')"></span>
+                    <span x-text="liveModal.aiLoading ? t('analyzing_ai') : t('btn_ai_scan_now')"></span>
                 </button>
                 <button @click="closeLiveModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition" x-text="t('btn_close')"></button>
             </div>
@@ -787,11 +867,12 @@
                 theme_dark: "Qorong'i rejimga o'tish",
                 camera_mgmt_title: "Kameralar konfiguratsiyasi & Jonli CCTV",
                 camera_mgmt_subtitle: "RTSP va IP kameralar monitoring holati",
-                btn_test: "Jonli efir / Test",
+                btn_test: "Jonli efir / AI Test",
+                btn_zoom_hint: "Kattalashtirish / AI Test",
                 stat_total: "Jami aniqlangan",
                 stat_ev: "Elektr avtomobil (EV)",
                 stat_regular: "Oddiy avtomobil",
-                stat_alerts: "Noto'g'ri to'xtashlar",
+                stat_alerts: "Qoidabuzarliklar",
                 stat_today: "Bugun",
                 stat_alert_desc: "EV zaryadlash joyiga qo'yilgan oddiy mashinalar",
                 test_title: "Avtomobil rasmini test qilish & aniqlash",
@@ -800,6 +881,7 @@
                 dropzone_formats: "JPG, PNG formatlar (EV va oddiy raqamlar avtomatik ajratiladi)",
                 analyzing_title: "AI orqali raqam o'qilmoqda va EV tahlil qilinmoqda...",
                 analyzing_desc: "YOLOv8 + OCR + HSV rang tahlili jarayonda",
+                analyzing_ai: "AI Tahlil qilinmoqda...",
                 result_title: "Aniqlash va tasniflash natijasi",
                 recognized_plate_label: "Aniqlangan davlat raqami",
                 btn_add_camera: "Yangi Kamera Qo'shish",
@@ -816,6 +898,7 @@
                 cam_pass_label: "Parol",
                 advanced_url_toggle: "Maxsus Stream URL (ixtiyoriy)",
                 btn_save_camera: "Kamerani saqlash va faollashtirish",
+                connecting_status: "Ulanmoqda...",
                 unnamed_camera: "Nomsiz kamera",
                 btn_view: "Ko'rish",
                 btn_delete: "O'chirish",
@@ -856,8 +939,18 @@
                 event_end: "Chiqish",
                 vehicle_ev: "EV Avtomobil",
                 vehicle_regular: "Oddiy",
-                slot_vacant_badge: "🟢 Bo'sh",
-                slot_offline_badge: "🔴 OFFLINE",
+                slot_vacant: "Bo'sh",
+                slot_vacant_full: "🟢 Bo'sh (Foydalanishga tayyor)",
+                slot_charging_occupied: "⚡ Zaryadlanmoqda",
+                slot_charging_desc: "⚡ Zaryadlanmoqda (Avtomobil)",
+                slot_cable_connected: "🔌 Kabel ulangan / Tayyor",
+                slot_faulted: "🛠️ Nosoz / Ta'mirda",
+                lbl_parking_time: "To'xtash",
+                lbl_charge_time: "Zaryad",
+                lbl_battery_soc: "Batareya (SoC)",
+                lbl_ac_charging: "AC Sekin zaryad",
+                lbl_signal_lost: "Signal yo'q (Oflayn)",
+                battery_full: "100% (To'ldi)",
                 result_ev_confirmed: "⚡ EV Tasdiqlandi",
                 result_regular_car: "🚗 Oddiy avtomobil",
                 result_ev_allowed: "Zaryadlash ruxsat etildi",
@@ -876,23 +969,21 @@
                 theme_dark: "다크 모드로 전환",
                 camera_mgmt_title: "카메라 구성 및 실시간 CCTV",
                 camera_mgmt_subtitle: "RTSP 및 IP 카메라 모니터링 현황",
-                btn_test: "실시간 / 테스트",
+                btn_test: "실시간 / AI 테스트",
+                btn_zoom_hint: "확대 / AI 테스트",
                 stat_total: "총 감지 차량",
                 stat_ev: "전기차 (EV) 감지",
                 stat_regular: "일반 차량 (내연기관)",
-                stat_today_total: "오늘 감지",
-                stat_today_ev: "오늘 전기차",
-                stat_today_regular: "오늘 일반차",
-                stat_today_alerts: "오늘 위반 경고",
-                stat_today_badge: "오늘",
-                stat_total_badge: "전체",
-                upload_title: "차량 이미지 빠른 분석 (테스트)",
-                upload_subtitle: "번호판 인식, 한국어 규격 검증 및 EV 판별",
+                stat_alerts: "위반 경고",
+                stat_today: "오늘",
+                stat_alert_desc: "전기차 충전구역 불법 주차 차량",
+                test_title: "차량 이미지 빠른 분석 (테스트)",
                 korean_plates_support: "한국 번호판 지원",
                 dropzone_prompt: "차량 이미지를 드래그하거나 클릭하여 업로드",
                 dropzone_formats: "JPG, PNG 파일 지원 (한국 EV 및 일반 번호판 자동 판별)",
                 analyzing_title: "AI 번호판 인식 및 EV 분류 중...",
                 analyzing_desc: "YOLOv8 + OCR + HSV 색상 분석 수행 중",
+                analyzing_ai: "AI 분석 중...",
                 result_title: "인식 및 분류 결과",
                 recognized_plate_label: "인식된 번호판",
                 btn_add_camera: "새 카메라 추가",
@@ -909,6 +1000,7 @@
                 cam_pass_label: "비밀번호",
                 advanced_url_toggle: "맞춤 스트림 URL (선택사항)",
                 btn_save_camera: "카메라 저장 및 활성화",
+                connecting_status: "연결 중...",
                 unnamed_camera: "이름 없음",
                 btn_view: "상세보기",
                 btn_delete: "삭제",
@@ -949,8 +1041,18 @@
                 event_end: "출차",
                 vehicle_ev: "전기차 (EV)",
                 vehicle_regular: "일반차",
-                slot_vacant_badge: "🟢 빈자리",
-                slot_offline_badge: "🔴 오프라인",
+                slot_vacant: "빈자리",
+                slot_vacant_full: "🟢 빈자리 (주차/충전 가능)",
+                slot_charging_occupied: "⚡ 충전 중",
+                slot_charging_desc: "⚡ 충전 진행 중 (차량 점유)",
+                slot_cable_connected: "🔌 케이블 연결 / 준비 중",
+                slot_faulted: "🛠️ 고장 / 점검 중",
+                lbl_parking_time: "주차",
+                lbl_charge_time: "충전",
+                lbl_battery_soc: "배터리 (SoC)",
+                lbl_ac_charging: "AC 완속 충전",
+                lbl_signal_lost: "신호 없음 (오프라인)",
+                battery_full: "100% (완충)",
                 result_ev_confirmed: "⚡ EV 확인됨",
                 result_regular_car: "🚗 일반 차량",
                 result_ev_allowed: "충전 구역 주차 가능",
@@ -1030,6 +1132,42 @@
                 setLanguage(lang) {
                     this.currentLang = lang;
                     localStorage.setItem('app_lang', lang);
+                },
+
+                getConnectorLabel(slot) {
+                    if (!slot) return '';
+                    if (this.currentLang === 'ko') {
+                        return slot.connector_status_kr || '사용 가능';
+                    } else {
+                        return slot.connector_status_uz || slot.connector_status_kr || "Mavjud (Bo'sh)";
+                    }
+                },
+
+                getViolationLabel(slotOrItem) {
+                    if (!slotOrItem) return '';
+                    if (this.currentLang === 'ko') {
+                        return slotOrItem.violation_label_kr || '정상';
+                    } else {
+                        return slotOrItem.violation_label_uz || slotOrItem.violation_label_kr || 'Normal';
+                    }
+                },
+
+                getActionLabel(slotOrItem) {
+                    if (!slotOrItem) return '—';
+                    if (this.currentLang === 'ko') {
+                        return slotOrItem.action_required_kr || slotOrItem.action_required || '—';
+                    } else {
+                        return slotOrItem.action_required_uz || slotOrItem.action_required || '—';
+                    }
+                },
+
+                formatDurationDisplay(durationStr) {
+                    if (!durationStr) return this.currentLang === 'ko' ? '0분' : '0 min';
+                    if (this.currentLang === 'ko') {
+                        return durationStr;
+                    }
+                    let str = durationStr.replace(/시간/g, ' soat').replace(/분/g, ' min').replace(/초/g, ' sek');
+                    return str.trim();
                 },
                 
                 toggleTheme() {

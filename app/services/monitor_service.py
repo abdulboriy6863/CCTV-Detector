@@ -155,6 +155,7 @@ class AutoMonitorService:
                 # Live CSMS Charger & Violation info
                 "connector_status": charger_info.get("connector_status", "AVAILABLE"),
                 "connector_status_kr": charger_info.get("connector_status_kr", "사용 가능"),
+                "connector_status_uz": charger_info.get("connector_status_uz", "Mavjud (Bo'sh)"),
                 "is_charging": charger_info.get("is_charging", False),
                 "battery_soc": charger_info.get("battery_soc"),
                 "charge_power_kw": charger_info.get("charge_power_kw", 0.0),

@@ -226,7 +226,7 @@
                                 </div>
 
                                 <!-- Video Stream Display (Click to open full modal) -->
-                                <div class="relative bg-black w-full aspect-video sm:h-32 overflow-hidden group cursor-pointer" @click="openLiveModal(slot)">
+                                <div class="relative bg-black w-full aspect-video min-h-[170px] overflow-hidden group cursor-pointer" @click="openLiveModal(slot)">
                                     <template x-if="slot.is_online">
                                         <img :src="'/api/v1/cameras/' + slot.camera_id + '/live'" 
                                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -241,7 +241,99 @@
                                     </template>
 
 
-                                    
+                                    <!-- Glassmorphic HUD Overlay on Bottom of Video (Translucent & Blurred) -->
+                                    <template x-if="slot.is_occupied || slot.is_charging || (slot.battery_soc && slot.battery_soc > 0) || slot.connector_status === 'CHARGING' || slot.connector_status === 'PREPARING' || (slot.violation_type && slot.violation_type !== 'NONE' && slot.violation_type !== 'NORMAL_CHARGING')">
+                                        <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/90 via-black/60 to-transparent backdrop-blur-[2px] text-white space-y-1">
+                                            <!-- 1. When camera detected vehicle -->
+                                            <template x-if="slot.is_occupied">
+                                                <div class="space-y-1">
+                                                    <div class="flex items-center justify-between">
+                                                        <span class="font-mono font-bold px-1.5 py-0.5 rounded text-[11px] shadow"
+                                                            :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'"
+                                                            x-text="(slot.is_ev ? '⚡ ' : '🚗 ') + slot.current_plate"></span>
+                                                        <span class="font-mono text-[10px] text-slate-300" x-text="'🅿️ ' + formatDurationDisplay(slot.duration_formatted)"></span>
+                                                    </div>
+
+                                                    <!-- Battery SoC (DC) -->
+                                                    <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
+                                                        <div class="space-y-0.5">
+                                                            <div class="flex items-center justify-between text-[10px] font-bold">
+                                                                <span class="text-slate-300 flex items-center space-x-1">
+                                                                    <i class="fa-solid fa-battery-three-quarters text-emerald-400"></i>
+                                                                    <span x-text="t('lbl_battery_soc')"></span>
+                                                                </span>
+                                                                <span class="font-mono text-emerald-400 font-bold" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
+                                                            </div>
+                                                            <div class="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+                                                                <div class="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+
+                                                    <!-- AC / DC Charging without SoC -->
+                                                    <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
+                                                        <div class="flex items-center justify-between text-[10px] font-bold text-sky-300">
+                                                            <span class="flex items-center space-x-1">
+                                                                <i class="fa-solid fa-bolt text-amber-400 animate-pulse"></i>
+                                                                <span x-text="slot.charge_power_kw > 15 ? t('lbl_dc_charging') : t('lbl_ac_charging')"></span>
+                                                            </span>
+                                                            <span class="font-mono" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
+                                                        </div>
+                                                    </template>
+
+                                                    <!-- Violation Banner -->
+                                                    <template x-if="slot.violation_type !== 'NORMAL_CHARGING' && slot.violation_type !== 'NONE' && slot.violation_type !== 'PREPARING'">
+                                                        <div class="px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 truncate shadow"
+                                                            :class="slot.violation_level === 'danger' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-slate-950'">
+                                                            <i class="fa-solid fa-triangle-exclamation text-[9px] shrink-0"></i>
+                                                            <span class="truncate" x-text="getViolationLabel(slot)"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+
+                                            <!-- 2. When camera did NOT detect vehicle, but DB says charging -->
+                                            <template x-if="!slot.is_occupied && (slot.is_charging || slot.connector_status === 'CHARGING')">
+                                                <div class="space-y-1">
+                                                    <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
+                                                        <div class="space-y-0.5">
+                                                            <div class="flex items-center justify-between text-[10px] font-bold">
+                                                                <span class="text-slate-300 flex items-center space-x-1">
+                                                                    <i class="fa-solid fa-battery-three-quarters text-emerald-400"></i>
+                                                                    <span x-text="t('lbl_battery_soc')"></span>
+                                                                </span>
+                                                                <span class="font-mono text-emerald-400 font-bold" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
+                                                            </div>
+                                                            <div class="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+                                                                <div class="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    
+                                                    <!-- Soft Semi-transparent Pill -->
+                                                    <div class="flex items-center justify-between px-2 py-0.5 rounded bg-black/40 border border-white/10 text-[10px]">
+                                                        <span class="flex items-center space-x-1 text-slate-200 font-medium">
+                                                            <i class="fa-solid fa-bolt text-amber-400"></i>
+                                                            <span x-text="slot.is_charging ? (slot.charge_power_kw > 15 ? t('lbl_dc_charging') : t('lbl_ac_charging')) : t('slot_charging_desc')"></span>
+                                                        </span>
+                                                        <span class="font-mono font-bold text-emerald-400" x-text="slot.charging_duration_formatted ? '⏱️ ' + formatDurationDisplay(slot.charging_duration_formatted) : getConnectorLabel(slot)"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            <!-- 3. When camera did NOT detect vehicle, cable preparing -->
+                                            <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status === 'PREPARING'">
+                                                <div class="flex items-center justify-between px-2 py-0.5 rounded bg-amber-950/70 border border-amber-500/40 text-[10px] text-amber-300 font-medium">
+                                                    <span class="flex items-center space-x-1">
+                                                        <i class="fa-solid fa-plug text-amber-400"></i>
+                                                        <span x-text="t('slot_cable_connected')"></span>
+                                                    </span>
+                                                    <span class="font-mono text-[10px] font-bold" x-text="getConnectorLabel(slot)"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
                                     <!-- Hover Expand Hint Icon -->
                                     <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                         <div class="w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
@@ -249,98 +341,6 @@
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- Telemetry & Charging Info Underneath (Only shown when occupied or active) -->
-                                <template x-if="slot.is_occupied || slot.is_charging || (slot.battery_soc && slot.battery_soc > 0) || slot.connector_status === 'CHARGING' || slot.connector_status === 'PREPARING' || (slot.violation_type && slot.violation_type !== 'NONE' && slot.violation_type !== 'NORMAL_CHARGING')">
-                                    <div class="p-2.5 space-y-1.5 text-xs bg-slate-50/70 dark:bg-slate-900/60 border-t border-slate-200/50 dark:border-slate-800">
-                                        <!-- 1. When camera detected vehicle -->
-                                        <template x-if="slot.is_occupied">
-                                            <div class="space-y-1">
-                                                <!-- Battery SoC (DC) -->
-                                                <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
-                                                    <div class="space-y-0.5">
-                                                        <div class="flex items-center justify-between text-[10px] font-bold">
-                                                            <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
-                                                                <i class="fa-solid fa-battery-three-quarters text-emerald-500"></i>
-                                                                <span x-text="t('lbl_battery_soc')"></span>
-                                                            </span>
-                                                            <span class="font-mono text-emerald-600 dark:text-emerald-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
-                                                        </div>
-                                                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                                            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
-                                                        </div>
-                                                    </div>
-                                                </template>
-
-                                                <!-- AC / DC Charging without SoC -->
-                                                <template x-if="slot.is_charging && (!slot.battery_soc || slot.battery_soc <= 0)">
-                                                    <div class="flex items-center justify-between text-[10px] font-bold text-sky-600 dark:text-sky-400">
-                                                        <span class="flex items-center space-x-1">
-                                                            <i class="fa-solid fa-bolt text-sky-500 animate-pulse"></i>
-                                                            <span x-text="slot.charge_power_kw > 15 ? t('lbl_dc_charging') : t('lbl_ac_charging')"></span>
-                                                        </span>
-                                                        <span class="font-mono" x-text="(slot.charge_power_kw || 0) + ' kW' + (slot.charged_energy_kwh > 0 ? ' | ' + slot.charged_energy_kwh + ' kWh' : '')"></span>
-                                                    </div>
-                                                </template>
-
-                                                <!-- Dual Timers -->
-                                                <div class="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                                                    <span>🅿️ <span x-text="t('lbl_parking_time') + ':'"></span> <strong class="text-slate-700 dark:text-slate-200 font-mono" x-text="formatDurationDisplay(slot.duration_formatted)"></strong></span>
-                                                    <span x-show="slot.is_charging || slot.charging_duration_seconds > 0">⚡ <span x-text="t('lbl_charge_time') + ':'"></span> <strong class="text-emerald-600 dark:text-emerald-400 font-mono" x-text="formatDurationDisplay(slot.charging_duration_formatted)"></strong></span>
-                                                </div>
-
-                                                <!-- Violation Banner -->
-                                                <template x-if="slot.violation_type !== 'NORMAL_CHARGING' && slot.violation_type !== 'NONE' && slot.violation_type !== 'PREPARING'">
-                                                    <div class="px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 truncate"
-                                                        :class="slot.violation_level === 'danger' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-slate-950'">
-                                                        <i class="fa-solid fa-triangle-exclamation text-[9px] shrink-0"></i>
-                                                        <span class="truncate" x-text="getViolationLabel(slot)"></span>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                        </template>
-
-                                        <!-- 2. When camera did NOT detect vehicle, but DB says charging -->
-                                        <template x-if="!slot.is_occupied && (slot.is_charging || slot.connector_status === 'CHARGING')">
-                                            <div class="space-y-1.5">
-                                                <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
-                                                    <div class="space-y-0.5">
-                                                        <div class="flex items-center justify-between text-[10px] font-bold">
-                                                            <span class="text-slate-500 dark:text-slate-400 flex items-center space-x-1">
-                                                                <i class="fa-solid fa-battery-three-quarters text-emerald-500"></i>
-                                                                <span x-text="t('lbl_battery_soc')"></span>
-                                                            </span>
-                                                            <span class="font-mono text-emerald-600 dark:text-emerald-400" x-text="slot.battery_soc + '% ' + (slot.charge_power_kw > 0 ? '(' + slot.charge_power_kw + ' kW)' : '')"></span>
-                                                        </div>
-                                                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                                            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, Math.max(5, slot.battery_soc)) + '%'"></div>
-                                                        </div>
-                                                    </div>
-                                                </template>
-                                                
-                                                <!-- Soft Muted Status Pill -->
-                                                <div class="flex items-center justify-between px-2 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 text-[10px]">
-                                                    <span class="flex items-center space-x-1 text-slate-600 dark:text-slate-300 font-medium">
-                                                        <i class="fa-solid fa-bolt text-amber-500"></i>
-                                                        <span x-text="slot.is_charging ? (slot.charge_power_kw > 15 ? t('lbl_dc_charging') : t('lbl_ac_charging')) : t('slot_charging_desc')"></span>
-                                                    </span>
-                                                    <span class="font-mono font-bold text-slate-500 dark:text-slate-400" x-text="slot.charging_duration_formatted ? '⏱️ ' + formatDurationDisplay(slot.charging_duration_formatted) : getConnectorLabel(slot)"></span>
-                                                </div>
-                                            </div>
-                                        </template>
-
-                                        <!-- 3. When camera did NOT detect vehicle, cable preparing -->
-                                        <template x-if="!slot.is_occupied && !slot.is_charging && slot.connector_status === 'PREPARING'">
-                                            <div class="flex items-center justify-between px-2 py-1 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 text-[10px] text-amber-700 dark:text-amber-300 font-medium">
-                                                <span class="flex items-center space-x-1">
-                                                    <i class="fa-solid fa-plug text-amber-500"></i>
-                                                    <span x-text="t('slot_cable_connected')"></span>
-                                                </span>
-                                                <span class="font-mono text-[10px] font-bold" x-text="getConnectorLabel(slot)"></span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
                             </div>
                         </template>
                     </div>

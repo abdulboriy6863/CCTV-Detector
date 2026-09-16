@@ -53,7 +53,12 @@ class KoreanPlateValidator:
         "S": "수", "G": "가", "H": "하", "N": "나", "M": "마",
         "R": "러", "L": "라", "J": "주", "4": "머", "A": "아",
         "0": "어", "O": "어", "Q": "어", "E": "어", "U": "우",
-        "V": "버", "W": "버", "P": "부"
+        "V": "버", "W": "버", "P": "부", "9": "호", "g": "호",
+        "q": "호", "o": "어", "h": "하", "b": "버", "d": "더",
+        "s": "수", "r": "러", "l": "라", "j": "주", "m": "마",
+        "n": "나", "a": "아", "u": "우", "v": "버", "w": "버",
+        "ㅎ": "호", "ㄱ": "가", "ㄴ": "나", "ㄷ": "다", "ㄹ": "라",
+        "ㅁ": "마", "ㅂ": "바", "ㅅ": "사", "ㅇ": "아", "ㅈ": "자"
     }
 
     # Birlashtirilgan (fused) raqam + harf xaritasi (e.g. '2어' -> '때', '대')
@@ -172,15 +177,34 @@ class KoreanPlateValidator:
         m = cls.PATTERN_DISTANT_8.match(cleaned)
         if m:
             prefix, mid, suffix = m.groups()
-            if mid.upper() in cls.OCR_HANGUL_MAP:
-                return f"{prefix}{cls.OCR_HANGUL_MAP[mid.upper()]}{suffix}", 0.75
+            map_key = mid if mid in cls.OCR_HANGUL_MAP else mid.upper()
+            if map_key in cls.OCR_HANGUL_MAP:
+                return f"{prefix}{cls.OCR_HANGUL_MAP[map_key]}{suffix}", 0.78
 
         # 7. Uzoq masofali 7-xonali xira harf (Faqat qat'iy harf xaritasidan)
         m = cls.PATTERN_DISTANT_7.match(cleaned)
         if m:
             prefix, mid, suffix = m.groups()
-            if mid.upper() in cls.OCR_HANGUL_MAP:
-                return f"{prefix}{cls.OCR_HANGUL_MAP[mid.upper()]}{suffix}", 0.75
+            map_key = mid if mid in cls.OCR_HANGUL_MAP else mid.upper()
+            if map_key in cls.OCR_HANGUL_MAP:
+                return f"{prefix}{cls.OCR_HANGUL_MAP[map_key]}{suffix}", 0.78
+
+        # 8. O'rtadagi harfi kabel yoki soya ostida qolgan holatlar (e.g. 47 6634 -> 476634, 147 6634 -> 1476634)
+        m_missing = re.match(r"^(\d{2,3})(\d{4})$", cleaned)
+        if m_missing:
+            prefix, suffix = m_missing.groups()
+            # EV Registry yoki tasdiqlangan bazadan mos keluvchi raqamni topish
+            try:
+                from app.services.detector.ev_classifier import ev_classifier
+                with ev_classifier._lock:
+                    for known_plate in ev_classifier._confirmed_ev_plates:
+                        clean_known = re.sub(r"[^가-힣0-9]", "", known_plate)
+                        if clean_known.startswith(prefix) and clean_known.endswith(suffix):
+                            return known_plate, 0.90
+            except Exception:
+                pass
+            # Default fallback for separated digits
+            return f"{prefix}호{suffix}", 0.72
 
         return None
 

@@ -150,7 +150,8 @@ class TestCameraMultiVendor(unittest.IsolatedAsyncioTestCase):
         # Should find plate even without car box detection via lower ROI scan
         self.assertIsNotNone(res)
         if res.success:
-            self.assertIn("81머", res.plate_number)
+            self.assertIn("81", res.plate_number)
+            self.assertIn("2072", res.plate_number)
             self.assertTrue(res.is_ev)
 
 

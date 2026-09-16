@@ -185,6 +185,54 @@ class DetectionPipeline:
                             "source": f"{crop_source}_merged"
                         })
 
+        # 3. Fallback: If no candidate found in raw crop, run on CLAHE contrast-enhanced crop
+        if not candidates and crop_img.shape[0] >= 20 and crop_img.shape[1] >= 40:
+            enhanced_img = plate_reader._preprocess_plate(crop_img)
+            enh_segments = plate_reader.read_with_boxes(enhanced_img)
+            
+            for raw_text, ocr_conf, bbox in enh_segments:
+                validated = KoreanPlateValidator.validate_and_normalize(raw_text)
+                if validated:
+                    plate_str, val_score = validated
+                    candidates.append({
+                        "plate_str": plate_str,
+                        "raw_text": raw_text,
+                        "confidence": ocr_conf,
+                        "val_score": val_score,
+                        "bbox": bbox,
+                        "weight": weight * 1.05,
+                        "source": f"{crop_source}_enhanced"
+                    })
+
+            n_enh = len(enh_segments)
+            for i in range(n_enh):
+                for j in range(n_enh):
+                    if i == j:
+                        continue
+                    raw_1, conf_1, b1 = enh_segments[i]
+                    raw_2, conf_2, b2 = enh_segments[j]
+
+                    if self._is_valid_collinear_pair(b1, b2):
+                        merged_raw = f"{raw_1}{raw_2}"
+                        validated = KoreanPlateValidator.validate_and_normalize(merged_raw)
+                        if validated:
+                            plate_str, val_score = validated
+                            pts1 = np.array(b1, dtype=np.float32)
+                            pts2 = np.array(b2, dtype=np.float32)
+                            combined_bbox = [
+                                np.minimum(np.min(pts1, axis=0), np.min(pts2, axis=0)),
+                                np.maximum(np.max(pts1, axis=0), np.max(pts2, axis=0))
+                            ]
+                            candidates.append({
+                                "plate_str": plate_str,
+                                "raw_text": merged_raw,
+                                "confidence": (conf_1 + conf_2) / 2.0,
+                                "val_score": val_score,
+                                "bbox": combined_bbox,
+                                "weight": weight * 1.10,
+                                "source": f"{crop_source}_enh_merged"
+                            })
+
         return candidates
 
     @staticmethod

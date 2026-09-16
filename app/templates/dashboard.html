@@ -833,9 +833,11 @@
                         <div>
                             <div class="flex items-center space-x-2">
                                 <span class="text-sm font-black tracking-wider text-slate-900 dark:text-white" x-text="liveModal.aiResult.plate_number || t('unrecognized')"></span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="liveModal.aiResult.is_ev ? 'bg-sky-500 text-white' : 'bg-rose-500 text-white'" x-text="liveModal.aiResult.is_ev ? t('result_ev_confirmed') : t('result_regular_car')"></span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold" 
+                                    :class="liveModal.aiResult.is_ev ? 'bg-sky-500 text-white' : (liveModal.aiResult.success ? 'bg-rose-500 text-white' : 'bg-slate-500 text-white')" 
+                                    x-text="liveModal.aiResult.is_ev ? t('result_ev_confirmed') : (liveModal.aiResult.success ? t('result_regular_car') : t('result_unrecognized'))"></span>
                             </div>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? t('result_ev_allowed') : (liveModal.aiResult.success ? t('result_alert_illegal') : t('result_unrecognized'))"></p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="liveModal.aiResult.is_ev ? t('result_ev_allowed') : (liveModal.aiResult.success ? t('result_alert_illegal') : (liveModal.aiResult.message || t('result_unrecognized')))"></p>
                         </div>
                     </div>
                     <div class="text-right" x-show="liveModal.aiResult.success">

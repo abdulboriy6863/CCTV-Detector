@@ -334,3 +334,54 @@ async def stream_camera(camera_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/network-scan", summary="Scan local network for active CCTV cameras")
+async def scan_network_cameras(subnet_prefix: str = "192.168.0"):
+    """
+    Scans local /24 subnet for active devices with CCTV ports (554 RTSP, 80 HTTP, 8000, 37777).
+    Returns list of reachable camera IP addresses and open ports.
+    """
+    import socket
+    import concurrent.futures
+
+    def check_host(ip: str):
+        open_ports = []
+        for p in [554, 80, 8000, 8080, 37777]:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.35)
+            if sock.connect_ex((ip, p)) == 0:
+                open_ports.append(p)
+            sock.close()
+        if 554 in open_ports or 80 in open_ports or 8000 in open_ports or 37777 in open_ports:
+            return {
+                "ip": ip,
+                "open_ports": open_ports,
+                "has_rtsp": 554 in open_ports,
+                "has_http": 80 in open_ports,
+                "suggested_type": "RTSP" if 554 in open_ports else "HTTP_SNAPSHOT"
+            }
+        return None
+
+    ips = [f"{subnet_prefix}.{i}" for i in range(1, 255)]
+    devices = []
+
+    loop = asyncio.get_running_loop()
+    def do_scan():
+        res_list = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+            for item in executor.map(check_host, ips):
+                if item:
+                    res_list.append(item)
+        return res_list
+
+    devices = await loop.run_in_executor(None, do_scan)
+    devices.sort(key=lambda x: int(x["ip"].split(".")[-1]))
+
+    return {
+        "success": True,
+        "scanned_subnet": f"{subnet_prefix}.0/24",
+        "found_count": len(devices),
+        "devices": devices
+    }
+
+
+

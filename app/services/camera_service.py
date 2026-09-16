@@ -874,7 +874,16 @@ class CameraService:
         return success, msg, working_url or stream_url, detected_type or camera_type
 
     _snapshot_cache: Dict[str, Tuple[float, CaptureResult]] = {}
+    _last_known_good: Dict[str, Tuple[float, CaptureResult]] = {}
     _cache_lock = threading.Lock()
+    _ip_locks: Dict[str, asyncio.Lock] = {}
+    _ip_locks_guard = threading.Lock()
+
+    def _get_ip_lock(self, ip: str) -> asyncio.Lock:
+        with self._ip_locks_guard:
+            if ip not in self._ip_locks:
+                self._ip_locks[ip] = asyncio.Lock()
+            return self._ip_locks[ip]
 
     async def capture_snapshot(
         self,
@@ -891,33 +900,57 @@ class CameraService:
     ) -> CaptureResult:
         """
         Captures a live frame using the specified camera protocol.
-        Caches successful frames for 3.5 seconds to avoid overwhelming camera hardware with concurrent RTSP sessions.
+        - Serializes requests per IP to protect camera RTSP socket limits.
+        - Caches successful frames for 2.5 seconds.
+        - Provides graceful last-known-good frame fallback (up to 60s) to prevent offline flickering.
         """
         cache_key = f"{camera_type.value}_{stream_url}_{ip_address}_{port}"
+        target_ip = (ip_address or stream_url).split("://")[-1].split("@")[-1].split("/")[0].split(":")[0]
         now_ts = time.time()
 
         if not force_fresh:
             with self._cache_lock:
                 if cache_key in self._snapshot_cache:
                     cached_time, cached_res = self._snapshot_cache[cache_key]
-                    if (now_ts - cached_time) < 3.5 and cached_res.success and cached_res.image_bytes:
+                    if (now_ts - cached_time) < 2.5 and cached_res.success and cached_res.image_bytes:
                         return cached_res
 
-        adapter = self.adapters.get(camera_type, self.adapters[CameraTypeEnum.RTSP])
+        # Acquire lock for this physical camera IP
+        lock = self._get_ip_lock(target_ip)
+        async with lock:
+            # Re-check cache inside lock in case another coroutine just captured it
+            if not force_fresh:
+                with self._cache_lock:
+                    if cache_key in self._snapshot_cache:
+                        cached_time, cached_res = self._snapshot_cache[cache_key]
+                        if (now_ts - cached_time) < 2.5 and cached_res.success and cached_res.image_bytes:
+                            return cached_res
 
-        logger.info(f"Capturing frame ({camera_type}) for Station {cs_id}/{cp_id} from {stream_url}")
+            adapter = self.adapters.get(camera_type, self.adapters[CameraTypeEnum.RTSP])
 
-        result = await adapter.capture(
-            stream_url=stream_url,
-            username=username,
-            password=password,
-            ip_address=ip_address,
-            port=port
-        )
+            logger.info(f"Capturing frame ({camera_type}) for Station {cs_id}/{cp_id} from {stream_url}")
 
-        if result.success and result.image_bytes:
+            result = await adapter.capture(
+                stream_url=stream_url,
+                username=username,
+                password=password,
+                ip_address=ip_address,
+                port=port
+            )
+
+            if result.success and result.image_bytes:
+                with self._cache_lock:
+                    self._snapshot_cache[cache_key] = (now_ts, result)
+                    self._last_known_good[cache_key] = (now_ts, result)
+                return result
+
+            # If live capture failed momentarily, use last known good frame (up to 60s)
             with self._cache_lock:
-                self._snapshot_cache[cache_key] = (now_ts, result)
+                if cache_key in self._last_known_good:
+                    last_ts, last_res = self._last_known_good[cache_key]
+                    if (now_ts - last_ts) < 60.0 and last_res.image_bytes:
+                        logger.debug(f"Serving graceful fallback frame for {target_ip} (age: {now_ts - last_ts:.1f}s)")
+                        return last_res
 
         if not result.success and self.enable_mock_fallback:
             logger.warning(

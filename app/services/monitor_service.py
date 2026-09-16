@@ -570,6 +570,6 @@ class AutoMonitorService:
 
 auto_monitor_service = AutoMonitorService(
     interval_seconds=settings.MONITOR_INTERVAL_SECONDS,
-    exit_threshold_cycles=3,
-    transition_threshold_cycles=2
+    exit_threshold_cycles=6,
+    transition_threshold_cycles=3
 )

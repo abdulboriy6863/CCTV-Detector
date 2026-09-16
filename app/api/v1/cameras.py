@@ -262,6 +262,49 @@ async def test_camera(camera_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/{camera_id}/frame", summary="Get latest single JPEG frame from camera")
+@router.get("/{camera_id}/snapshot", summary="Get latest single JPEG frame from camera alias")
+async def get_camera_frame(camera_id: int, db: Session = Depends(get_db)):
+    """
+    Returns a single JPEG frame for ultra-fast, socket-friendly UI display.
+    Caches frame for 1.5 seconds to protect camera CPU/bandwidth.
+    """
+    import time
+    from fastapi import Response
+    from app.services.camera_service import camera_service, RTSPStreamHub
+    from app.schemas.snapshot import CameraTypeEnum
+
+    cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
+    if not cam:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    result = await camera_service.capture_snapshot(
+        camera_type=CameraTypeEnum(cam.camera_type),
+        stream_url=cam.stream_url,
+        cs_id=cam.cs_id,
+        cp_id=cam.cp_id or "BNS00000",
+        username=cam.username,
+        password=cam.password,
+        ip_address=cam.ip_address,
+        port=cam.port
+    )
+
+    if result.success and result.image_bytes:
+        return Response(
+            content=result.image_bytes,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+        )
+
+    # 1x1 transparent JPEG placeholder when offline
+    gray_1x1 = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9'
+    return Response(
+        content=gray_1x1,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+    )
+
+
 @router.get("/{camera_id}/stream", summary="Live continuous MJPEG video stream")
 @router.get("/{camera_id}/live", summary="Live continuous MJPEG video stream alias")
 async def stream_camera(camera_id: int, db: Session = Depends(get_db)):

@@ -238,7 +238,7 @@
                                 <!-- Video Stream Display (Click to open full modal) -->
                                 <div class="relative bg-black w-full aspect-video min-h-[170px] overflow-hidden group cursor-pointer" @click="openLiveModal(slot)">
                                     <template x-if="slot.is_online">
-                                        <img :src="'/api/v1/cameras/' + slot.camera_id + '/live'" 
+                                        <img :src="'/api/v1/cameras/' + slot.camera_id + '/frame?t=' + lastFrameTimestamp" 
                                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                              alt="Live Stream"
                                              loading="lazy" />
@@ -966,7 +966,7 @@
                         <!-- Video Stream Canvas / Frame -->
                         <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
                             <template x-if="slot.is_online">
-                                <img :src="'/api/v1/cameras/' + slot.camera_id + '/live'" 
+                                <img :src="'/api/v1/cameras/' + slot.camera_id + '/frame?t=' + lastFrameTimestamp" 
                                      class="w-full h-full object-contain pointer-events-none"
                                      alt="Live CCTV Stream" />
                             </template>
@@ -1318,6 +1318,7 @@
                 liveModal: { open: false, slot: null, aiLoading: false, aiResult: null, aiError: null },
                 previewImage: { open: false, url: '' },
                 isSavingCam: false,
+                lastFrameTimestamp: Date.now(),
                 
                 tvWallModal: false,
                 tvClock: '',
@@ -1336,6 +1337,7 @@
                     
                     // Live polling every 3s for real-time slot and detection updates
                     setInterval(() => {
+                        this.lastFrameTimestamp = Date.now();
                         this.fetchSlots();
                         this.fetchStats();
                         if (this.page === 1) this.fetchVehicles();

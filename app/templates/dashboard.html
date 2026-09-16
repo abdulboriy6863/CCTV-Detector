@@ -1335,13 +1335,14 @@
                         this.isTvFullscreen = !!document.fullscreenElement;
                     });
                     
-                    // Live polling every 3s for real-time slot and detection updates
+                    // Live polling every 4s for real-time slot and detection updates
                     setInterval(() => {
+                        if (document.hidden) return;
                         this.lastFrameTimestamp = Date.now();
                         this.fetchSlots();
                         this.fetchStats();
                         if (this.page === 1) this.fetchVehicles();
-                    }, 3000);
+                    }, 4000);
                 },
 
                 t(key) {

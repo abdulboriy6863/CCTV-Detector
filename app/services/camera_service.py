@@ -296,13 +296,14 @@ class RTSPCameraAdapter(BaseCameraAdapter):
                     protocol="RTSP"
                 )
 
-            # Flush stale socket buffer to grab the freshest live frame
+            # Read decoded frame with retry for keyframe/stream synchronization (up to 8 attempts)
             ret = False
             frame = None
-            for _ in range(3):
+            for _ in range(8):
                 ret, frame = cap.read()
-                if not ret or frame is None:
+                if ret and frame is not None and frame.size > 0:
                     break
+                time.sleep(0.04)
 
             if not ret or frame is None:
                 return CaptureResult(
@@ -872,6 +873,9 @@ class CameraService:
         )
         return success, msg, working_url or stream_url, detected_type or camera_type
 
+    _snapshot_cache: Dict[str, Tuple[float, CaptureResult]] = {}
+    _cache_lock = threading.Lock()
+
     async def capture_snapshot(
         self,
         camera_type: CameraTypeEnum,
@@ -883,10 +887,22 @@ class CameraService:
         ip_address: Optional[str] = None,
         port: Optional[int] = None,
         expected_plate_number: Optional[str] = None,
+        force_fresh: bool = False
     ) -> CaptureResult:
         """
         Captures a live frame using the specified camera protocol.
+        Caches successful frames for 3.5 seconds to avoid overwhelming camera hardware with concurrent RTSP sessions.
         """
+        cache_key = f"{camera_type.value}_{stream_url}_{ip_address}_{port}"
+        now_ts = time.time()
+
+        if not force_fresh:
+            with self._cache_lock:
+                if cache_key in self._snapshot_cache:
+                    cached_time, cached_res = self._snapshot_cache[cache_key]
+                    if (now_ts - cached_time) < 3.5 and cached_res.success and cached_res.image_bytes:
+                        return cached_res
+
         adapter = self.adapters.get(camera_type, self.adapters[CameraTypeEnum.RTSP])
 
         logger.info(f"Capturing frame ({camera_type}) for Station {cs_id}/{cp_id} from {stream_url}")
@@ -898,6 +914,10 @@ class CameraService:
             ip_address=ip_address,
             port=port
         )
+
+        if result.success and result.image_bytes:
+            with self._cache_lock:
+                self._snapshot_cache[cache_key] = (now_ts, result)
 
         if not result.success and self.enable_mock_fallback:
             logger.warning(

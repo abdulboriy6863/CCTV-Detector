@@ -465,18 +465,23 @@ class AutoMonitorService:
             port=camera.port
         )
 
+        current_health = self.camera_health.get(camera_key, {"is_online": True, "failed_count": 0})
         if not capture_result.success or not capture_result.image_bytes:
-            # Record offline / network error state
+            failed_count = current_health.get("failed_count", 0) + 1
+            # Mark offline only after 3 consecutive failures (approx 45s of total failure)
+            is_offline = failed_count >= 3
             self.camera_health[camera_key] = {
-                "is_online": False,
+                "is_online": not is_offline,
+                "failed_count": failed_count,
                 "last_error": capture_result.error_message or "Frame capture failed",
                 "last_checked_at": get_kst_now()
             }
             return
 
-        # Record online state
+        # Record online state and reset failed count
         self.camera_health[camera_key] = {
             "is_online": True,
+            "failed_count": 0,
             "last_error": None,
             "last_checked_at": get_kst_now()
         }

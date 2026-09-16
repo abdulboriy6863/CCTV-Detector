@@ -98,7 +98,7 @@ class AutoMonitorService:
         now = get_kst_now()
 
         for cam in cameras:
-            camera_key = f"{cam.cs_id}_{cam.cp_id or 'BNS00000'}"
+            camera_key = f"cam_{cam.id}"
             session_info = self.active_sessions.get(camera_key)
             health_info = self.camera_health.get(camera_key, {
                 "is_online": cam.is_active,
@@ -205,7 +205,11 @@ class AutoMonitorService:
             )
             ended_session_ids = {r[0] for r in ended_rows if r[0]}
 
-            # 2. Get all START events
+            # 2. Get all registered cameras
+            cameras = db.query(CCTVCamera).all()
+            cam_by_id = {c.id: c for c in cameras}
+
+            # 3. Get all START events
             start_snapshots = (
                 db.query(CCTVSnapshot)
                 .filter(CCTVSnapshot.event_type == EventTypeEnum.START.value)
@@ -218,7 +222,25 @@ class AutoMonitorService:
             restored_count = 0
             seen_camera_keys = set()
             for snap in start_snapshots:
-                camera_key = f"{snap.cs_id}_{snap.cp_id or 'BNS00000'}"
+                # Match camera_key: check if session_id has _CAM{id}_
+                matched_cam_id = None
+                if snap.session_id and "_CAM" in snap.session_id:
+                    try:
+                        part = snap.session_id.split("_CAM")[1]
+                        matched_cam_id = int(part.split("_")[0])
+                    except Exception:
+                        matched_cam_id = None
+
+                if matched_cam_id and matched_cam_id in cam_by_id:
+                    camera_key = f"cam_{matched_cam_id}"
+                else:
+                    # Match by station and charger
+                    matching_cams = [c for c in cameras if c.cs_id == snap.cs_id and c.cp_id == snap.cp_id]
+                    if matching_cams:
+                        camera_key = f"cam_{matching_cams[0].id}"
+                    else:
+                        continue
+
                 if camera_key in seen_camera_keys:
                     continue
                 seen_camera_keys.add(camera_key)
@@ -293,25 +315,16 @@ class AutoMonitorService:
     async def check_all_cameras(self):
         db: Session = SessionLocal()
         try:
-            cameras = db.query(CCTVCamera).filter(CCTVCamera.is_active.is_(True)).all()
+            cameras = db.query(CCTVCamera).filter(CCTVCamera.is_active.is_(True)).order_by(CCTVCamera.id.asc()).all()
             if not cameras:
                 return
 
-            # Deduplicate cameras by (cs_id, cp_id) to prevent duplicate inspections
-            seen_keys = set()
-            unique_cameras = []
             for cam in cameras:
-                key = f"{cam.cs_id}_{cam.cp_id or 'BNS00000'}"
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    unique_cameras.append(cam)
-
-            for cam in unique_cameras:
                 try:
                     await self._inspect_camera_safe(cam, db)
                 except Exception as cam_err:
-                    logger.error(f"Error inspecting camera {cam.cs_id}/{cam.cp_id}: {cam_err}")
-                await asyncio.sleep(1.0)
+                    logger.error(f"Error inspecting camera {cam.id} ({cam.cs_id}/{cam.cp_id}): {cam_err}")
+                await asyncio.sleep(0.5)
 
             import gc
             gc.collect()
@@ -320,7 +333,7 @@ class AutoMonitorService:
 
     async def _inspect_camera_safe(self, camera: CCTVCamera, db: Session):
         """Wrapper that acquires per-camera lock before inspection."""
-        camera_key = f"{camera.cs_id}_{camera.cp_id or 'BNS00000'}"
+        camera_key = f"cam_{camera.id}"
         lock = self._get_lock(camera_key)
         async with lock:
             await self._inspect_camera(camera, camera_key, db)
@@ -336,7 +349,7 @@ class AutoMonitorService:
         db: Session
     ):
         """Record ONE START event in DB and update active_sessions state."""
-        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_{now.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        session_id = f"PARK_{camera.cs_id}_{camera.cp_id or 'CP01'}_CAM{camera.id}_{now.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
         relative_path = storage_service.generate_relative_path(
             cs_id=camera.cs_id, cp_id=camera.cp_id or "BNS00000",

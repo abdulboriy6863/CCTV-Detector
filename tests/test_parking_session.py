@@ -244,7 +244,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
     @patch("app.services.monitor_service.camera_service.capture_snapshot", new_callable=AsyncMock)
     async def test_idempotent_start_prevents_duplicate_on_restart(self, mock_capture, mock_detect, mock_save_img):
         """Simulate server restart: open session exists in DB, should not create duplicate START."""
-        camera_key = "CS_TEST_01_CP01"
+        camera_key = f"cam_{self.camera.id}"
         mock_capture.return_value = CaptureResult(success=True, image_bytes=b"fake_jpeg", protocol="RTSP")
 
         # Pre-create an open session in DB (simulating previous server run)
@@ -252,7 +252,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             cs_id="CS_TEST_01",
             cp_id="CP01",
             connector_id=1,
-            session_id="PARK_CS_TEST_01_CP01_20260911080348",
+            session_id=f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911080348",
             plate_number="81머2072",
             event_type=EventTypeEnum.START.value,
             image_path="some/path.jpg",
@@ -282,14 +282,14 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             CCTVSnapshot.event_type == EventTypeEnum.START.value
         ).all()
         self.assertEqual(len(start_records), 1)
-        self.assertEqual(start_records[0].session_id, "PARK_CS_TEST_01_CP01_20260911080348")
+        self.assertEqual(start_records[0].session_id, f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911080348")
 
         # Monitor state should be restored from DB
-        self.assertIn(camera_key, self.monitor.last_seen_state)
-        self.assertEqual(self.monitor.last_seen_state[camera_key]["plate"], "81머2072")
+        self.assertIn(camera_key, self.monitor.active_sessions)
+        self.assertEqual(self.monitor.active_sessions[camera_key]["plate"], "81머2072")
         self.assertEqual(
-            self.monitor.last_seen_state[camera_key]["session_id"],
-            "PARK_CS_TEST_01_CP01_20260911080348"
+            self.monitor.active_sessions[camera_key]["session_id"],
+            f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911080348"
         )
 
     @patch("app.services.monitor_service.storage_service.save_image", new_callable=AsyncMock)
@@ -300,7 +300,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         # Create an open session (START without END)
         open_start = CCTVSnapshot(
             cs_id="CS_TEST_01", cp_id="CP01", connector_id=1,
-            session_id="PARK_CS_TEST_01_CP01_20260911070000",
+            session_id=f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911070000",
             plate_number="58버6091", event_type=EventTypeEnum.START.value,
             image_path="test.jpg", ai_confidence=0.88, status="SUCCESS",
             notes="Kirish", vehicle_type="REGULAR", is_ev=False,
@@ -310,7 +310,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         # Create a closed session (both START and END)
         closed_start = CCTVSnapshot(
             cs_id="CS_TEST_01", cp_id="CP01", connector_id=1,
-            session_id="PARK_CS_TEST_01_CP01_20260911060000",
+            session_id=f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911060000",
             plate_number="12가3456", event_type=EventTypeEnum.START.value,
             image_path="test2.jpg", ai_confidence=0.90, status="SUCCESS",
             notes="Kirish", vehicle_type="EV", is_ev=True,
@@ -319,7 +319,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         )
         closed_end = CCTVSnapshot(
             cs_id="CS_TEST_01", cp_id="CP01", connector_id=1,
-            session_id="PARK_CS_TEST_01_CP01_20260911060000",
+            session_id=f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911060000",
             plate_number="12가3456", event_type=EventTypeEnum.END.value,
             image_path="test2.jpg", ai_confidence=0.90, status="SUCCESS",
             notes="Chiqish: Jami 10 daqiqa to'xtab turdi", vehicle_type="EV", is_ev=True,
@@ -335,12 +335,12 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             fresh_monitor._restore_sessions_from_db()
 
         # Only the OPEN session should be restored
-        camera_key = "CS_TEST_01_CP01"
-        self.assertIn(camera_key, fresh_monitor.last_seen_state)
-        self.assertEqual(fresh_monitor.last_seen_state[camera_key]["plate"], "58버6091")
+        camera_key = f"cam_{self.camera.id}"
+        self.assertIn(camera_key, fresh_monitor.active_sessions)
+        self.assertEqual(fresh_monitor.active_sessions[camera_key]["plate"], "58버6091")
         self.assertEqual(
-            fresh_monitor.last_seen_state[camera_key]["session_id"],
-            "PARK_CS_TEST_01_CP01_20260911070000"
+            fresh_monitor.active_sessions[camera_key]["session_id"],
+            f"PARK_CS_TEST_01_CP01_CAM{self.camera.id}_20260911070000"
         )
 
     def test_get_all_slot_statuses_multi_camera(self):
@@ -359,7 +359,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
 
         # Simulate Slot 1 is occupied by an EV
-        self.monitor.active_sessions["CS_TEST_01_CP01"] = {
+        self.monitor.active_sessions[f"cam_{self.camera.id}"] = {
             "session_id": "PARK_01",
             "plate": "52어0586",
             "vehicle_type": "EV",

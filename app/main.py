@@ -75,6 +75,17 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
 
+# Add Cache-Control Middleware to prevent browser caching stale dashboard and API data
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.get("/health", tags=["System"])
 def health_check():
     return {
@@ -101,5 +112,12 @@ def serve_dashboard(request: Request):
     dashboard_path = BASE_DIR / "app" / "templates" / "dashboard.html"
     if dashboard_path.exists():
         with open(dashboard_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+            return HTMLResponse(
+                content=f.read(),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                }
+            )
     return HTMLResponse(content="<h1>CCTV EV Detector Running. <a href='/docs'>API Docs</a></h1>")

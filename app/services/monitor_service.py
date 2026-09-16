@@ -306,8 +306,15 @@ class AutoMonitorService:
                     seen_keys.add(key)
                     unique_cameras.append(cam)
 
-            tasks = [self._inspect_camera_safe(cam, db) for cam in unique_cameras]
-            await asyncio.gather(*tasks, return_exceptions=True)
+            for cam in unique_cameras:
+                try:
+                    await self._inspect_camera_safe(cam, db)
+                except Exception as cam_err:
+                    logger.error(f"Error inspecting camera {cam.cs_id}/{cam.cp_id}: {cam_err}")
+                await asyncio.sleep(1.0)
+
+            import gc
+            gc.collect()
         finally:
             db.close()
 

@@ -7,12 +7,49 @@ from sqlalchemy.orm import Session
 from app.core.config import get_kst_now
 from app.core.database import get_db
 from app.models.snapshot import CCTVCamera
-from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum, SlotStatusResponse
+from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum, SlotStatusResponse, CameraProbeRequest, CameraProbeResponse
 from app.services.camera_service import camera_service
 from app.services.monitor_service import auto_monitor_service
 from app.services.charger_service import charger_service
+import logging
+import base64
 
+logger = logging.getLogger("cctv_cameras")
 router = APIRouter()
+
+
+@router.post("/probe", response_model=CameraProbeResponse, summary="Probe and test camera connection")
+async def probe_camera_endpoint(probe_in: CameraProbeRequest):
+    """
+    Tests camera IP, port, credentials, and auto-discovers working RTSP/HTTP endpoints.
+    """
+    success, msg, working_url, detected_type, capture_res = await camera_service.probe_camera(
+        ip_address=probe_in.ip_address,
+        port=probe_in.port,
+        camera_type=probe_in.camera_type,
+        stream_url=probe_in.stream_url,
+        username=probe_in.username,
+        password=probe_in.password,
+        brand=probe_in.brand,
+        timeout_seconds=4.5
+    )
+    b64 = None
+    width = None
+    height = None
+    if capture_res and capture_res.success and capture_res.image_bytes:
+        b64 = base64.b64encode(capture_res.image_bytes).decode("utf-8")
+        width = capture_res.width
+        height = capture_res.height
+
+    return CameraProbeResponse(
+        success=success,
+        message=msg,
+        camera_type=detected_type.value if detected_type else (probe_in.camera_type.value if probe_in.camera_type else "RTSP"),
+        working_stream_url=working_url,
+        image_base64=b64,
+        width=width,
+        height=height
+    )
 
 
 @router.get("/slots-status", response_model=List[SlotStatusResponse], summary="Live occupancy and health status of all parking slots")
@@ -40,55 +77,65 @@ def list_cameras(
 
 @router.post("", response_model=CameraResponse, summary="Add camera")
 async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
-    # Validate cs_id and cp_id existence against CSMS database
-    is_valid_charger, charger_msg = charger_service.validate_station_and_charger(
-        cs_id=camera_in.cs_id,
-        cp_id=camera_in.cp_id,
-        db=db
-    )
-    if not is_valid_charger:
-        raise HTTPException(
-            status_code=400,
-            detail=charger_msg
+    # Validate cs_id and cp_id against CSMS database (log warning if new custom slot)
+    try:
+        is_valid_charger, charger_msg = charger_service.validate_station_and_charger(
+            cs_id=camera_in.cs_id,
+            cp_id=camera_in.cp_id,
+            db=db
         )
+        if not is_valid_charger:
+            logger.info(f"Custom/New charger slot '{camera_in.cp_id}' registered for '{camera_in.cs_id}'")
+    except Exception as e:
+        logger.debug(f"Charger validation note: {e}")
 
-    stream_url = camera_in.stream_url
-    if camera_in.ip_address:
-        if not stream_url or camera_in.ip_address not in stream_url:
-            if camera_in.camera_type == CameraTypeEnum.RTSP:
-                port_val = camera_in.port or 554
-                stream_url = f"rtsp://{camera_in.ip_address}:{port_val}/stream1"
-            else:
-                port_val = camera_in.port or 80
-                port_str = f":{port_val}" if port_val != 80 else ""
-                stream_url = f"http://{camera_in.ip_address}{port_str}/api/snapshot"
+    # Standardize stream URL if raw IP/Port provided
+    normalized_url = camera_in.stream_url
+    if not normalized_url and camera_in.ip_address:
+        if camera_in.camera_type == CameraTypeEnum.HTTP_SNAPSHOT:
+            normalized_url = camera_service.adapters[CameraTypeEnum.HTTP_SNAPSHOT].format_http_url(
+                ip_address=camera_in.ip_address,
+                port=camera_in.port or 80
+            )
+        else:
+            normalized_url = camera_service.adapters[CameraTypeEnum.RTSP].format_rtsp_url(
+                ip_address=camera_in.ip_address,
+                port=camera_in.port or 554,
+                username=camera_in.username,
+                password=camera_in.password
+            )
 
-    final_stream_url = stream_url or f"rtsp://{camera_in.ip_address or '127.0.0.1'}:554/stream1"
-
-    # Validate reachability of the camera before saving to DB
-    is_reachable, reachability_msg = await camera_service.check_camera_reachability(
+    # Smart probe and validate reachability of the camera
+    is_reachable, reachability_msg, working_url, detected_type = await camera_service.check_camera_reachability(
         camera_type=camera_in.camera_type,
-        stream_url=final_stream_url,
+        stream_url=normalized_url or "",
         username=camera_in.username,
         password=camera_in.password,
         ip_address=camera_in.ip_address,
-        port=camera_in.port or (554 if camera_in.camera_type == CameraTypeEnum.RTSP else 80),
-        timeout_seconds=3.0
+        port=camera_in.port,
+        brand=camera_in.brand,
+        timeout_seconds=5.0
     )
-    if not is_reachable:
+
+    # If unreachable and force_save is not enabled, return detailed message
+    if not is_reachable and not camera_in.force_save and not camera_in.stream_url:
         raise HTTPException(
             status_code=400,
             detail=f"카메라 연결 실패: {reachability_msg}"
         )
 
+    final_type = detected_type.value if (is_reachable and detected_type) else camera_in.camera_type.value
+    final_url = (working_url if is_reachable else None) or normalized_url or camera_in.stream_url
+    final_port = camera_in.port or (554 if final_type == "RTSP" else 80)
+
     cam = CCTVCamera(
         cs_id=camera_in.cs_id,
         cp_id=camera_in.cp_id,
         camera_name=camera_in.camera_name,
-        camera_type=camera_in.camera_type.value,
-        stream_url=final_stream_url,
+        camera_type=final_type,
+        stream_url=final_url,
         ip_address=camera_in.ip_address,
-        port=camera_in.port or (554 if camera_in.camera_type.value == "RTSP" else 80),
+        port=final_port,
         username=camera_in.username,
         password=camera_in.password,
         is_active=camera_in.is_active,
@@ -133,20 +180,24 @@ async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = D
     test_pass = update_data.get('password', cam.password)
 
     if 'ip_address' in update_data or 'stream_url' in update_data:
-        is_reachable, reachability_msg = await camera_service.check_camera_reachability(
+        is_reachable, reachability_msg, working_url, detected_type = await camera_service.check_camera_reachability(
             camera_type=test_type,
-            stream_url=test_url,
+            stream_url=test_url or "",
             username=test_user,
             password=test_pass,
             ip_address=test_ip,
             port=test_port,
-            timeout_seconds=3.0
+            timeout_seconds=4.0
         )
         if not is_reachable:
             raise HTTPException(
                 status_code=400,
                 detail=f"카메라 연결 실패: {reachability_msg}"
             )
+        if working_url:
+            update_data['stream_url'] = working_url
+        if detected_type:
+            update_data['camera_type'] = detected_type.value
 
     if 'camera_type' in update_data and update_data['camera_type']:
         update_data['camera_type'] = update_data['camera_type'].value

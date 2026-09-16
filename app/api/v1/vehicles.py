@@ -14,6 +14,7 @@ from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.schemas.snapshot import SnapshotResponse, VehicleTypeEnum
 from app.services.monitor_service import auto_monitor_service
 from app.services.charger_service import charger_service
+from app.services.storage_service import storage_service
 
 router = APIRouter()
 

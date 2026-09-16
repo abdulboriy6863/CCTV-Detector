@@ -270,17 +270,13 @@ class DetectionPipeline:
                 result.error_message = "Rasmni o'qib bo'lmadi (Corrupt image)"
                 return result
 
-            # Smart resize to optimize speed without losing sharpness
-            image, _ = self._smart_resize(raw_image, max_dim=1600)
+            # Smart resize to optimize speed (960px is optimal for both vehicle detection and OCR)
+            image, _ = self._smart_resize(raw_image, max_dim=960)
             h_img, w_img = image.shape[:2]
 
             crops_to_test: List[Tuple[np.ndarray, str, float]] = []
 
-            # 2. Add ultra-fast deskewed plate proposals from image
-            deskewed_props = self._extract_deskewed_proposals(image)
-            crops_to_test.extend(deskewed_props)
-
-            # 3. Detect vehicles with YOLOv8 and prioritize primary foreground vehicle
+            # 2. Detect vehicles with YOLOv8 and prioritize primary foreground vehicle
             yolo = self._get_yolo()
             vehicles = []
             if yolo is not None:
@@ -300,25 +296,35 @@ class DetectionPipeline:
             vehicles.sort(key=lambda x: x[0], reverse=True)
 
             if vehicles:
-                # Add Bumper ROI (lower 48% of vehicle)
+                # Add Bumper ROI (lower 45% of primary vehicle) - FIRST priority
                 area, (x1, y1, x2, y2), cls_name = vehicles[0]
                 vh = y2 - y1
                 vw = x2 - x1
-                by1 = y1 + int(vh * 0.48)
+                by1 = max(0, y1 + int(vh * 0.40))
                 by2 = min(h_img, y2 + int(vh * 0.05))
                 bx1 = max(0, x1 - int(vw * 0.05))
                 bx2 = min(w_img, x2 + int(vw * 0.05))
                 bumper_crop = image[by1:by2, bx1:bx2]
-                if bumper_crop.size > 0 and (by2 - by1) > 30 and (bx2 - bx1) > 60:
-                    crops_to_test.append((bumper_crop, f"{cls_name}_bumper_roi", 1.4))
+                if bumper_crop.size > 0 and (by2 - by1) > 20 and (bx2 - bx1) > 40:
+                    crops_to_test.append((bumper_crop, f"{cls_name}_bumper_roi", 1.5))
 
-                # Add full vehicle ROI as fallback
-                veh_crop = image[y1:y2, x1:x2]
-                if veh_crop.size > 0:
-                    crops_to_test.append((veh_crop, f"{cls_name}_full_crop", 1.2))
+                # Add deskewed color proposals
+                deskewed_props = self._extract_deskewed_proposals(image)
+                crops_to_test.extend(deskewed_props[:3])
+            else:
+                # No vehicle detected by YOLO -> check deskewed proposals + Lower Parking Bay ROI
+                deskewed_props = self._extract_deskewed_proposals(image)
+                if deskewed_props:
+                    crops_to_test.extend(deskewed_props[:3])
 
-            # Full image as fallback
-            crops_to_test.append((image, "full_image", 1.0))
+                # Add lower parking slot region (lower 65% of entire frame)
+                lower_bay = image[int(h_img * 0.35):h_img, 0:w_img]
+                if lower_bay.size > 0:
+                    crops_to_test.append((lower_bay, "lower_parking_bay_roi", 1.1))
+
+            # Add full image fallback if no crops available
+            if not crops_to_test:
+                crops_to_test.append((image, "full_frame_fallback", 1.0))
 
             best_candidate = None
             best_score = 0.0
@@ -371,12 +377,12 @@ class DetectionPipeline:
                         }
 
                 # Early Exit: If valid legal plate found with strong score on bumper/crop, stop immediately!
-                if best_candidate and best_score >= 0.50:
+                if best_candidate and best_score >= 0.45:
                     break
 
-            # 4. Build Final Result with Strict Confidence Threshold
-            MIN_CONFIDENCE_THRESHOLD = 0.45
-            MIN_TOTAL_SCORE = 0.35
+            # 4. Build Final Result with Calibrated Threshold
+            MIN_CONFIDENCE_THRESHOLD = 0.38
+            MIN_TOTAL_SCORE = 0.30
 
             if best_candidate and best_candidate["confidence"] >= MIN_CONFIDENCE_THRESHOLD and best_score >= MIN_TOTAL_SCORE:
                 result.success = True

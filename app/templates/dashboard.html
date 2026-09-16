@@ -649,7 +649,7 @@
 
     <!-- MODAL 1: ADD CAMERA / PARKING SLOT -->
     <div x-show="addCamModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4" @click.outside="addCamModal = false">
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar" @click.outside="addCamModal = false">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div class="flex items-center space-x-2.5">
                     <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center text-sm">
@@ -663,7 +663,7 @@
             </div>
 
             <!-- Form -->
-            <div class="space-y-3 text-xs" x-data="{ showAdvanced: false }">
+            <div class="space-y-3.5 text-xs" x-data="{ showAdvanced: false, showPass: false }">
                 <!-- Station & Slot Inputs -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -681,6 +681,33 @@
                     <input type="text" x-model="newCam.camera_name" :placeholder="t('cam_name_ph')" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
                 </div>
 
+                <!-- CCTV Brand / Vendor Preset Selector -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('lbl_brand_preset')"></label>
+                        <select x-model="newCam.brand" @change="onBrandChange()" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-semibold cursor-pointer">
+                            <option value="auto" x-text="t('preset_auto')"></option>
+                            <option value="hikvision">하이크비전 (Hikvision / Ezviz)</option>
+                            <option value="dahua">다화 (Dahua / Imou)</option>
+                            <option value="hanwha">한화테크윈 (Hanwha / Samsung)</option>
+                            <option value="uniview">유니뷰 (Uniview / UNV)</option>
+                            <option value="tplink">티피링크 (TP-Link Tapo / Vigi)</option>
+                            <option value="axis">엑시스 (Axis Communications)</option>
+                            <option value="generic">일반 표준 RTSP (Generic)</option>
+                            <option value="http">HTTP 스냅샷 (Snapshot API)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('lbl_camera_protocol')"></label>
+                        <select x-model="newCam.camera_type" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-semibold cursor-pointer">
+                            <option value="RTSP">RTSP (Real-Time Stream)</option>
+                            <option value="HTTP_SNAPSHOT">HTTP Snapshot (JPEG)</option>
+                            <option value="ONVIF">ONVIF (Standard IP Cam)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- IP Address & Port -->
                 <div class="grid grid-cols-3 gap-2">
                     <div class="col-span-2">
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_ip_label')"></label>
@@ -688,7 +715,7 @@
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_port_label')"></label>
-                        <input type="number" x-model.number="newCam.port" :placeholder="newCam.camera_type === 'RTSP' ? '554' : '80'" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                        <input type="number" x-model.number="newCam.port" placeholder="554" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                     </div>
                 </div>
 
@@ -699,7 +726,12 @@
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1" x-text="t('cam_pass_label')"></label>
-                        <input type="password" x-model="newCam.password" placeholder="••••••••" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                        <div class="relative">
+                            <input :type="showPass ? 'text' : 'password'" x-model="newCam.password" placeholder="••••••••" class="w-full p-2 pr-8 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                            <button type="button" @click="showPass = !showPass" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <i class="fa-solid text-xs" :class="showPass ? 'fa-eye-slash' : 'fa-eye'"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -709,9 +741,37 @@
                         <i class="fa-solid text-[9px]" :class="showAdvanced ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                         <span x-text="t('advanced_url_toggle')"></span>
                     </button>
-                    <div x-show="showAdvanced" class="mt-1.5">
-                        <input type="text" x-model="newCam.stream_url" placeholder="rtsp://192.168.0.16:554/stream1" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
+                    <div x-show="showAdvanced" class="mt-1.5 space-y-1">
+                        <input type="text" x-model="newCam.stream_url" placeholder="rtsp://192.168.0.16:554/Streaming/Channels/101" class="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-mono">
                     </div>
+                </div>
+
+                <!-- Test Connection (Probe) Button & Live Probe Result Box -->
+                <div class="pt-1">
+                    <button type="button" @click="testProbeCamera()" :disabled="isProbingCam || (!newCam.ip_address && !newCam.stream_url)" class="w-full py-2 px-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center space-x-1.5 transition disabled:opacity-50">
+                        <i class="fa-solid" :class="isProbingCam ? 'fa-circle-notch fa-spin' : 'fa-plug-circle-check'"></i>
+                        <span x-text="isProbingCam ? t('testing_connection') : t('btn_test_connection')"></span>
+                    </button>
+
+                    <!-- Probe Result Preview -->
+                    <div x-show="probeResult" x-cloak class="mt-2.5 p-3 rounded-xl border space-y-2"
+                        :class="probeResult && probeResult.success ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'">
+                        <div class="flex items-center space-x-2 font-bold text-xs">
+                            <i class="fa-solid" :class="probeResult && probeResult.success ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark text-rose-600'"></i>
+                            <span x-text="probeResult ? probeResult.message : ''"></span>
+                        </div>
+                        <template x-if="probeResult && probeResult.image_base64">
+                            <div class="mt-2 rounded-lg overflow-hidden border border-emerald-400/40 max-h-40 bg-black aspect-video flex items-center justify-center">
+                                <img :src="'data:image/jpeg;base64,' + probeResult.image_base64" class="max-h-40 w-full object-contain" alt="Live Camera Preview" />
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Force Save Option -->
+                <div class="pt-1 flex items-center space-x-2 text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" id="force_save_cb" x-model="newCam.force_save" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                    <label for="force_save_cb" class="text-[11px] cursor-pointer" x-text="currentLang === 'uz' ? 'Hozircha offline bo\'lsa ham kamerani saqlash' : '현재 오프라인 상태여도 카메라 등록 저장'"></label>
                 </div>
             </div>
 
@@ -1002,6 +1062,17 @@
                 cam_name_label: "Kamera nomi",
                 cam_name_ph: "Masalan: 1-ustun kamera",
                 cam_protocol_label: "Protokol turi",
+                lbl_camera_protocol: "Kamera Protokoli (Turi)",
+                lbl_brand_preset: "Kamera Ishlab Chiqaruvchi (Preset)",
+                preset_auto: "⚡ Avtomatik aniqlash (Auto-Detect)",
+                preset_generic_rtsp: "Standard RTSP (/stream1)",
+                preset_hikvision: "Hikvision / Ezviz (/Streaming/Channels/101)",
+                preset_dahua: "Dahua / Imou (/cam/realmonitor)",
+                preset_uniview: "Uniview / UNV (/unicast/c1/s0/live)",
+                preset_hanwha: "Hanwha / Samsung (/profile2/media.smp)",
+                preset_http_snap: "HTTP Snapshot (Veb rasm)",
+                btn_test_connection: "Ulanishni tekshirish",
+                testing_connection: "Qurilma va portlar tekshirilmoqda...",
                 cam_ip_label: "Kamera IP Manzili",
                 cam_port_label: "Port",
                 cam_user_label: "Login (ID)",
@@ -1109,6 +1180,17 @@
                 cam_name_label: "카메라 이름",
                 cam_name_ph: "예: 1번 베이 카메라",
                 cam_protocol_label: "프로토콜 유형",
+                lbl_camera_protocol: "카메라 방식 / 프로토콜",
+                lbl_brand_preset: "제조사 프리셋 / 경로 프리셋",
+                preset_auto: "⚡ 자동 감지 및 스마트 스캔 (Auto-Detect)",
+                preset_generic_rtsp: "일반 RTSP (/stream1)",
+                preset_hikvision: "하이크비전 (Hikvision / Ezviz)",
+                preset_dahua: "다화 (Dahua / Imou)",
+                preset_uniview: "유니뷰 (Uniview / UNV)",
+                preset_hanwha: "한화 테크윈 (Hanwha / Samsung)",
+                preset_http_snap: "HTTP 스냅샷 이미지",
+                btn_test_connection: "연결 테스트 & 자동 검색",
+                testing_connection: "카메라 연결 확인 및 경로 스캔 중...",
                 cam_ip_label: "카메라 IP 주소",
                 cam_port_label: "포트",
                 cam_user_label: "접속 아이디 (ID)",
@@ -1212,16 +1294,20 @@
                 },
                 
                 addCamModal: false,
+                isProbingCam: false,
+                probeResult: null,
                 newCam: {
                     cs_id: 'bluenetwrks',
                     cp_id: 'BNS00000',
                     camera_name: '',
                     camera_type: 'RTSP',
+                    brand: 'auto',
                     stream_url: '',
                     ip_address: '',
                     port: 554,
                     username: '',
                     password: '',
+                    force_save: false,
                     is_active: true
                 },
 
@@ -1413,44 +1499,122 @@
                     window.location.href = url;
                 },
 
+                onBrandChange() {
+                    const b = this.newCam.brand;
+                    const ip = (this.newCam.ip_address || '192.168.0.16').trim();
+                    if (b === 'hikvision') {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = `rtsp://${ip}:554/Streaming/Channels/101`;
+                    } else if (b === 'dahua') {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = `rtsp://${ip}:554/cam/realmonitor?channel=1&subtype=0`;
+                    } else if (b === 'hanwha') {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = `rtsp://${ip}:554/profile2/media.smp`;
+                    } else if (b === 'uniview') {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = `rtsp://${ip}:554/unicast/c1/s0/live`;
+                    } else if (b === 'tplink') {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = `rtsp://${ip}:554/stream1`;
+                    } else if (b === 'axis') {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = `rtsp://${ip}:554/axis-media/media.amp`;
+                    } else if (b === 'http') {
+                        this.newCam.camera_type = 'HTTP_SNAPSHOT';
+                        this.newCam.port = 80;
+                        this.newCam.stream_url = `http://${ip}:80/snapshot.jpg`;
+                    } else {
+                        this.newCam.camera_type = 'RTSP';
+                        this.newCam.port = 554;
+                        this.newCam.stream_url = '';
+                    }
+                    this.probeResult = null;
+                },
+
+                async testProbeCamera() {
+                    if (!this.newCam.ip_address && !this.newCam.stream_url) {
+                        alert(this.currentLang === 'uz' ? "IP manzilni kiriting." : "IP 주소를 입력해주세요.");
+                        return;
+                    }
+                    this.isProbingCam = true;
+                    this.probeResult = null;
+                    try {
+                        const payload = {
+                            ip_address: this.newCam.ip_address,
+                            port: this.newCam.port || 554,
+                            camera_type: this.newCam.camera_type,
+                            stream_url: this.newCam.stream_url,
+                            username: this.newCam.username,
+                            password: this.newCam.password,
+                            brand: this.newCam.brand
+                        };
+                        const res = await fetch('/api/v1/cameras/probe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+                        this.probeResult = data;
+                        if (data.success && data.working_stream_url) {
+                            this.newCam.stream_url = data.working_stream_url;
+                            if (data.camera_type) this.newCam.camera_type = data.camera_type;
+                        }
+                    } catch (e) {
+                        this.probeResult = {
+                            success: false,
+                            message: (this.currentLang === 'uz' ? "Ulanish xatosi: " : "연결 오류: ") + e.message
+                        };
+                    } finally {
+                        this.isProbingCam = false;
+                    }
+                },
+
                 async createCamera() {
+                    let timeoutId = null;
                     try {
                         this.isSavingCam = true;
                         if (!this.newCam.port) {
-                            this.newCam.port = this.newCam.camera_type === 'RTSP' ? 554 : 80;
+                            this.newCam.port = this.newCam.camera_type === 'HTTP_SNAPSHOT' ? 80 : 554;
                         }
-                        if (!this.newCam.stream_url) {
-                            if (this.newCam.ip_address) {
-                                if (this.newCam.camera_type === 'RTSP') {
-                                    this.newCam.stream_url = `rtsp://${this.newCam.ip_address}:${this.newCam.port}/stream1`;
-                                } else {
-                                    const portPart = (this.newCam.port && this.newCam.port !== 80) ? `:${this.newCam.port}` : '';
-                                    this.newCam.stream_url = `http://${this.newCam.ip_address}${portPart}/api/snapshot`;
-                                }
-                            }
-                        }
+                        const controller = new AbortController();
+                        timeoutId = setTimeout(() => controller.abort(), 25000);
                         const res = await fetch('/api/v1/cameras', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(this.newCam)
+                            body: JSON.stringify(this.newCam),
+                            signal: controller.signal
                         });
+                        clearTimeout(timeoutId);
                         if (res.ok) {
                             await this.fetchSlots();
                             this.addCamModal = false;
                             this.newCam = {
                                 cs_id: 'bluenetwrks', cp_id: 'BNS00000',
-                                camera_name: '', camera_type: 'RTSP', stream_url: '',
-                                ip_address: '', port: 554, username: '', password: '', is_active: true
+                                camera_name: '', camera_type: 'RTSP', brand: 'auto', stream_url: '',
+                                ip_address: '', port: 554, username: '', password: '', force_save: false, is_active: true
                             };
+                            this.probeResult = null;
                         } else {
                             const errData = await res.json().catch(() => ({}));
-                            const msg = errData.detail || "Kameraga ulanib bo'lmadi! IP manzil va sozlamalarni tekshiring.";
-                            alert("❌ Xatolik: " + msg);
+                            const msg = errData.detail || "카메라 연결에 실패했습니다. IP, 아이디, 비밀번호를 확인해주세요.";
+                            alert("❌ " + msg);
                         }
                     } catch (e) {
                         console.error("Create camera error:", e);
-                        alert("❌ Ulanish xatosi: " + e.message);
+                        if (e.name === 'AbortError') {
+                            alert("❌ " + (this.currentLang === 'uz' ? "Ulanish vaqti tugadi (Timeout). IP manzil yoki parolni tekshiring." : "연결 시간 초과되었습니다. IP 또는 비밀번호를 확인해주세요."));
+                        } else {
+                            alert("❌ " + (this.currentLang === 'uz' ? "Ulanish xatosi: " : "연결 오류: ") + e.message);
+                        }
                     } finally {
+                        if (timeoutId) clearTimeout(timeoutId);
                         this.isSavingCam = false;
                     }
                 },

@@ -26,6 +26,8 @@ class PlateReader:
 
         # EasyOCR is highly accurate for Korean license plate numbers
         try:
+            import torch
+            torch.set_num_threads(1)
             import easyocr
             from app.core.config import settings, BASE_DIR
             local_model_dir = str(BASE_DIR / "models" / "easyocr")
@@ -92,20 +94,22 @@ class PlateReader:
         results = []
 
         try:
-            if self._reader_type == 'easyocr':
-                # Direct read on original color image to preserve coordinates
-                ocr_result = self._reader.readtext(img)
-                for bbox, text, conf in ocr_result:
-                    results.append((text, float(conf), bbox))
+            import torch
+            with torch.inference_mode():
+                if self._reader_type == 'easyocr':
+                    # Direct read on original color image to preserve coordinates
+                    ocr_result = self._reader.readtext(img)
+                    for bbox, text, conf in ocr_result:
+                        results.append((text, float(conf), bbox))
 
-            elif self._reader_type == 'paddle':
-                ocr_result = self._reader.ocr(img, cls=True)
-                if ocr_result and ocr_result[0]:
-                    for line in ocr_result[0]:
-                        bbox = line[0]
-                        text = line[1][0]
-                        conf = float(line[1][1])
-                        results.append((text, conf, bbox))
+                elif self._reader_type == 'paddle':
+                    ocr_result = self._reader.ocr(img, cls=True)
+                    if ocr_result and ocr_result[0]:
+                        for line in ocr_result[0]:
+                            bbox = line[0]
+                            text = line[1][0]
+                            conf = float(line[1][1])
+                            results.append((text, conf, bbox))
 
         except Exception as e:
             logger.error(f"OCR read error: {e}")

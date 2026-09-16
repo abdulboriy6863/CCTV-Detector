@@ -109,11 +109,12 @@ class CameraBase(BaseModel):
     port: Optional[int] = 554
     username: Optional[str] = None
     password: Optional[str] = None
+    brand: Optional[str] = None
     is_active: bool = True
 
 
 class CameraCreate(CameraBase):
-    pass
+    force_save: Optional[bool] = False
 
 
 class CameraUpdate(BaseModel):
@@ -124,7 +125,9 @@ class CameraUpdate(BaseModel):
     port: Optional[int] = None
     username: Optional[str] = None
     password: Optional[str] = None
+    brand: Optional[str] = None
     is_active: Optional[bool] = None
+    force_save: Optional[bool] = False
 
 
 class CameraResponse(CameraBase):
@@ -133,6 +136,26 @@ class CameraResponse(CameraBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CameraProbeRequest(BaseModel):
+    ip_address: Optional[str] = None
+    port: Optional[int] = None
+    camera_type: Optional[CameraTypeEnum] = None
+    stream_url: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    brand: Optional[str] = None
+
+
+class CameraProbeResponse(BaseModel):
+    success: bool
+    message: str
+    camera_type: Optional[str] = None
+    working_stream_url: Optional[str] = None
+    image_base64: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 # ===== Stats & Realtime Slot Status Schemas =====

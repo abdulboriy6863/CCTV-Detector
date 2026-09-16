@@ -360,8 +360,8 @@ class DetectionPipeline:
                     if tight_crop.size == 0:
                         continue
 
-                    # Color classification (EV vs Regular)
-                    ev_result = ev_classifier.classify(tight_crop)
+                    # Color classification (EV vs Regular) with plate memory support
+                    ev_result = ev_classifier.classify(tight_crop, plate_number=plate_str)
 
                     total_score = ocr_conf * val_score * cand["weight"]
 

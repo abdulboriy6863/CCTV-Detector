@@ -36,8 +36,19 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables verified.")
+
+        # Preload confirmed EV plates into memory registry
+        from app.models.snapshot import CCTVSnapshot
+        from app.services.detector.ev_classifier import ev_classifier
+        from app.core.database import SessionLocal
+        with SessionLocal() as db:
+            ev_snaps = db.query(CCTVSnapshot.plate_number).filter(CCTVSnapshot.is_ev.is_(True)).filter(CCTVSnapshot.plate_number.isnot(None)).distinct().all()
+            for r in ev_snaps:
+                if r[0]:
+                    ev_classifier.register_ev_plate(r[0])
+            logger.info(f"Loaded {len(ev_snaps)} verified EV license plates into EV registry.")
     except Exception as e:
-        logger.warning(f"Database connection issue: {e}")
+        logger.warning(f"Database setup / EV preload issue: {e}")
 
     # Start background monitor
     await auto_monitor_service.start()

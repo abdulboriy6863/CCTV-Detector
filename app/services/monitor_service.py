@@ -397,8 +397,13 @@ class AutoMonitorService:
         departure_time: Optional[datetime] = None
     ):
         """Record ONE END event when a vehicle departs."""
+        if charger_service.is_physically_plugged(camera.cs_id, camera.cp_id, db):
+            logger.info(f"🔌 [{camera_key}] Cannot close session for {state.get('plate')}: Charger is still plugged in.")
+            return False
+
         now = get_kst_now()
         entry_at = state.get("entry_at", now)
+
 
         if departure_time:
             duration_seconds = max(1, int((departure_time - entry_at).total_seconds()))

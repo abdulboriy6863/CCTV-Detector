@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     YOLO_CONFIDENCE: float = 0.25
     OCR_LANGUAGE: str = "korean"
     EV_BLUE_THRESHOLD: float = 0.3
+    PLATE_JPEG_QUALITY: int = 85
 
     # Monitor Settings
     MONITOR_INTERVAL_SECONDS: int = 10

@@ -472,10 +472,11 @@ class DetectionPipeline:
                     scale = 480.0 / c_w
                     crop_to_encode = cv2.resize(crop_to_encode, (480, int(c_h * scale)), interpolation=cv2.INTER_AREA)
 
+                jpeg_qual = getattr(settings, 'PLATE_JPEG_QUALITY', 85)
                 _, buffer = cv2.imencode(
                     ".jpg",
                     crop_to_encode,
-                    [int(cv2.IMWRITE_JPEG_QUALITY), 85]
+                    [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_qual]
                 )
                 result.plate_crop_bytes = buffer.tobytes()
                 result.plate_crop_base64 = base64.b64encode(result.plate_crop_bytes).decode("utf-8")
@@ -499,10 +500,11 @@ class DetectionPipeline:
         return result
 
     @staticmethod
-    def crop_plate_base64(image: np.ndarray, bbox: List[int], quality: int = 85) -> Optional[str]:
+    def crop_plate_base64(image: np.ndarray, bbox: List[int], quality: Optional[int] = None) -> Optional[str]:
         """Crops a bounding box with padding and encodes to base64 JPEG data URL."""
         if image is None or len(bbox) < 4:
             return None
+        quality = quality or getattr(settings, 'PLATE_JPEG_QUALITY', 85)
         h, w = image.shape[:2]
         x1, y1, x2, y2 = bbox[:4]
         # Apply slight margin

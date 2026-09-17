@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.database import SessionLocal, engine
 from app.models.snapshot import CCTVSnapshot, CCTVCamera
+from app.services.storage_service import storage_service
 from app.core.config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -42,20 +43,8 @@ def purge_cameras(db):
 
 def clean_disk_images():
     """Removes stored vehicle snapshot JPEG files from storage directory."""
-    storage_dir = Path(settings.STORAGE_PATH)
-    if not storage_dir.exists():
-        logger.info(f"📁 Disk papkasi topilmadi: {storage_dir}")
-        return
-
-    deleted_count = 0
-    for file in storage_dir.rglob("*.jpg"):
-        try:
-            file.unlink()
-            deleted_count += 1
-        except Exception as e:
-            logger.warning(f"Faylni o'chirishda xatolik {file}: {e}")
-
-    logger.info(f"🗑️ Diskdan {deleted_count} ta rasm fayllari o'chirildi ({storage_dir}).")
+    deleted_count = storage_service.purge_all_snapshots()
+    logger.info(f"🗑️ Diskdan {deleted_count} ta rasm fayllari o'chirildi.")
 
 
 def main():

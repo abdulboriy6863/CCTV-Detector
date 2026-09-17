@@ -18,7 +18,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.db.session import SessionLocal, engine
+from app.core.database import SessionLocal, engine
 from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.core.config import settings
 

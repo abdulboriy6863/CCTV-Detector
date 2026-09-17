@@ -45,7 +45,7 @@ CONNECTOR_STATUS_UZ = {
 }
 
 def format_duration_kr(seconds: int) -> str:
-    """Format duration in seconds to standard Korean string."""
+    """Format duration in seconds to standard Korean string with 24h+ multi-day support."""
     if seconds <= 0:
         return "0분"
     if seconds < 60:
@@ -58,9 +58,53 @@ def format_duration_kr(seconds: int) -> str:
         return f"{mins}분"
     hours = seconds // 3600
     rem_mins = (seconds % 3600) // 60
+
+    if hours >= 24:
+        days = hours // 24
+        rem_hours = hours % 24
+        if rem_hours > 0 and rem_mins > 0:
+            return f"{days}일 {rem_hours}시간 {rem_mins}분"
+        elif rem_hours > 0:
+            return f"{days}일 {rem_hours}시간"
+        elif rem_mins > 0:
+            return f"{days}일 {rem_mins}분"
+        return f"{days}일"
+
     if rem_mins > 0:
         return f"{hours}시간 {rem_mins}분"
     return f"{hours}시간"
+
+
+def format_duration_uz(seconds: int) -> str:
+    """Format duration in seconds to Uzbek localized string."""
+    if seconds <= 0:
+        return "0 daqiqa"
+    if seconds < 60:
+        return f"{seconds} soniya"
+    mins = seconds // 60
+    rem_secs = seconds % 60
+    if seconds < 3600:
+        if rem_secs > 0:
+            return f"{mins} daq {rem_secs} son"
+        return f"{mins} daqiqa"
+    hours = seconds // 3600
+    rem_mins = (seconds % 3600) // 60
+
+    if hours >= 24:
+        days = hours // 24
+        rem_hours = hours % 24
+        if rem_hours > 0 and rem_mins > 0:
+            return f"{days} kun {rem_hours} soat {rem_mins} daqiqa"
+        elif rem_hours > 0:
+            return f"{days} kun {rem_hours} soat"
+        elif rem_mins > 0:
+            return f"{days} kun {rem_mins} daqiqa"
+        return f"{days} kun"
+
+    if rem_mins > 0:
+        return f"{hours} soat {rem_mins} daqiqa"
+    return f"{hours} soat"
+
 
 
 class ChargerService:

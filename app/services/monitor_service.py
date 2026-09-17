@@ -342,6 +342,14 @@ class AutoMonitorService:
             plate_region_path = relative_path.replace(".jpg", "_plate.jpg")
             await storage_service.save_image(plate_crop_bytes, plate_region_path)
 
+        # Generate base64 data URL for instant database persistence
+        plate_base64 = None
+        if hasattr(det_result, 'get_data_url'):
+            plate_base64 = det_result.get_data_url()
+        elif plate_crop_bytes:
+            b64_str = base64.b64encode(plate_crop_bytes).decode("utf-8")
+            plate_base64 = f"data:image/jpeg;base64,{b64_str}"
+
         is_non_ev = not det_result.is_ev and det_result.vehicle_type != "UNKNOWN"
 
         entry_snapshot = CCTVSnapshot(
@@ -362,7 +370,7 @@ class AutoMonitorService:
             alert_type="NON_EV_WARNING" if is_non_ev else None,
             detection_source="CCTV_AUTO",
             raw_ocr_text=det_result.raw_ocr_text,
-            plate_region_image=plate_region_path,
+            plate_region_image=plate_base64 or plate_region_path,
             created_at=now
         )
         db.add(entry_snapshot)
@@ -383,7 +391,8 @@ class AutoMonitorService:
             "plate_color": det_result.plate_color,
             "confidence": det_result.confidence,
             "image_path": relative_path,
-            "plate_region_path": plate_region_path,
+            "plate_region_path": plate_base64 or plate_region_path,
+            "plate_base64": plate_base64,
             "raw_ocr_text": det_result.raw_ocr_text,
         }
 

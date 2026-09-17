@@ -174,10 +174,9 @@ def list_vehicles(
                 dur_sec = 0
             item.stay_duration_seconds = dur_sec
             item.stay_duration_formatted = format_duration_kr(dur_sec)
-        else:
-            item.is_ongoing = False
-            item.stay_duration_seconds = 0
-            item.stay_duration_formatted = "—"
+        # Fallback plate_region_image for END events from session's START event
+        if not item.plate_region_image and snap.session_id and snap.session_id in session_start_map:
+            item.plate_region_image = session_start_map[snap.session_id].plate_region_image
 
         # Determine violation & action labels
         if not snap.is_ev:

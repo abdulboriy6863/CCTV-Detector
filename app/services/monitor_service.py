@@ -313,12 +313,17 @@ class AutoMonitorService:
                     await self._inspect_camera_safe(cam, db)
                 except Exception as cam_err:
                     logger.error(f"Error inspecting camera {cam.id} ({cam.cs_id}/{cam.cp_id}): {cam_err}")
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.3)
 
+        except Exception as e:
+            logger.error(f"Error querying active cameras: {e}")
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
             import gc
             gc.collect()
-        finally:
-            db.close()
 
     async def _inspect_camera_safe(self, camera: CCTVCamera, db: Session):
         """Wrapper that acquires per-camera lock before inspection."""

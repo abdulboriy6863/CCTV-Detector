@@ -87,5 +87,21 @@ class StorageService:
             logger.warning(f"Error cleaning temp frames in {target_dir}: {e}")
         return cleaned_count
 
+    def purge_all_snapshots(self) -> int:
+        """Deletes all stored JPEG/PNG snapshot files from the base storage directory."""
+        if not self.base_dir.exists():
+            return 0
+        deleted_count = 0
+        for pattern in ["*.jpg", "*.jpeg", "*.png"]:
+            for f in self.base_dir.rglob(pattern):
+                try:
+                    if f.is_file():
+                        f.unlink()
+                        deleted_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to delete {f}: {e}")
+        logger.info(f"Purged {deleted_count} snapshot images from storage ({self.base_dir})")
+        return deleted_count
+
 
 storage_service = StorageService()

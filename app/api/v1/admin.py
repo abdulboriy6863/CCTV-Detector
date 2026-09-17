@@ -77,14 +77,7 @@ async def purge_system_data(req: PurgeRequest, db: Session = Depends(get_db)):
 
         # 5. Delete images from disk
         if req.delete_images:
-            storage_dir = Path(settings.STORAGE_PATH)
-            if storage_dir.exists():
-                for f in storage_dir.rglob("*.jpg"):
-                    try:
-                        f.unlink()
-                        deleted_imgs += 1
-                    except Exception as e:
-                        logger.warning(f"Error removing file {f}: {e}")
+            deleted_imgs = storage_service.purge_all_snapshots()
 
         msg = (
             f"Successfully purged {deleted_snaps} snapshots, {deleted_alerts} alerts, "

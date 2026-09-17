@@ -34,8 +34,8 @@ An intelligent, on-premise CCTV surveillance system designed for EV charging sta
 - **🖥️ Single-Page Interactive Dashboard:**
   - Bilingual interface: **🇺🇿 Uzbek** & **🇰🇷 Korean** with instant language switching.
   - Dark / Light Mode with seamless theme toggling.
-  - Real-time drag-and-drop image detection and live CCTV camera stream snapshot testing.
-  - Snapshot history viewer, filter by EV status, live charging badge, and graceful image fallback.
+  - **Real-Time Stay Duration Ticker:** Dynamic live parking duration counter per table row for ongoing sessions with complete historical duration records.
+  - Snapshot history viewer, filter by EV status, live charging badge, interactive license plate photo preview, and graceful image fallback.
 
 
 ---

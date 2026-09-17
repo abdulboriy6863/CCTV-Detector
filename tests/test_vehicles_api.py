@@ -126,6 +126,39 @@ class TestVehiclesAPI(unittest.TestCase):
         self.assertGreater(item["stay_duration_seconds"], 0)
         self.assertIsNotNone(item["stay_duration_formatted"])
 
+    def test_image_fallback_to_base64_when_disk_file_absent(self):
+        # Create a snapshot with missing disk file but stored base64 crop
+        db = self.TestingSessionLocal()
+        b64_data = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+        snap_fallback = CCTVSnapshot(
+            cs_id="bluenetwrks",
+            cp_id="BNS00000",
+            plate_number="81머2072",
+            event_type="START",
+            image_path="non_existent/path/on/disk.jpg",
+            plate_region_image=b64_data,
+            is_ev=True,
+            vehicle_type="EV",
+            created_at=datetime(2026, 9, 17, 10, 0, 0)
+        )
+        db.add(snap_fallback)
+        db.commit()
+        db.refresh(snap_fallback)
+        snap_id = snap_fallback.id
+        db.close()
+
+        # 1. Main image endpoint fallback
+        res = self.client.get(f"/api/v1/vehicles/{snap_id}/image")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers["content-type"], "image/jpeg")
+        self.assertGreater(len(res.content), 10)
+
+        # 2. Plate crop image endpoint fallback
+        res_plate = self.client.get(f"/api/v1/vehicles/{snap_id}/plate-image")
+        self.assertEqual(res_plate.status_code, 200)
+        self.assertEqual(res_plate.headers["content-type"], "image/jpeg")
+        self.assertGreater(len(res_plate.content), 10)
+
 
 if __name__ == "__main__":
     unittest.main()

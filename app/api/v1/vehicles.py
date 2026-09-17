@@ -2,6 +2,7 @@
 import csv
 import io
 import re
+import base64
 from datetime import datetime, date
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query

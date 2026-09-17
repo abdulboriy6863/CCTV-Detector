@@ -43,11 +43,14 @@ def _format_korean_notes(notes: Optional[str], event_type: str) -> str:
     if not notes:
         return "출차 완료" if event_type == "END" else ("입차 기록" if event_type == "START" else "-")
     t = notes
+    if "진행 중" in t:
+        return t
     if "boshlandi" in t.lower() or event_type == "START":
         return "입차 (주차 시작)"
     t = re.sub(r"^Chiqish:\s*", "", t, flags=re.IGNORECASE)
     t = re.sub(r"^Kirish:\s*", "", t, flags=re.IGNORECASE)
     t = re.sub(r"Jami\s*", "총 ", t, flags=re.IGNORECASE)
+    t = re.sub(r"(\d+)\s*kun", r"\1일 ", t, flags=re.IGNORECASE)
     t = re.sub(r"(\d+)\s*soat", r"\1시간 ", t, flags=re.IGNORECASE)
     t = re.sub(r"(\d+)\s*daqiqa", r"\1분 ", t, flags=re.IGNORECASE)
     t = re.sub(r"(\d+)\s*soniya", r"\1초", t, flags=re.IGNORECASE)
@@ -55,6 +58,7 @@ def _format_korean_notes(notes: Optional[str], event_type: str) -> str:
     t = re.sub(r"To['’]xtab turish:\s*", "총 ", t, flags=re.IGNORECASE)
     t = re.sub(r"\s+", " ", t)
     return t.strip() or ("출차 완료" if event_type == "END" else "입차 기록")
+
 
 
 @router.get("", summary="List detected vehicles with filtering")

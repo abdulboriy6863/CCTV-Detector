@@ -938,6 +938,19 @@ class CameraService:
                 port=port
             )
 
+            # If capture failed, attempt one fast retry (0.2s delay) to overcome packet loss
+            if not result.success:
+                await asyncio.sleep(0.2)
+                retry_res = await adapter.capture(
+                    stream_url=stream_url,
+                    username=username,
+                    password=password,
+                    ip_address=ip_address,
+                    port=port
+                )
+                if retry_res.success and retry_res.image_bytes:
+                    result = retry_res
+
             if result.success and result.image_bytes:
                 with self._cache_lock:
                     self._snapshot_cache[cache_key] = (now_ts, result)

@@ -349,7 +349,7 @@ class DetectionPipeline:
             vehicles = []
             if yolo is not None:
                 try:
-                    yolo_res = yolo(image, conf=0.15, verbose=False)
+                    yolo_res = yolo(image, conf=0.12, verbose=False)
                     for r in yolo_res:
                         for box in r.boxes:
                             cls_id = int(box.cls[0])

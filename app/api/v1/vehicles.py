@@ -9,11 +9,12 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
+from app.core.config import get_kst_now
 from app.core.database import get_db
 from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.schemas.snapshot import SnapshotResponse, VehicleTypeEnum
 from app.services.monitor_service import auto_monitor_service
-from app.services.charger_service import charger_service
+from app.services.charger_service import charger_service, format_duration_kr
 from app.services.storage_service import storage_service
 
 router = APIRouter()

@@ -13,46 +13,22 @@ from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.schemas.snapshot import CameraTypeEnum, EventTypeEnum
 from app.services.camera_service import camera_service
 from app.services.detector.pipeline import detection_pipeline
+from app.services.detector.plate_validator import KoreanPlateValidator
 from app.services.storage_service import storage_service
 from app.services.charger_service import charger_service, format_duration_kr
 
 logger = logging.getLogger("cctv_monitor")
 
 
-def _levenshtein_distance(s1: str, s2: str) -> int:
-    """Calculate edit distance between two strings."""
-    if len(s1) < len(s2):
-        return _levenshtein_distance(s2, s1)
-    if len(s2) == 0:
-        return len(s1)
-    previous_row = range(len(s2) + 1)
-    for i, c1 in enumerate(s1):
-        current_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            insertions = previous_row[j + 1] + 1
-            deletions = current_row[j] + 1
-            substitutions = previous_row[j] + (c1 != c2)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-    return previous_row[-1]
-
-
 def is_same_plate(plate1: Optional[str], plate2: Optional[str]) -> bool:
     """
-    Compare two license plate strings with tolerance for OCR jitter / minor typos.
-    - Exact match after cleaning whitespace and dashes
-    - Levenshtein distance <= 1 for plates with length >= 5
+    Compare two license plate strings with tolerance for OCR jitter, minor typos,
+    and vertical charging cable occlusion.
     """
     if not plate1 or not plate2:
         return False
-    p1 = "".join(plate1.split()).upper().replace("-", "")
-    p2 = "".join(plate2.split()).upper().replace("-", "")
-    if p1 == p2:
-        return True
-    if len(p1) >= 5 and len(p2) >= 5 and abs(len(p1) - len(p2)) <= 1:
-        if _levenshtein_distance(p1, p2) <= 1:
-            return True
-    return False
+    return KoreanPlateValidator.is_cable_occlusion_match(plate1, plate2)
+
 
 
 def format_duration(duration_seconds: int) -> str:
@@ -392,6 +368,8 @@ class AutoMonitorService:
         self.active_sessions[camera_key] = {
             "session_id": session_id,
             "plate": detected_plate,
+            "anchor_plate": detected_plate,
+            "anchor_confidence": det_result.confidence,
             "entry_at": now,
             "last_seen_at": now,
             "missed_cycles": 0,
@@ -405,6 +383,7 @@ class AutoMonitorService:
             "plate_region_path": plate_region_path,
             "raw_ocr_text": det_result.raw_ocr_text,
         }
+
 
         ev_emoji = "⚡" if det_result.is_ev else "🚨"
         logger.info(f"{ev_emoji} [{camera_key}] Kirish (START): {det_result.vehicle_type} - {detected_plate} (Session: {session_id})")

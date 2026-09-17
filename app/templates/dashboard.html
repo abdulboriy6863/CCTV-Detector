@@ -90,6 +90,12 @@
                         <i class="fa-solid" :class="isMuted ? 'fa-volume-xmark text-slate-400' : 'fa-volume-high text-emerald-500'"></i>
                     </button>
 
+                    <!-- System Reset / Data Purge Button -->
+                    <button @click="dbResetModal = true" class="h-9 px-3 flex items-center space-x-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-bold transition shadow-sm" :title="t('btn_db_reset')">
+                        <i class="fa-solid fa-broom"></i>
+                        <span class="hidden md:inline" x-text="t('btn_db_reset')"></span>
+                    </button>
+
                     <!-- Theme Toggle -->
                     <button @click="toggleTheme()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition shadow-sm" :title="isDark ? t('theme_light') : t('theme_dark')">
                         <i class="fa-solid" :class="isDark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
@@ -818,6 +824,72 @@
         </div>
     </div>
 
+    <!-- MODAL: SYSTEM RESET & DATA PURGE -->
+    <div x-show="dbResetModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+        <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 space-y-4" @click.outside="dbResetModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 flex items-center justify-center text-base">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 dark:text-white" x-text="t('modal_reset_title')"></h3>
+                        <p class="text-[11px] text-slate-400">Production Clean Initialization</p>
+                    </div>
+                </div>
+                <button @click="dbResetModal = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs text-slate-700 dark:text-slate-300">
+                <label class="flex items-start space-x-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <input type="checkbox" x-model="purgeOptions.purge_snapshots" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                    <div>
+                        <span class="font-bold" x-text="t('lbl_purge_snaps')"></span>
+                    </div>
+                </label>
+
+                <label class="flex items-start space-x-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <input type="checkbox" x-model="purgeOptions.purge_alerts" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                    <div>
+                        <span class="font-bold" x-text="t('lbl_purge_alerts')"></span>
+                    </div>
+                </label>
+
+                <label class="flex items-start space-x-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <input type="checkbox" x-model="purgeOptions.delete_images" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                    <div>
+                        <span class="font-bold" x-text="t('lbl_purge_imgs')"></span>
+                    </div>
+                </label>
+
+                <label class="flex items-start space-x-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <input type="checkbox" x-model="purgeOptions.reset_active_sessions" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                    <div>
+                        <span class="font-bold" x-text="t('lbl_reset_sessions')"></span>
+                    </div>
+                </label>
+
+                <label class="flex items-start space-x-2.5 p-2 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 cursor-pointer hover:bg-rose-100/50 transition">
+                    <input type="checkbox" x-model="purgeOptions.purge_cameras" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                    <div>
+                        <span class="font-bold text-rose-600 dark:text-rose-400" x-text="t('lbl_purge_cams')"></span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button @click="dbResetModal = false" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs" x-text="t('btn_close')"></button>
+                <button @click="performSystemPurge()" :disabled="isPurging" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-rose-600/20">
+                    <i class="fa-solid fa-trash-can" x-show="!isPurging"></i>
+                    <i class="fa-solid fa-circle-notch fa-spin" x-show="isPurging"></i>
+                    <span x-text="t('btn_confirm_purge')"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL 2: CCTV LIVE VIDEO EXPANDED VIEWER & AI SCAN -->
     <div x-show="liveModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md">
         <div class="bg-white dark:bg-darkcard rounded-2xl shadow-2xl max-w-4xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-700 space-y-4">
@@ -1446,6 +1518,15 @@
                 },
                 
                 addCamModal: false,
+                dbResetModal: false,
+                isPurging: false,
+                purgeOptions: {
+                    purge_snapshots: true,
+                    purge_alerts: true,
+                    purge_cameras: false,
+                    delete_images: true,
+                    reset_active_sessions: true
+                },
                 isProbingCam: false,
                 probeResult: null,
                 newCam: {
@@ -2110,6 +2191,33 @@
                         return 'grid grid-cols-3 grid-rows-2 gap-2 sm:gap-3 h-full w-full';
                     }
                     return 'grid grid-cols-4 grid-rows-2 gap-2 sm:gap-3 h-full w-full';
+                },
+
+                async performSystemPurge() {
+                    if (!confirm(this.t('purge_confirm_prompt'))) {
+                        return;
+                    }
+                    this.isPurging = true;
+                    try {
+                        const res = await fetch('/api/v1/admin/purge-data', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.purgeOptions)
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                            alert("✅ " + this.t('purge_success_msg') + "\n\n" + data.message);
+                            this.dbResetModal = false;
+                            this.page = 1;
+                            await Promise.all([this.fetchStats(), this.fetchSlots(), this.fetchVehicles()]);
+                        } else {
+                            alert("❌ " + (data.detail || data.message || "오류가 발생했습니다."));
+                        }
+                    } catch (err) {
+                        alert("❌ " + err.message);
+                    } finally {
+                        this.isPurging = false;
+                    }
                 }
             };
         }

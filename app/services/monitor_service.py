@@ -571,9 +571,10 @@ class AutoMonitorService:
 
 
             # Subcase 2B: Different plate detected -> Debounce transition
-            # Require solid confidence to begin candidate transition evaluation
-            if det_result.confidence < 0.55:
-                # Weak candidate, treat as temporary OCR glitch and keep current session
+            # Require solid confidence (>= 0.60) to begin candidate transition evaluation
+            anchor_conf = active.get("anchor_confidence", 0.0)
+            if det_result.confidence < 0.60 or (anchor_conf > 0.75 and det_result.confidence < 0.65):
+                # Weak candidate or lower than stable anchor, treat as temporary OCR glitch and keep current session
                 active["last_seen_at"] = now
                 active["missed_cycles"] = 0
                 return

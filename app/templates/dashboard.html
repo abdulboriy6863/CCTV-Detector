@@ -1710,14 +1710,22 @@
                 
                 async fetchStats() {
                     try {
-                        const res = await fetch('/api/v1/stats/summary');
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), 6000);
+                        const res = await fetch('/api/v1/stats/summary', { signal: controller.signal });
+                        clearTimeout(timer);
                         if (res.ok) this.stats = await res.json();
-                    } catch (e) { console.error("Stats fetch error:", e); }
+                    } catch (e) {
+                        if (e.name !== 'AbortError') console.error("Stats fetch error:", e);
+                    }
                 },
 
                 async fetchSlots() {
                     try {
-                        const res = await fetch('/api/v1/cameras/slots-status');
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), 6000);
+                        const res = await fetch('/api/v1/cameras/slots-status', { signal: controller.signal });
+                        clearTimeout(timer);
                         if (res.ok) {
                             this.slots = await res.json();
                             let hasNewViolation = false;
@@ -1734,7 +1742,9 @@
                                 this.playAlarmSound();
                             }
                         }
-                    } catch (e) { console.error("Slots fetch error:", e); }
+                    } catch (e) {
+                        if (e.name !== 'AbortError') console.error("Slots fetch error:", e);
+                    }
                 },
                 
                 async fetchVehicles(manual = false) {
@@ -1749,7 +1759,10 @@
                         if (this.filters.startDate) url += `&start_date=${this.filters.startDate}`;
                         if (this.filters.endDate) url += `&end_date=${this.filters.endDate}`;
                         
-                        const res = await fetch(url);
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), 6000);
+                        const res = await fetch(url, { signal: controller.signal });
+                        clearTimeout(timer);
                         if (res.ok) {
                             const data = await res.json();
                             let items = data.items;
@@ -1762,7 +1775,7 @@
                             this.totalVehicles = data.total;
                         }
                     } catch (e) {
-                        console.error("Vehicles fetch error:", e);
+                        if (e.name !== 'AbortError') console.error("Vehicles fetch error:", e);
                     } finally {
                         if (manual) {
                             setTimeout(() => { this.isRefreshing = false; }, 300);

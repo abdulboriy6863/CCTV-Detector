@@ -460,14 +460,21 @@ class DetectionPipeline:
                 result.vehicle_type = best_candidate["ev_result"].vehicle_type
                 result.is_ev = best_candidate["ev_result"].is_ev
                 result.plate_color = best_candidate["ev_result"].plate_color
-                result.plate_crop = best_candidate["plate_crop"]
+                # Encode plate crop with optimal JPEG quality (85) and base64 representation
+                crop_to_encode = best_candidate["plate_crop"]
+                # Resize if excessively large to keep base64 payload under 25KB
+                c_h, c_w = crop_to_encode.shape[:2]
+                if c_w > 480:
+                    scale = 480.0 / c_w
+                    crop_to_encode = cv2.resize(crop_to_encode, (480, int(c_h * scale)), interpolation=cv2.INTER_AREA)
 
                 _, buffer = cv2.imencode(
                     ".jpg",
-                    best_candidate["plate_crop"],
-                    [int(cv2.IMWRITE_JPEG_QUALITY), 95]
+                    crop_to_encode,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), 85]
                 )
                 result.plate_crop_bytes = buffer.tobytes()
+                result.plate_crop_base64 = base64.b64encode(result.plate_crop_bytes).decode("utf-8")
 
                 ev_emoji = "⚡" if result.is_ev else "🚗"
                 logger.info(

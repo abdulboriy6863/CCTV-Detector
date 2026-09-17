@@ -453,7 +453,7 @@ class AutoMonitorService:
             alert_type=None,
             detection_source="CCTV_AUTO",
             raw_ocr_text=state.get("raw_ocr_text"),
-            plate_region_image=state.get("plate_region_path"),
+            plate_region_image=state.get("plate_base64") or state.get("plate_region_path"),
             created_at=now
         )
         db.add(exit_snapshot)

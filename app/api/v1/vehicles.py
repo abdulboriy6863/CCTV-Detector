@@ -176,6 +176,15 @@ def list_vehicles(
                 dur_sec = max(0, int((snap.created_at - start_snap.created_at).total_seconds()))
             else:
                 dur_sec = 0
+                if snap.session_id and len(snap.session_id.split('_')) >= 5:
+                    try:
+                        parts = snap.session_id.split('_')
+                        ts_str = parts[-2]
+                        if len(ts_str) == 14 and ts_str.isdigit():
+                            start_dt = datetime.strptime(ts_str, "%Y%m%d%H%M%S")
+                            dur_sec = max(0, int((snap.created_at - start_dt).total_seconds()))
+                    except Exception:
+                        pass
             item.stay_duration_seconds = dur_sec
             item.stay_duration_formatted = format_duration_kr(dur_sec)
         # Fallback and normalize plate_region_image for END events from session's START event
@@ -325,7 +334,20 @@ def export_vehicles_csv(
                 dur_sec = max(0, int((item.created_at - start_snap.created_at).total_seconds()))
                 dur_text = f"총 {format_duration_kr(dur_sec)} 주차"
             else:
-                dur_text = _format_korean_notes(item.notes, item.event_type)
+                dur_sec = 0
+                if item.session_id and len(item.session_id.split('_')) >= 5:
+                    try:
+                        parts = item.session_id.split('_')
+                        ts_str = parts[-2]
+                        if len(ts_str) == 14 and ts_str.isdigit():
+                            start_dt = datetime.strptime(ts_str, "%Y%m%d%H%M%S")
+                            dur_sec = max(0, int((item.created_at - start_dt).total_seconds()))
+                    except Exception:
+                        pass
+                if dur_sec > 0:
+                    dur_text = f"총 {format_duration_kr(dur_sec)} 주차"
+                else:
+                    dur_text = _format_korean_notes(item.notes, item.event_type)
         else:
             dur_text = _format_korean_notes(item.notes, item.event_type)
 

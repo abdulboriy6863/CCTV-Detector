@@ -1647,7 +1647,33 @@
                 },
 
                 getLiveStayDuration(item) {
-                    if (!item || !item.created_at) return this.currentLang === 'ko' ? '0분' : '0 min';
+                    if (!item) return this.currentLang === 'ko' ? '0분' : '0 min';
+                    // 1. If matching an active camera slot, synchronize with slot live duration
+                    if (this.slots && this.slots.length > 0) {
+                        const activeSlot = this.slots.find(s => 
+                            s.is_occupied && (
+                                (s.session_id && item.session_id && s.session_id === item.session_id) ||
+                                (s.cp_id && item.cp_id && s.cp_id === item.cp_id) ||
+                                (s.current_plate && item.plate_number && s.current_plate === item.plate_number)
+                            )
+                        );
+                        if (activeSlot) {
+                            if (activeSlot.duration_seconds !== undefined && activeSlot.duration_seconds > 0) {
+                                return this.formatSeconds(activeSlot.duration_seconds);
+                            }
+                            if (activeSlot.duration_formatted) {
+                                return this.formatDurationDisplay(activeSlot.duration_formatted);
+                            }
+                        }
+                    }
+                    // 2. Otherwise use item.stay_duration_seconds or calculate from created_at
+                    if (item.stay_duration_seconds !== null && item.stay_duration_seconds !== undefined && item.stay_duration_seconds > 0) {
+                        return this.formatSeconds(item.stay_duration_seconds);
+                    }
+                    if (item.stay_duration_formatted && item.stay_duration_formatted !== '—' && item.stay_duration_formatted !== '0분' && item.stay_duration_formatted !== '0 min') {
+                        return this.formatDurationDisplay(item.stay_duration_formatted);
+                    }
+                    if (!item.created_at) return this.currentLang === 'ko' ? '0분' : '0 min';
                     const entryDate = new Date(item.created_at.includes('T') ? item.created_at : item.created_at.replace(' ', 'T'));
                     const now = this.nowTimestamp || new Date();
                     const diffSec = Math.max(0, Math.floor((now.getTime() - entryDate.getTime()) / 1000));
@@ -1659,11 +1685,12 @@
                     if (item.stay_duration_seconds !== null && item.stay_duration_seconds !== undefined && item.stay_duration_seconds > 0) {
                         return this.formatSeconds(item.stay_duration_seconds);
                     }
-                    if (item.stay_duration_formatted && item.stay_duration_formatted !== '—') {
+                    if (item.stay_duration_formatted && item.stay_duration_formatted !== '—' && item.stay_duration_formatted !== '0분' && item.stay_duration_formatted !== '0 min') {
                         return this.formatDurationDisplay(item.stay_duration_formatted);
                     }
                     if (item.notes) {
-                        return this.formatDurationText(item.notes) || '—';
+                        const parsed = this.formatDurationText(item.notes);
+                        if (parsed) return parsed.replace(/^(Jami|총)\s*/i, '').replace(/(to['’]xtab turdi|주차)/i, '').trim();
                     }
                     return '—';
                 },
@@ -2133,16 +2160,24 @@
 
                 formatDurationText(text) {
                     if (!text) return '';
-                    if (this.currentLang !== 'ko') {
-                        return text.replace(/^Chiqish:\s*/i, '').trim();
+                    if (this.currentLang === 'ko') {
+                        let t = text.replace(/^Chiqish:\s*/i, '');
+                        t = t.replace(/Jami\s*/gi, '총 ');
+                        t = t.replace(/(\d+)\s*soat/gi, '$1시간 ');
+                        t = t.replace(/(\d+)\s*daqiqa/gi, '$1분 ');
+                        t = t.replace(/(\d+)\s*soniya/gi, '$1초');
+                        t = t.replace(/to['’]xtab turdi/gi, '주차');
+                        return t.trim();
+                    } else {
+                        let t = text.replace(/^Chiqish:\s*/i, '');
+                        t = t.replace(/총\s*/gi, 'Jami ');
+                        t = t.replace(/(\d+)\s*일/gi, '$1 kun ');
+                        t = t.replace(/(\d+)\s*시간/gi, '$1 soat ');
+                        t = t.replace(/(\d+)\s*분/gi, '$1 min ');
+                        t = t.replace(/(\d+)\s*초/gi, '$1 sek');
+                        t = t.replace(/주차/gi, "to'xtab turdi");
+                        return t.trim();
                     }
-                    let t = text.replace(/^Chiqish:\s*/i, '');
-                    t = t.replace(/Jami\s*/gi, '총 ');
-                    t = t.replace(/(\d+)\s*soat/gi, '$1시간 ');
-                    t = t.replace(/(\d+)\s*daqiqa/gi, '$1분 ');
-                    t = t.replace(/(\d+)\s*soniya/gi, '$1초');
-                    t = t.replace(/to['’]xtab turdi/gi, '주차');
-                    return t.trim();
                 },
 
                 formatNote(item) {

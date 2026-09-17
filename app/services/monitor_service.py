@@ -484,16 +484,31 @@ class AutoMonitorService:
         now = get_kst_now()
         active = self.active_sessions.get(camera_key)
 
+        # 3. Check hardware ground truth from CSMS Charger status
+        is_plugged = charger_service.is_physically_plugged(
+            cs_id=camera.cs_id,
+            cp_id=camera.cp_id,
+            db=db
+        )
+
         # ----------------------------------------------------
         # SCENARIO 1: No plate recognized in this frame (or confidence too low)
         # ----------------------------------------------------
         if not det_result.success or not det_result.plate_number or det_result.confidence < 0.45:
             if active:
+                # If charger is actively plugged or YOLO sees a car in the slot, KEEP SESSION ALIVE!
+                if is_plugged or getattr(det_result, 'vehicle_present', False):
+                    active["last_seen_at"] = now
+                    active["missed_cycles"] = 0
+                    active["pending_new_plate"] = None
+                    active["pending_cycles"] = 0
+                    return
+
                 active["missed_cycles"] = active.get("missed_cycles", 0) + 1
                 active["pending_new_plate"] = None
                 active["pending_cycles"] = 0
                 if active["missed_cycles"] >= self.exit_threshold_cycles:
-                    # Vehicle has officially departed -> Close session
+                    # Vehicle has officially departed (unplugged + no car in frame) -> Close session
                     await self._close_session(camera, camera_key, active, db)
                     del self.active_sessions[camera_key]
             return
@@ -504,8 +519,9 @@ class AutoMonitorService:
         # SCENARIO 2: Slot is currently occupied
         # ----------------------------------------------------
         if active:
-            # Subcase 2A: Same vehicle is still present (with fuzzy matching)
-            if is_same_plate(active.get("plate"), detected_plate):
+            anchor_or_curr = active.get("anchor_plate") or active.get("plate")
+            # Subcase 2A: Same vehicle or cable-occluded variant of anchor plate
+            if is_same_plate(anchor_or_curr, detected_plate) or is_same_plate(active.get("plate"), detected_plate):
                 active["last_seen_at"] = now
                 active["missed_cycles"] = 0
                 active["pending_new_plate"] = None
@@ -514,6 +530,16 @@ class AutoMonitorService:
                     active["plate"] = detected_plate
                     active["confidence"] = det_result.confidence
                 return
+
+            # If charger is plugged, do not allow false transition caused by OCR noise
+            if is_plugged:
+                active["last_seen_at"] = now
+                active["missed_cycles"] = 0
+                active["pending_new_plate"] = None
+                active["pending_cycles"] = 0
+                logger.info(f"🔌 [{camera_key}] Charger is plugged in. Retaining anchor session {anchor_or_curr} (ignored noisy candidate {detected_plate})")
+                return
+
 
             # Subcase 2B: Different plate detected -> Debounce transition
             pending_plate = active.get("pending_new_plate")

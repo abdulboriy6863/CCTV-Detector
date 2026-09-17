@@ -145,7 +145,10 @@ def list_vehicles(
         # Active session correlation from memory
         matched_active = None
         for cam_key_str, s_dict in auto_monitor_service.active_sessions.items():
-            if s_dict.get("session_id") == snap.session_id:
+            if snap.session_id and s_dict.get("session_id") == snap.session_id:
+                matched_active = s_dict
+                break
+            if snap.cs_id and snap.cp_id and s_dict.get("cs_id") == snap.cs_id and s_dict.get("cp_id") == snap.cp_id:
                 matched_active = s_dict
                 break
 
@@ -190,9 +193,17 @@ def list_vehicles(
             item.action_required_uz = "Darhol joyni bo'shating" if snap.event_type != "END" else "Chiqib ketgan"
             item.action_required = item.action_required_kr
         else:
-            if matched_active and snap.event_type != "END":
+            if snap.event_type != "END":
+                effective_session = matched_active or {
+                    "entry_at": snap.created_at,
+                    "is_ev": snap.is_ev,
+                    "plate": snap.plate_number,
+                    "session_id": snap.session_id,
+                    "cs_id": snap.cs_id,
+                    "cp_id": snap.cp_id
+                }
                 chg_status = charger_service.get_charger_realtime_status(
-                    cs_id=snap.cs_id, cp_id=snap.cp_id, db=db, session_info=matched_active
+                    cs_id=snap.cs_id, cp_id=snap.cp_id, db=db, session_info=effective_session
                 )
                 item.battery_soc = chg_status.get("battery_soc")
                 item.charge_power_kw = chg_status.get("charge_power_kw")
@@ -205,8 +216,8 @@ def list_vehicles(
                 item.violation_type = "NORMAL_CHARGING"
                 item.violation_label_kr = "정상"
                 item.violation_label_uz = "Normal"
-                item.action_required_kr = "출차 완료" if snap.event_type == "END" else "—"
-                item.action_required_uz = "Chiqib ketgan" if snap.event_type == "END" else "—"
+                item.action_required_kr = "출차 완료"
+                item.action_required_uz = "Chiqib ketgan"
             item.action_required = item.action_required_kr
 
         results.append(item)
@@ -272,6 +283,7 @@ def export_vehicles_csv(
         "차량 유형",
         "전기차 여부",
         "인식 정확도",
+        "배터리 SoC & 충전 전력",
         "위반 상태",
         "조치 필요 사항",
         "주차 시간 및 비고"
@@ -320,12 +332,27 @@ def export_vehicles_csv(
         cam_key = (item.cs_id, item.cp_id or "BNS00000")
         cctv_name = cam_name_map.get(cam_key, f"CCTV ({item.cp_id or '1'})")
 
+        # Battery SoC & Charging power info
+        battery_power_str = "—"
         if not item.is_ev:
             viol_label = "일반차 불법 주차"
             act_label = "즉시 이동 주차 필요" if item.event_type != "END" else "출차 완료"
         else:
-            viol_label = "정상"
-            act_label = "출차 완료" if item.event_type == "END" else "—"
+            if item.event_type != "END":
+                chg_status = charger_service.get_charger_realtime_status(
+                    cs_id=item.cs_id, cp_id=item.cp_id, db=db, session_info={"entry_at": item.created_at, "is_ev": True}
+                )
+                soc = chg_status.get("battery_soc")
+                pwr = chg_status.get("charge_power_kw")
+                if soc is not None and soc > 0:
+                    battery_power_str = f"{soc}%" + (f" ({pwr} kW)" if pwr else "")
+                elif pwr and pwr > 0:
+                    battery_power_str = f"{pwr} kW"
+                viol_label = chg_status.get("violation_label_kr", "정상")
+                act_label = chg_status.get("action_required_kr", "—")
+            else:
+                viol_label = "정상"
+                act_label = "출차 완료"
 
         writer.writerow([
             item.id,
@@ -337,6 +364,7 @@ def export_vehicles_csv(
             type_label,
             ev_label,
             conf_str,
+            battery_power_str,
             viol_label,
             act_label,
             dur_text

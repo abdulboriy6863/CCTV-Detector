@@ -940,10 +940,20 @@
                 <!-- Image with onload and onerror handlers -->
                 <img :src="previewImage.url" 
                      x-show="!previewImage.error"
-                     @load="previewImage.loading = false; previewImage.error = false" 
+                     @load="previewImage.loading = false; previewImage.error = false; previewImage.naturalWidth = $event.target.naturalWidth; previewImage.naturalHeight = $event.target.naturalHeight" 
                      @error="handleImageError()"
                      class="w-full h-auto max-h-[75vh] object-contain rounded-xl transition duration-300 ease-in-out" 
                      alt="Vehicle Snapshot Preview">
+
+                <!-- Image Bottom Meta Overlay Tag -->
+                <div x-show="!previewImage.loading && !previewImage.error && previewImage.url"
+                     class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-sm text-[10px] font-mono text-slate-300 border border-white/10 flex items-center space-x-2 pointer-events-none">
+                    <span class="flex items-center space-x-1 text-emerald-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span x-text="previewImage.url.startsWith('data:') ? 'Base64 Crop' : 'HD Snapshot'"></span>
+                    </span>
+                    <span x-show="previewImage.naturalWidth" x-text="previewImage.naturalWidth + 'x' + previewImage.naturalHeight" class="text-slate-400"></span>
+                </div>
 
                 <!-- Error Fallback Message -->
                 <div x-show="previewImage.error" class="p-8 text-center text-slate-400 space-y-3">

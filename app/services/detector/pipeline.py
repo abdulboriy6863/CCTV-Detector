@@ -498,11 +498,42 @@ class DetectionPipeline:
         result.processing_time_ms = (time.time() - start_time) * 1000
         return result
 
+    @staticmethod
+    def crop_plate_base64(image: np.ndarray, bbox: List[int], quality: int = 85) -> Optional[str]:
+        """Crops a bounding box with padding and encodes to base64 JPEG data URL."""
+        if image is None or len(bbox) < 4:
+            return None
+        h, w = image.shape[:2]
+        x1, y1, x2, y2 = bbox[:4]
+        # Apply slight margin
+        pad_x = int((x2 - x1) * 0.08)
+        pad_y = int((y2 - y1) * 0.15)
+        crop_x1 = max(0, x1 - pad_x)
+        crop_y1 = max(0, y1 - pad_y)
+        crop_x2 = min(w, x2 + pad_x)
+        crop_y2 = min(h, y2 + pad_y)
+        
+        crop = image[crop_y1:crop_y2, crop_x1:crop_x2]
+        if crop.size == 0:
+            return None
+            
+        c_h, c_w = crop.shape[:2]
+        if c_w > 480:
+            scale = 480.0 / c_w
+            crop = cv2.resize(crop, (480, int(c_h * scale)), interpolation=cv2.INTER_AREA)
+
+        ret, buffer = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+        if not ret:
+            return None
+        raw_b64 = base64.b64encode(buffer.tobytes()).decode("utf-8")
+        return f"data:image/jpeg;base64,{raw_b64}"
+
     async def detect(self, image_bytes: bytes) -> DetectionResult:
         """Async wrapper — runs detection in thread pool."""
         return await asyncio.to_thread(self._sync_detect, image_bytes)
 
 
-# Singleton
+# Class Aliases & Singleton
+PlateDetectionPipeline = DetectionPipeline
 detection_pipeline = DetectionPipeline()
 

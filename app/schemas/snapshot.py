@@ -46,6 +46,13 @@ class DetectionResult(BaseModel):
     plate_region_base64: Optional[str] = None  # For API response
     plate_crop_bytes: Optional[bytes] = None
 
+    def get_data_url(self) -> Optional[str]:
+        """Returns normalized data URL format for frontend display."""
+        if not self.plate_region_base64:
+            return None
+        b64 = self.plate_region_base64.strip()
+        return b64 if b64.startswith("data:image") else f"data:image/jpeg;base64,{b64}"
+
 
 # ===== Snapshot Schemas =====
 

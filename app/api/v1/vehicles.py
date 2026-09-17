@@ -385,13 +385,17 @@ def _resolve_snapshot_image_bytes(snap: CCTVSnapshot, db: Session) -> Optional[b
             comma_idx = pri.find(",")
             if comma_idx != -1:
                 try:
-                    return base64.b64decode(pri[comma_idx + 1:])
+                    data = base64.b64decode(pri[comma_idx + 1:], validate=True)
+                    if len(data) >= 20:
+                        return data
                 except Exception:
                     pass
         elif len(pri) > 60 and not (pri.endswith(".jpg") or pri.endswith(".png") or "/" in pri or "\\" in pri):
             # Raw base64 string
             try:
-                return base64.b64decode(pri)
+                data = base64.b64decode(pri, validate=True)
+                if len(data) >= 20:
+                    return data
             except Exception:
                 pass
         else:
@@ -439,16 +443,19 @@ def view_plate_image(vehicle_id: int, db: Session = Depends(get_db)):
     if snap.plate_region_image:
         pri = snap.plate_region_image.strip()
         if pri.startswith("data:image"):
+            comma_idx = pri.find(",")
+            if comma_idx != -1:
+                try:
+                    img_bytes = base64.b64decode(pri[comma_idx + 1:], validate=True)
+                    if len(img_bytes) >= 20:
+                        return Response(content=img_bytes, media_type="image/jpeg")
+                except Exception:
+                    pass
+        elif len(pri) > 60 and not (pri.endswith(".jpg") or pri.endswith(".png") or "/" in pri or "\\" in pri):
             try:
-                b64_part = pri.split(",", 1)[1]
-                img_bytes = base64.b64decode(b64_part)
-                return Response(content=img_bytes, media_type="image/jpeg")
-            except Exception:
-                pass
-        elif len(pri) > 100 and not pri.endswith(".jpg") and not pri.endswith(".png"):
-            try:
-                img_bytes = base64.b64decode(pri)
-                return Response(content=img_bytes, media_type="image/jpeg")
+                img_bytes = base64.b64decode(pri, validate=True)
+                if len(img_bytes) >= 20:
+                    return Response(content=img_bytes, media_type="image/jpeg")
             except Exception:
                 pass
         else:
@@ -474,7 +481,9 @@ def download_vehicle_image(vehicle_id: int, db: Session = Depends(get_db)):
     if not img_bytes:
         raise HTTPException(status_code=404, detail="Image file not found")
     
-    filename = f"{snap.plate_number or 'UNKNOWN'}_{snap.vehicle_type}_{snap.created_at.strftime('%Y%m%d_%H%M%S')}.jpg"
+    clean_plate = re.sub(r'[^a-zA-Z0-9_-]', '', snap.plate_number or '') or f"vehicle_{snap.id}"
+    date_str = snap.created_at.strftime("%Y%m%d_%H%M%S") if snap.created_at else "snapshot"
+    filename = f"{clean_plate}_{snap.vehicle_type}_{date_str}.jpg"
     return Response(
         content=img_bytes,
         media_type="image/jpeg",

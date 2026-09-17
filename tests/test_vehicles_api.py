@@ -201,6 +201,60 @@ class TestVehiclesAPI(unittest.TestCase):
         self.assertEqual(res.headers["content-type"], "image/jpeg")
         self.assertGreater(len(res.content), 10)
 
+    def test_download_vehicle_image_with_base64_fallback(self):
+        # Create a snapshot with base64 image and download it
+        db = self.TestingSessionLocal()
+        b64_data = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+        snap = CCTVSnapshot(
+            cs_id="bluenetwrks",
+            cp_id="BNS00000",
+            plate_number="81머2072",
+            event_type="START",
+            image_path="missing_file.jpg",
+            plate_region_image=b64_data,
+            is_ev=True,
+            vehicle_type="EV",
+            created_at=datetime(2026, 9, 17, 10, 0, 0)
+        )
+        db.add(snap)
+        db.commit()
+        db.refresh(snap)
+        snap_id = snap.id
+        db.close()
+
+        res = self.client.get(f"/api/v1/vehicles/{snap_id}/download")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers["content-type"], "image/jpeg")
+        self.assertIn("attachment; filename=", res.headers["content-disposition"])
+        self.assertGreater(len(res.content), 10)
+
+    def test_missing_and_corrupt_image_handling(self):
+        # 1. Non-existent vehicle ID -> 404
+        res_non = self.client.get("/api/v1/vehicles/999999/image")
+        self.assertEqual(res_non.status_code, 404)
+
+        # 2. Corrupt base64 / missing file -> 404 gracefully
+        db = self.TestingSessionLocal()
+        snap_corrupt = CCTVSnapshot(
+            cs_id="bluenetwrks",
+            cp_id="BNS00000",
+            plate_number="99X9999",
+            event_type="START",
+            image_path="corrupt.jpg",
+            plate_region_image="data:image/jpeg;base64,INVALID_NOT_BASE64_###!!!",
+            is_ev=False,
+            vehicle_type="REGULAR",
+            created_at=datetime(2026, 9, 17, 10, 0, 0)
+        )
+        db.add(snap_corrupt)
+        db.commit()
+        db.refresh(snap_corrupt)
+        c_id = snap_corrupt.id
+        db.close()
+
+        res_c = self.client.get(f"/api/v1/vehicles/{c_id}/image")
+        self.assertEqual(res_c.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

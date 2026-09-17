@@ -226,6 +226,8 @@ class AutoMonitorService:
                     self.active_sessions[camera_key] = {
                         "session_id": snap.session_id,
                         "plate": snap.plate_number,
+                        "anchor_plate": snap.plate_number,
+                        "anchor_confidence": snap.ai_confidence or 0.0,
                         "entry_at": snap.created_at,
                         "last_seen_at": snap.created_at,
                         "missed_cycles": 0,
@@ -239,6 +241,7 @@ class AutoMonitorService:
                         "plate_region_path": snap.plate_region_image,
                         "raw_ocr_text": snap.raw_ocr_text,
                     }
+
                     restored_count += 1
                     logger.info(
                         f"🔄 Sessiya tiklandi: [{camera_key}] {snap.plate_number} "

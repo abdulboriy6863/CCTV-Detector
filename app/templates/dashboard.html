@@ -922,7 +922,7 @@
                             class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center space-x-1 transition"
                             title="Copy Plate Number">
                         <i class="fa-regular fa-copy text-[10px]"></i>
-                        <span x-text="currentLang === 'ko' ? '복사' : 'Nusxa'"></span>
+                        <span x-text="t('btn_copy_plate')"></span>
                     </button>
                     <button @click="previewImage.open = false" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
                         <i class="fa-solid fa-xmark text-sm"></i>
@@ -1261,7 +1261,8 @@
                 btn_exit_tv: "Chiqish (ESC)",
                 image_not_found: "Rasm serverda topilmadi",
                 image_not_found_desc: "Ushbu yozuv uchun fizik snapshot fayli server diskida mavjud emas yoki o'chirilgan.",
-                loading_msg: "Yuklanmoqda..."
+                loading_msg: "Yuklanmoqda...",
+                btn_copy_plate: "Nusxa olish"
             },
             ko: {
 
@@ -1386,7 +1387,8 @@
                 btn_exit_tv: "나가기 (ESC)",
                 image_not_found: "이미지 파일을 찾을 수 없습니다",
                 image_not_found_desc: "해당 감지 기록의 스냅샷 원본 파일이 서버 스토리지에 존재하지 않거나 삭제되었습니다.",
-                loading_msg: "로딩 중..."
+                loading_msg: "로딩 중...",
+                btn_copy_plate: "복사"
             }
         };
 

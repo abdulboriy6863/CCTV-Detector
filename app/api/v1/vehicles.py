@@ -426,28 +426,57 @@ def view_vehicle_image(vehicle_id: int, db: Session = Depends(get_db)):
     raise HTTPException(status_code=404, detail="Image file not found")
 
 
-@router.get("/{vehicle_id}/plate-image", summary="View cropped plate image")
+@router.get("/{vehicle_id}/plate-image", summary="View cropped plate image with base64 support")
 def view_plate_image(vehicle_id: int, db: Session = Depends(get_db)):
     snap = db.query(CCTVSnapshot).filter(CCTVSnapshot.id == vehicle_id).first()
-    if not snap or not snap.plate_region_image:
-        raise HTTPException(status_code=404, detail="Plate image not found")
-    abs_path = storage_service.get_absolute_path(snap.plate_region_image)
-    if not abs_path.exists():
-        raise HTTPException(status_code=404, detail="Plate image file not found")
-    return FileResponse(path=str(abs_path), media_type="image/jpeg")
+    if not snap:
+        raise HTTPException(status_code=404, detail="Vehicle record not found")
+    
+    # Check base64 in plate_region_image first
+    if snap.plate_region_image:
+        pri = snap.plate_region_image.strip()
+        if pri.startswith("data:image"):
+            try:
+                b64_part = pri.split(",", 1)[1]
+                img_bytes = base64.b64decode(b64_part)
+                return Response(content=img_bytes, media_type="image/jpeg")
+            except Exception:
+                pass
+        elif len(pri) > 100 and not pri.endswith(".jpg") and not pri.endswith(".png"):
+            try:
+                img_bytes = base64.b64decode(pri)
+                return Response(content=img_bytes, media_type="image/jpeg")
+            except Exception:
+                pass
+        else:
+            abs_path = storage_service.get_absolute_path(pri)
+            if abs_path.exists():
+                return FileResponse(path=str(abs_path), media_type="image/jpeg")
+
+    # Fallback to full frame image bytes
+    img_bytes = _resolve_snapshot_image_bytes(snap, db)
+    if img_bytes:
+        return Response(content=img_bytes, media_type="image/jpeg")
+    
+    raise HTTPException(status_code=404, detail="Plate image not found")
 
 
 @router.get("/{vehicle_id}/download", summary="Download vehicle image")
 def download_vehicle_image(vehicle_id: int, db: Session = Depends(get_db)):
     snap = db.query(CCTVSnapshot).filter(CCTVSnapshot.id == vehicle_id).first()
     if not snap:
-        raise HTTPException(status_code=404, detail="Not found")
-    abs_path = storage_service.get_absolute_path(snap.image_path)
-    if not abs_path.exists():
+        raise HTTPException(status_code=404, detail="Vehicle record not found")
+    
+    img_bytes = _resolve_snapshot_image_bytes(snap, db)
+    if not img_bytes:
         raise HTTPException(status_code=404, detail="Image file not found")
+    
     filename = f"{snap.plate_number or 'UNKNOWN'}_{snap.vehicle_type}_{snap.created_at.strftime('%Y%m%d_%H%M%S')}.jpg"
-    return FileResponse(path=str(abs_path), media_type="image/jpeg", filename=filename,
-                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return Response(
+        content=img_bytes,
+        media_type="image/jpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 @router.delete("/{vehicle_id}", summary="Delete vehicle record")

@@ -18,9 +18,9 @@ from app.services.camera_service import CaptureResult
 from app.services.monitor_service import (
     AutoMonitorService,
     is_same_plate,
-    format_duration,
-    _levenshtein_distance
+    format_duration
 )
+
 
 
 class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
@@ -386,6 +386,81 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(slot2["current_plate"])
 
 
+    @patch("app.services.monitor_service.charger_service.is_physically_plugged")
+    @patch("app.services.monitor_service.storage_service.save_image", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.detection_pipeline.detect", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.camera_service.capture_snapshot", new_callable=AsyncMock)
+    async def test_cable_occluded_24hour_charging_session_stays_alive(
+        self, mock_capture, mock_detect, mock_save_img, mock_plugged
+    ):
+        """
+        Verify that a car charging for 24 hours with constant cable occlusion jitter
+        (47호6633 -> 47오3633 -> 47오8633 -> 47오9633 -> missed OCR)
+        stays in ONE single continuous session with zero premature START/END spam.
+        """
+        camera_key = f"cam_{self.camera.id}"
+        mock_capture.return_value = CaptureResult(success=True, image_bytes=b"fake_jpeg", protocol="RTSP")
+
+        # 1. Car arrives and clear plate 47호6633 is detected before plugging
+        mock_plugged.return_value = False
+        mock_detect.return_value = DetectionResult(
+            success=True, plate_number="47호6633", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.95
+        )
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+
+        records = self.db.query(CCTVSnapshot).all()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].event_type, EventTypeEnum.START.value)
+        self.assertEqual(records[0].plate_number, "47호6633")
+
+        # 2. Driver plugs in cable -> charger becomes plugged in
+        mock_plugged.return_value = True
+
+        # 3. Simulate continuous cycles with cable occlusion variations
+        jitter_plates = ["47오3633", "47오8633", "47오9633", "47호3633", "47호8633"]
+        for i in range(20):
+            plate_candidate = jitter_plates[i % len(jitter_plates)]
+            mock_detect.return_value = DetectionResult(
+                success=True, plate_number=plate_candidate, vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.88
+            )
+            await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+
+            # DB must STILL have only the single 1 START record!
+            records = self.db.query(CCTVSnapshot).all()
+            self.assertEqual(len(records), 1)
+
+        # 4. Simulate OCR complete failure (cable blocking plate)
+        for _ in range(10):
+            mock_detect.return_value = DetectionResult(success=False, plate_number=None, vehicle_present=True)
+            await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+            records = self.db.query(CCTVSnapshot).all()
+            self.assertEqual(len(records), 1)
+
+        # 5. Simulate 24 hours elapsed
+        now_time = datetime.utcnow()
+        self.monitor.active_sessions[camera_key]["entry_at"] = now_time - timedelta(hours=24)
+        self.monitor.active_sessions[camera_key]["last_seen_at"] = now_time
+
+        # 6. Driver unplugs cable and car departs
+        mock_plugged.return_value = False
+        mock_detect.return_value = DetectionResult(success=False, plate_number=None, vehicle_present=False)
+
+        # 3 cycles of empty slot -> officially exits
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+
+        # Verify DB has exactly 2 records: 1 START and 1 END with 1 day (24 hours) duration
+        records = self.db.query(CCTVSnapshot).order_by(CCTVSnapshot.id.asc()).all()
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0].event_type, EventTypeEnum.START.value)
+        self.assertEqual(records[1].event_type, EventTypeEnum.END.value)
+        self.assertEqual(records[0].session_id, records[1].session_id)
+        self.assertTrue("1일" in records[1].notes or "24시간" in records[1].notes)
+
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

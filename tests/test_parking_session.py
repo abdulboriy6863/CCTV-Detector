@@ -555,6 +555,46 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertIn(camera_key, self.monitor.active_sessions)
         self.assertEqual(self.monitor.active_sessions[camera_key]["missed_cycles"], 0)
 
+    @patch("app.services.monitor_service.storage_service.save_image", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.detection_pipeline.detect", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.camera_service.capture_snapshot", new_callable=AsyncMock)
+    async def test_weak_ocr_jitter_rejected_during_parking(
+        self, mock_capture, mock_detect, mock_save_img
+    ):
+        """Verify that weak candidate OCR (<0.60) is ignored as noise while vehicle remains parked."""
+        mock_capture.return_value = CaptureResult(success=True, image_bytes=b"fake_jpeg", protocol="RTSP")
+        mock_save_img.return_value = "2026/09/17/test_snap.jpg"
+        camera_key = f"cam_{self.camera.id}"
+
+        # 1. Car arrives with strong anchor confidence (0.95)
+        mock_detect.return_value = DetectionResult(
+            success=True,
+            plate_number="81머2072",
+            vehicle_type=VehicleTypeEnum.EV,
+            is_ev=True,
+            confidence=0.95,
+            vehicle_present=True
+        )
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
+
+        # 2. Noisy low-confidence random plate glitch (0.50 confidence)
+        mock_detect.return_value = DetectionResult(
+            success=True,
+            plate_number="99하9999",
+            vehicle_type=VehicleTypeEnum.REGULAR,
+            is_ev=False,
+            confidence=0.50,
+            vehicle_present=True
+        )
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+
+        # Must NOT set pending transition or disrupt anchor plate
+        active = self.monitor.active_sessions[camera_key]
+        self.assertEqual(active["plate"], "81머2072")
+        self.assertIsNone(active.get("pending_new_plate"))
+        self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

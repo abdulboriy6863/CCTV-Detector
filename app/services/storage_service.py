@@ -70,5 +70,22 @@ class StorageService:
         zip_buffer.seek(0)
         return zip_buffer
 
+    def cleanup_temp_frames(self, temp_dir: Optional[str] = None, max_age_hours: int = 24) -> int:
+        """Removes temporary camera debug frames older than max_age_hours."""
+        target_dir = Path(temp_dir) if temp_dir else (self.base_dir / "temp")
+        if not target_dir.exists():
+            return 0
+        cleaned_count = 0
+        now_ts = datetime.utcnow().timestamp()
+        max_age_sec = max_age_hours * 3600
+        try:
+            for f in target_dir.glob("*.*"):
+                if f.is_file() and (now_ts - f.stat().st_mtime) > max_age_sec:
+                    f.unlink()
+                    cleaned_count += 1
+        except Exception as e:
+            logger.warning(f"Error cleaning temp frames in {target_dir}: {e}")
+        return cleaned_count
+
 
 storage_service = StorageService()

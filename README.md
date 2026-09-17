@@ -109,13 +109,29 @@ Open your browser at `http://localhost:8000` to access the Dashboard.
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/detect/upload` | Upload an image for real-time LPR & EV classification |
-| `GET` | `/api/v1/vehicles` | List vehicle detection history with pagination & filters |
-| `GET` | `/api/v1/vehicles/{id}/image` | Retrieve original captured CCTV snapshot |
+| `GET` | `/api/v1/vehicles` | List vehicle detection history with duration and ongoing flags |
+| `GET` | `/api/v1/vehicles/{id}/image` | Retrieve snapshot with automatic Base64 DB & session fallback |
+| `GET` | `/api/v1/vehicles/{id}/plate-image` | Retrieve cropped plate thumbnail directly from database |
+| `GET` | `/api/v1/vehicles/{id}/download` | Download vehicle snapshot with safe attachment headers |
+| `GET` | `/api/v1/vehicles/export` | Export vehicle logs as CSV formatted in Korean |
 | `GET` | `/api/v1/cameras` | List all registered CCTV camera connections |
 | `POST` | `/api/v1/cameras` | Register a new CCTV camera (RTSP / HTTP snapshot) |
+| `GET` | `/api/v1/cameras/slots-status` | Real-time charger slot status, telemetry & violation HUD |
 | `POST` | `/api/v1/cameras/{id}/snapshot` | Capture live test frame from camera |
 | `GET` | `/api/v1/stats/summary` | Retrieve summary analytics for today and total stats |
 | `GET` | `/health` | System health check endpoint |
+
+---
+
+## 💾 Storage & Base64 Fallback Architecture
+
+To ensure zero image preview failures even across distributed server environments:
+1. **Vehicle Entry (`START`):** Captures high-resolution frame, extracts tightly cropped license plate, and encodes JPEG Base64 (<25KB) directly into the `plate_region_image` database column.
+2. **Vehicle Departure (`END`):** Applies Zero-Image Exit strategy (no new disk files created), linking directly to the entry session's snapshot.
+3. **Multi-Tier Image Fallback:** The `/image` and `/plate-image` endpoints seamlessly serve:
+   - Primary: Physical file on local storage disk.
+   - Secondary: Embedded Base64 JPEG data decoded on the fly.
+   - Tertiary: Paired `START` session record for departed vehicles.
 
 ---
 

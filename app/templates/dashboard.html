@@ -1440,9 +1440,14 @@
                     if (this.currentLang === 'ko') {
                         return durationStr;
                     }
-                    let str = durationStr.replace(/시간/g, ' soat').replace(/분/g, ' min').replace(/초/g, ' sek');
+                    let str = durationStr
+                        .replace(/일/g, ' kun')
+                        .replace(/시간/g, ' soat')
+                        .replace(/분/g, ' min')
+                        .replace(/초/g, ' sek');
                     return str.trim();
                 },
+
                 
                 toggleTheme() {
                     this.isDark = !this.isDark;

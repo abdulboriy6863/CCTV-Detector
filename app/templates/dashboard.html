@@ -1049,170 +1049,171 @@
 
 
     <!-- MODAL 4: TV WALL / MULTI-VIEW FULLSCREEN MONITORING -->
-    <div x-show="tvWallModal" 
-         x-cloak 
-         @keydown.window.escape="if (tvWallModal) closeTvWall()"
-         class="fixed inset-0 z-[100] bg-slate-950 text-white flex flex-col overflow-hidden select-none">
-        
-        <!-- TV Wall Top Control Bar -->
-        <header class="h-12 sm:h-14 bg-slate-900/95 border-b border-slate-800/80 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-lg backdrop-blur-md">
-            <!-- Left: System Brand & Live Indicator -->
-            <div class="flex items-center space-x-3 min-w-0">
-                <div class="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-400 flex items-center justify-center text-sm shadow-inner shrink-0">
-                    <i class="fa-solid fa-tv"></i>
-                </div>
-                <div class="min-w-0">
-                    <div class="flex items-center space-x-2">
-                        <h2 class="text-xs sm:text-sm font-extrabold text-white tracking-wide truncate" x-text="t('tv_wall_title')"></h2>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1 shrink-0">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                            <span x-text="slots.length + ' ' + t('cameras_connected')"></span>
-                        </span>
+    <template x-if="tvWallModal">
+        <div x-cloak 
+             @keydown.window.escape="closeTvWall()"
+             class="fixed inset-0 z-[100] bg-slate-950 text-white flex flex-col overflow-hidden select-none">
+            
+            <!-- TV Wall Top Control Bar -->
+            <header class="h-12 sm:h-14 bg-slate-900/95 border-b border-slate-800/80 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-lg backdrop-blur-md">
+                <!-- Left: System Brand & Live Indicator -->
+                <div class="flex items-center space-x-3 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-400 flex items-center justify-center text-sm shadow-inner shrink-0">
+                        <i class="fa-solid fa-tv"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center space-x-2">
+                            <h2 class="text-xs sm:text-sm font-extrabold text-white tracking-wide truncate" x-text="t('tv_wall_title')"></h2>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1 shrink-0">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                <span x-text="slots.length + ' ' + t('cameras_connected')"></span>
+                            </span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Center: High-Precision Live Clock -->
-            <div class="hidden md:flex items-center space-x-2 bg-slate-950/80 px-4 py-1 rounded-xl border border-slate-800 shadow-inner">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-xs font-mono font-bold text-slate-300 tracking-wider" x-text="tvClock"></span>
-            </div>
-
-            <!-- Right Controls: Fullscreen Toggle & Exit -->
-            <div class="flex items-center space-x-2 shrink-0">
-                <button @click="toggleTvFullscreen()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer">
-                    <i class="fa-solid" :class="isTvFullscreen ? 'fa-compress' : 'fa-expand'"></i>
-                    <span class="hidden sm:inline" x-text="t('btn_fullscreen')"></span>
-                </button>
-                <button @click="closeTvWall()" class="px-3.5 py-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold flex items-center space-x-1.5 transition shadow-sm cursor-pointer">
-                    <i class="fa-solid fa-xmark"></i>
-                    <span x-text="t('btn_exit_tv')"></span>
-                </button>
-            </div>
-        </header>
-
-        <!-- TV Wall Dynamic CCTV Grid Area (100% Screen Height & Width Responsive) -->
-        <main class="flex-1 p-2 sm:p-3.5 bg-black overflow-hidden flex flex-col justify-center items-center">
-            <!-- No Cameras Connected State -->
-            <template x-if="!slots || slots.length === 0">
-                <div class="flex flex-col items-center justify-center text-slate-500 space-y-3">
-                    <i class="fa-solid fa-video-slash text-5xl text-slate-700 animate-pulse"></i>
-                    <p class="text-sm font-semibold" x-text="t('no_cameras_msg')"></p>
+                <!-- Center: High-Precision Live Clock -->
+                <div class="hidden md:flex items-center space-x-2 bg-slate-950/80 px-4 py-1 rounded-xl border border-slate-800 shadow-inner">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-xs font-mono font-bold text-slate-300 tracking-wider" x-text="tvClock"></span>
                 </div>
-            </template>
 
-            <!-- Dynamic Camera Grid -->
-            <div x-show="slots && slots.length > 0" class="w-full h-full" :class="getTvGridClass()">
-                <template x-for="slot in slots" :key="slot.camera_id">
-                    <div class="relative w-full h-full rounded-2xl overflow-hidden bg-slate-950 border flex flex-col justify-between transition-all duration-300 shadow-2xl group"
-                         :class="slot.violation_level === 'danger' ? 'border-rose-500 shadow-rose-900/30' : (slot.violation_level === 'warning' ? 'border-amber-500 shadow-amber-900/30' : 'border-slate-800 hover:border-blue-500/60')">
-                        
-                        <!-- Top HUD Bar inside Tile -->
-                        <div class="absolute top-0 left-0 right-0 z-20 px-3 py-2 bg-gradient-to-b from-black/90 via-black/50 to-transparent flex items-center justify-between pointer-events-none">
-                            <div class="flex items-center space-x-2">
-                                <span class="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-black text-white flex items-center space-x-1.5">
-                                    <span class="w-2 h-2 rounded-full" :class="slot.is_online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'"></span>
-                                    <span x-text="slot.camera_name || ('CCTV ' + slot.camera_id)"></span>
-                                </span>
-                                <span class="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/30 text-[10px] font-mono font-bold text-blue-300" x-text="slot.cs_id + ' / ' + slot.cp_id"></span>
+                <!-- Right Controls: Fullscreen Toggle & Exit -->
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button @click="toggleTvFullscreen()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer">
+                        <i class="fa-solid" :class="isTvFullscreen ? 'fa-compress' : 'fa-expand'"></i>
+                        <span class="hidden sm:inline" x-text="t('btn_fullscreen')"></span>
+                    </button>
+                    <button @click="closeTvWall()" class="px-3.5 py-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold flex items-center space-x-1.5 transition shadow-sm cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span x-text="t('btn_exit_tv')"></span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- TV Wall Dynamic CCTV Grid Area (100% Screen Height & Width Responsive) -->
+            <main class="flex-1 p-2 sm:p-3.5 bg-black overflow-hidden flex flex-col justify-center items-center">
+                <!-- No Cameras Connected State -->
+                <template x-if="!slots || slots.length === 0">
+                    <div class="flex flex-col items-center justify-center text-slate-500 space-y-3">
+                        <i class="fa-solid fa-video-slash text-5xl text-slate-700 animate-pulse"></i>
+                        <p class="text-sm font-semibold" x-text="t('no_cameras_msg')"></p>
+                    </div>
+                </template>
+
+                <!-- Dynamic Camera Grid -->
+                <div x-show="slots && slots.length > 0" class="w-full h-full" :class="getTvGridClass()">
+                    <template x-for="slot in slots" :key="slot.camera_id">
+                        <div class="relative w-full h-full rounded-2xl overflow-hidden bg-slate-950 border flex flex-col justify-between transition-all duration-300 shadow-2xl group"
+                             :class="slot.violation_level === 'danger' ? 'border-rose-500 shadow-rose-900/30' : (slot.violation_level === 'warning' ? 'border-amber-500 shadow-amber-900/30' : 'border-slate-800 hover:border-blue-500/60')">
+                            
+                            <!-- Top HUD Bar inside Tile -->
+                            <div class="absolute top-0 left-0 right-0 z-20 px-3 py-2 bg-gradient-to-b from-black/90 via-black/50 to-transparent flex items-center justify-between pointer-events-none">
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-black text-white flex items-center space-x-1.5">
+                                        <span class="w-2 h-2 rounded-full" :class="slot.is_online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'"></span>
+                                        <span x-text="slot.camera_name || ('CCTV ' + slot.camera_id)"></span>
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/30 text-[10px] font-mono font-bold text-blue-300" x-text="slot.cs_id + ' / ' + slot.cp_id"></span>
+                                </div>
+
+                                <!-- Violation or Status Badge -->
+                                <div class="flex items-center space-x-1.5">
+                                    <template x-if="slot.violation_type === 'NON_EV_PARKED'">
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white shadow-lg animate-bounce flex items-center space-x-1">
+                                            <span>🚨</span>
+                                            <span x-text="getViolationLabel(slot)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="slot.violation_type === 'NOT_CHARGING'">
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white shadow-lg flex items-center space-x-1">
+                                            <span>⚠️</span>
+                                            <span x-text="getViolationLabel(slot)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="slot.violation_type === 'OVERSTAY'">
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white shadow-lg flex items-center space-x-1">
+                                            <span>🛑</span>
+                                            <span x-text="getViolationLabel(slot)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="slot.is_occupied && slot.is_ev && (slot.violation_type === 'NONE' || slot.violation_type === 'NORMAL_CHARGING')">
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-white shadow-md flex items-center space-x-1">
+                                            <span>🟢</span>
+                                            <span x-text="getViolationLabel(slot)"></span>
+                                        </span>
+                                    </template>
+                                </div>
                             </div>
 
-                            <!-- Violation or Status Badge -->
-                            <div class="flex items-center space-x-1.5">
-                                <template x-if="slot.violation_type === 'NON_EV_PARKED'">
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white shadow-lg animate-bounce flex items-center space-x-1">
-                                        <span>🚨</span>
-                                        <span x-text="getViolationLabel(slot)"></span>
-                                    </span>
+                            <!-- Video Stream Canvas / Frame -->
+                            <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+                                <template x-if="slot.is_online">
+                                    <img :src="'/api/v1/cameras/' + slot.camera_id + '/frame?t=' + lastFrameTimestamp" 
+                                         class="w-full h-full object-contain pointer-events-none"
+                                         alt="Live CCTV Stream" />
                                 </template>
-                                <template x-if="slot.violation_type === 'NOT_CHARGING'">
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white shadow-lg flex items-center space-x-1">
-                                        <span>⚠️</span>
-                                        <span x-text="getViolationLabel(slot)"></span>
-                                    </span>
-                                </template>
-                                <template x-if="slot.violation_type === 'OVERSTAY'">
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white shadow-lg flex items-center space-x-1">
-                                        <span>🛑</span>
-                                        <span x-text="getViolationLabel(slot)"></span>
-                                    </span>
-                                </template>
-                                <template x-if="slot.is_occupied && slot.is_ev && (slot.violation_type === 'NONE' || slot.violation_type === 'NORMAL_CHARGING')">
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-white shadow-md flex items-center space-x-1">
-                                        <span>🟢</span>
-                                        <span x-text="getViolationLabel(slot)"></span>
-                                    </span>
+                                <template x-if="!slot.is_online">
+                                    <div class="flex flex-col items-center justify-center text-slate-500 space-y-2">
+                                        <i class="fa-solid fa-video-slash text-4xl text-slate-700"></i>
+                                        <span class="text-xs font-mono font-bold uppercase tracking-wider" x-text="t('lbl_signal_lost')"></span>
+                                    </div>
                                 </template>
                             </div>
-                        </div>
 
-                        <!-- Video Stream Canvas / Frame -->
-                        <div class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
-                            <template x-if="slot.is_online">
-                                <img :src="'/api/v1/cameras/' + slot.camera_id + '/frame?t=' + lastFrameTimestamp" 
-                                     class="w-full h-full object-contain pointer-events-none"
-                                     alt="Live CCTV Stream" />
-                            </template>
-                            <template x-if="!slot.is_online">
-                                <div class="flex flex-col items-center justify-center text-slate-500 space-y-2">
-                                    <i class="fa-solid fa-video-slash text-4xl text-slate-700"></i>
-                                    <span class="text-xs font-mono font-bold uppercase tracking-wider" x-text="t('lbl_signal_lost')"></span>
+                            <!-- Bottom Translucent Glassmorphic HUD with Live Plate, Battery & Action -->
+                            <template x-if="slot.is_occupied || slot.is_charging || (slot.battery_soc && slot.battery_soc > 0) || (slot.charge_power_kw && slot.charge_power_kw > 0) || (slot.violation_type && slot.violation_type !== 'NONE' && slot.violation_type !== 'NORMAL_CHARGING')">
+                                <div class="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-gradient-to-t from-black/95 via-black/75 to-transparent backdrop-blur-[3px] text-white space-y-1.5 pointer-events-none">
+                                    <!-- Vehicle & Plate Info -->
+                                    <template x-if="slot.is_occupied">
+                                        <div class="flex items-center justify-between flex-wrap gap-2">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="px-2 py-0.5 rounded-lg bg-white text-slate-950 font-black font-mono text-xs sm:text-sm tracking-wider shadow-md" x-text="slot.current_plate || 'RAQAMSIZ'"></span>
+                                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold"
+                                                      :class="slot.is_ev ? 'bg-sky-500/80 text-white' : 'bg-slate-700 text-slate-200'"
+                                                      x-text="slot.is_ev ? t('vehicle_ev') : t('vehicle_regular')">
+                                                </span>
+                                            </div>
+                                            <div class="text-right text-[11px] font-mono text-slate-300">
+                                                <span x-text="t('lbl_parking_time') + ': ' + formatDurationDisplay(slot.occupied_duration)"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Battery & Charging Telemetry (Strict CSMS DB) -->
+                                    <template x-if="slot.is_occupied || slot.is_charging || (slot.battery_soc && slot.battery_soc > 0) || (slot.charge_power_kw && slot.charge_power_kw > 0)">
+                                        <div class="flex items-center justify-between text-xs pt-0.5 border-t border-white/10">
+                                            <div class="flex items-center space-x-2">
+                                                <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
+                                                    <div class="flex items-center space-x-1 font-mono font-bold text-sky-400">
+                                                        <i class="fa-solid fa-bolt text-[10px] animate-pulse"></i>
+                                                        <span x-text="slot.battery_soc + '%'"></span>
+                                                        <span class="text-[10px] text-slate-300" x-show="slot.charge_power_kw && slot.charge_power_kw > 0" x-text="'(' + slot.charge_power_kw + ' kW)'"></span>
+                                                    </div>
+                                                </template>
+                                                <template x-if="(!slot.battery_soc || slot.battery_soc <= 0) && slot.charge_power_kw && slot.charge_power_kw > 0">
+                                                    <div class="flex items-center space-x-1 font-mono font-bold text-sky-400">
+                                                        <i class="fa-solid fa-bolt text-[10px] animate-pulse"></i>
+                                                        <span x-text="slot.charge_power_kw + ' kW'"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-[11px] font-bold"
+                                                      :class="slot.violation_type === 'NON_EV_PARKED' || slot.violation_type === 'OVERSTAY' ? 'text-rose-400 font-extrabold' : (slot.violation_type === 'NOT_CHARGING' ? 'text-amber-400 font-bold' : 'text-slate-300')"
+                                                      x-text="getActionLabel(slot)">
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
-
-                        <!-- Bottom Translucent Glassmorphic HUD with Live Plate, Battery & Action -->
-                        <template x-if="slot.is_occupied || slot.is_charging || (slot.battery_soc && slot.battery_soc > 0) || (slot.charge_power_kw && slot.charge_power_kw > 0) || (slot.violation_type && slot.violation_type !== 'NONE' && slot.violation_type !== 'NORMAL_CHARGING')">
-                            <div class="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-gradient-to-t from-black/95 via-black/75 to-transparent backdrop-blur-[3px] text-white space-y-1.5 pointer-events-none">
-                                <!-- Vehicle & Plate Info -->
-                                <template x-if="slot.is_occupied">
-                                    <div class="flex items-center justify-between flex-wrap gap-2">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="px-2 py-0.5 rounded-lg bg-white text-slate-950 font-black font-mono text-xs sm:text-sm tracking-wider shadow-md" x-text="slot.current_plate || 'RAQAMSIZ'"></span>
-                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold"
-                                                  :class="slot.is_ev ? 'bg-sky-500/80 text-white' : 'bg-slate-700 text-slate-200'"
-                                                  x-text="slot.is_ev ? t('vehicle_ev') : t('vehicle_regular')">
-                                            </span>
-                                        </div>
-                                        <div class="text-right text-[11px] font-mono text-slate-300">
-                                            <span x-text="t('lbl_parking_time') + ': ' + formatDurationDisplay(slot.occupied_duration)"></span>
-                                        </div>
-                                    </div>
-                                </template>
-
-                                <!-- Battery & Charging Telemetry (Strict CSMS DB) -->
-                                <template x-if="slot.is_occupied || slot.is_charging || (slot.battery_soc && slot.battery_soc > 0) || (slot.charge_power_kw && slot.charge_power_kw > 0)">
-                                    <div class="flex items-center justify-between text-xs pt-0.5 border-t border-white/10">
-                                        <div class="flex items-center space-x-2">
-                                            <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">
-                                                <div class="flex items-center space-x-1 font-mono font-bold text-sky-400">
-                                                    <i class="fa-solid fa-bolt text-[10px] animate-pulse"></i>
-                                                    <span x-text="slot.battery_soc + '%'"></span>
-                                                    <span class="text-[10px] text-slate-300" x-show="slot.charge_power_kw && slot.charge_power_kw > 0" x-text="'(' + slot.charge_power_kw + ' kW)'"></span>
-                                                </div>
-                                            </template>
-                                            <template x-if="(!slot.battery_soc || slot.battery_soc <= 0) && slot.charge_power_kw && slot.charge_power_kw > 0">
-                                                <div class="flex items-center space-x-1 font-mono font-bold text-sky-400">
-                                                    <i class="fa-solid fa-bolt text-[10px] animate-pulse"></i>
-                                                    <span x-text="slot.charge_power_kw + ' kW'"></span>
-                                                </div>
-                                            </template>
-                                        </div>
-                                        <div class="text-right">
-                                            <span class="text-[11px] font-bold"
-                                                  :class="slot.violation_type === 'NON_EV_PARKED' || slot.violation_type === 'OVERSTAY' ? 'text-rose-400 font-extrabold' : (slot.violation_type === 'NOT_CHARGING' ? 'text-amber-400 font-bold' : 'text-slate-300')"
-                                                  x-text="getActionLabel(slot)">
-                                            </span>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                    </div>
-                </template>
-            </div>
-        </main>
-    </div>
+                    </template>
+                </div>
+            </main>
+        </div>
+    </template>
 
     <!-- Alpine App Logic & Localization -->
     <script>

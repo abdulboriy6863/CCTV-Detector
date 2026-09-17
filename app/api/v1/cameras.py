@@ -17,6 +17,42 @@ import base64
 logger = logging.getLogger("cctv_cameras")
 router = APIRouter()
 
+# In-memory metadata cache for high-frequency frame and snapshot endpoints
+_camera_meta_cache = {}
+_camera_meta_cache_time = {}
+_META_CACHE_TTL = 60.0
+
+def get_cached_camera_meta(camera_id: int, db: Session):
+    now = time.time()
+    if camera_id in _camera_meta_cache and (now - _camera_meta_cache_time.get(camera_id, 0)) < _META_CACHE_TTL:
+        return _camera_meta_cache[camera_id]
+    cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
+    if not cam:
+        return None
+    meta = {
+        "id": cam.id,
+        "camera_type": cam.camera_type,
+        "stream_url": cam.stream_url,
+        "cs_id": cam.cs_id,
+        "cp_id": cam.cp_id or "BNS00000",
+        "username": cam.username,
+        "password": cam.password,
+        "ip_address": cam.ip_address,
+        "port": cam.port,
+        "is_active": cam.is_active
+    }
+    _camera_meta_cache[camera_id] = meta
+    _camera_meta_cache_time[camera_id] = now
+    return meta
+
+def invalidate_camera_meta_cache(camera_id: Optional[int] = None):
+    if camera_id is not None:
+        _camera_meta_cache.pop(camera_id, None)
+        _camera_meta_cache_time.pop(camera_id, None)
+    else:
+        _camera_meta_cache.clear()
+        _camera_meta_cache_time.clear()
+
 
 @router.post("/probe", response_model=CameraProbeResponse, summary="Probe and test camera connection")
 async def probe_camera_endpoint(probe_in: CameraProbeRequest):
@@ -145,6 +181,7 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
     db.add(cam)
     db.commit()
     db.refresh(cam)
+    invalidate_camera_meta_cache()
     return cam
 
 
@@ -206,6 +243,7 @@ async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = D
     cam.updated_at = get_kst_now()
     db.commit()
     db.refresh(cam)
+    invalidate_camera_meta_cache(camera_id)
     return cam
 
 
@@ -216,6 +254,7 @@ def delete_camera(camera_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Camera not found")
     db.delete(cam)
     db.commit()
+    invalidate_camera_meta_cache(camera_id)
     return {"status": "success", "message": f"Camera {camera_id} deleted"}
 
 
@@ -232,19 +271,19 @@ async def test_camera(camera_id: int, db: Session = Depends(get_db)):
     import base64
     from app.services.camera_service import camera_service
     from app.schemas.snapshot import CameraTypeEnum
-    cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
-    if not cam:
+    meta = get_cached_camera_meta(camera_id, db)
+    if not meta:
         raise HTTPException(status_code=404, detail="Camera not found")
     
     result = await camera_service.capture_snapshot(
-        camera_type=CameraTypeEnum(cam.camera_type),
-        stream_url=cam.stream_url,
-        cs_id=cam.cs_id,
-        cp_id=cam.cp_id or "BNS00000",
-        username=cam.username,
-        password=cam.password,
-        ip_address=cam.ip_address,
-        port=cam.port
+        camera_type=CameraTypeEnum(meta["camera_type"]),
+        stream_url=meta["stream_url"],
+        cs_id=meta["cs_id"],
+        cp_id=meta["cp_id"] or "BNS00000",
+        username=meta["username"],
+        password=meta["password"],
+        ip_address=meta["ip_address"],
+        port=meta["port"]
     )
     if not result.success or not result.image_bytes:
         return {
@@ -267,26 +306,26 @@ async def test_camera(camera_id: int, db: Session = Depends(get_db)):
 async def get_camera_frame(camera_id: int, db: Session = Depends(get_db)):
     """
     Returns a single JPEG frame for ultra-fast, socket-friendly UI display.
-    Caches frame for 1.5 seconds to protect camera CPU/bandwidth.
+    Caches frame for 2.5 seconds to protect camera CPU/bandwidth.
     """
     import time
     from fastapi import Response
     from app.services.camera_service import camera_service, RTSPStreamHub
     from app.schemas.snapshot import CameraTypeEnum
 
-    cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
-    if not cam:
+    meta = get_cached_camera_meta(camera_id, db)
+    if not meta:
         raise HTTPException(status_code=404, detail="Camera not found")
 
     result = await camera_service.capture_snapshot(
-        camera_type=CameraTypeEnum(cam.camera_type),
-        stream_url=cam.stream_url,
-        cs_id=cam.cs_id,
-        cp_id=cam.cp_id or "BNS00000",
-        username=cam.username,
-        password=cam.password,
-        ip_address=cam.ip_address,
-        port=cam.port
+        camera_type=CameraTypeEnum(meta["camera_type"]),
+        stream_url=meta["stream_url"],
+        cs_id=meta["cs_id"],
+        cp_id=meta["cp_id"] or "BNS00000",
+        username=meta["username"],
+        password=meta["password"],
+        ip_address=meta["ip_address"],
+        port=meta["port"]
     )
 
     if result.success and result.image_bytes:

@@ -1470,14 +1470,14 @@
                         this.nowTimestamp = new Date();
                     }, 1000);
                     
-                    // Live polling every 4s for real-time slot and detection updates
+                    // Live polling every 3s for real-time slot, telemetry, and vehicle history updates
                     setInterval(() => {
                         if (document.hidden) return;
                         this.lastFrameTimestamp = Date.now();
                         this.fetchSlots();
                         this.fetchStats();
-                        if (this.page === 1) this.fetchVehicles();
-                    }, 4000);
+                        this.fetchVehicles(false);
+                    }, 3000);
                 },
 
                 t(key) {

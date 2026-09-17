@@ -119,7 +119,27 @@ Open your browser at `http://localhost:8000` to access the Dashboard.
 | `GET` | `/api/v1/cameras/slots-status` | Real-time charger slot status, telemetry & violation HUD |
 | `POST` | `/api/v1/cameras/{id}/snapshot` | Capture live test frame from camera |
 | `GET` | `/api/v1/stats/summary` | Retrieve summary analytics for today and total stats |
+| `POST` | `/api/v1/admin/purge-data` | Purge historical snapshot records, alerts, and reset system |
+| `POST` | `/api/v1/admin/reset-sessions` | Reset in-memory active parking sessions cleanly |
 | `GET` | `/health` | System health check endpoint |
+
+---
+
+## 🧹 Database Maintenance & Production Initialization
+
+To reset test records, historical logs, and prepare a clean environment for production deployment:
+
+### Method 1: Web Dashboard Modal
+Click the **"시스템 초기화" (System Reset)** button in the top navigation bar to selectively purge records directly from the UI.
+
+### Method 2: Command-Line Utility
+```bash
+# Purge all snapshots and alerts
+python scripts/purge_data.py --snapshots -y
+
+# Complete production reset (snapshots, alerts, cameras, disk images)
+python scripts/purge_data.py --all -y
+```
 
 ---
 

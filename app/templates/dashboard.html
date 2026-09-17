@@ -543,13 +543,15 @@
                                 <!-- 4. License Plate & Event Tag -->
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="inline-flex items-center space-x-2">
-                                        <div class="group px-2.5 py-1 rounded-xl border font-mono font-extrabold tracking-wider text-xs shadow-sm inline-flex items-center space-x-1.5 cursor-pointer hover:ring-2 hover:ring-blue-400/50 transition"
+                                        <div class="group px-2.5 py-1 rounded-xl border font-mono font-extrabold tracking-wider text-xs shadow-sm inline-flex items-center space-x-1.5 cursor-pointer hover:ring-2 hover:ring-blue-400/50 transition active:scale-95"
                                              @click="openImageModal(item)"
                                              :title="t('view_image')"
                                              :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
                                             <span x-show="item.is_ev" class="text-sky-500 text-xs">⚡</span>
                                             <span x-text="item.plate_number || t('unrecognized')"></span>
-                                            <i class="fa-solid fa-camera text-[9px] text-slate-400 group-hover:text-blue-500 transition ml-0.5"></i>
+                                            <span class="w-4 h-4 rounded-md bg-slate-200/80 dark:bg-slate-700/80 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition text-slate-500 dark:text-slate-400">
+                                                <i class="fa-solid fa-camera text-[9px]"></i>
+                                            </span>
                                         </div>
                                         <template x-if="item.event_type === 'START'">
                                             <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" x-text="t('event_start')"></span>

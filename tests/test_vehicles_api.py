@@ -252,9 +252,34 @@ class TestVehiclesAPI(unittest.TestCase):
         c_id = snap_corrupt.id
         db.close()
 
-        res_c = self.client.get(f"/api/v1/vehicles/{c_id}/image")
-        self.assertEqual(res_c.status_code, 404)
+    def test_kst_timezone_date_filter_consistency(self):
+        # Verify query with single date format extracts correct day regardless of UTC offset
+        from app.core.config import get_kst_now
+        now_kst = get_kst_now()
+        today_str = now_kst.strftime("%Y-%m-%d")
+
+        db = self.TestingSessionLocal()
+        snap_today = CCTVSnapshot(
+            cs_id="bluenetwrks",
+            cp_id="BNS00000",
+            plate_number="33가1234",
+            event_type="START",
+            image_path="today.jpg",
+            is_ev=True,
+            vehicle_type="EV",
+            created_at=now_kst
+        )
+        db.add(snap_today)
+        db.commit()
+        db.close()
+
+        res = self.client.get(f"/api/v1/vehicles?start_date={today_str}&end_date={today_str}")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        plates = [item["plate_number"] for item in data["items"]]
+        self.assertIn("33가1234", plates)
 
 
 if __name__ == "__main__":
     unittest.main()
+

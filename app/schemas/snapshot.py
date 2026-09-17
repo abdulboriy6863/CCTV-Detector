@@ -80,6 +80,9 @@ class SnapshotResponse(BaseModel):
     action_required_kr: Optional[str] = None
     action_required_uz: Optional[str] = None
     action_required: Optional[str] = None
+    stay_duration_seconds: Optional[int] = None
+    stay_duration_formatted: Optional[str] = None
+    is_ongoing: bool = False
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

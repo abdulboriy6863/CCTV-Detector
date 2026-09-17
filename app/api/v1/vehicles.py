@@ -380,12 +380,13 @@ def _resolve_snapshot_image_bytes(snap: CCTVSnapshot, db: Session) -> Optional[b
     if snap.plate_region_image:
         pri = snap.plate_region_image.strip()
         if pri.startswith("data:image"):
-            try:
-                b64_part = pri.split(",", 1)[1]
-                return base64.b64decode(b64_part)
-            except Exception:
-                pass
-        elif len(pri) > 100 and not pri.endswith(".jpg") and not pri.endswith(".png"):
+            comma_idx = pri.find(",")
+            if comma_idx != -1:
+                try:
+                    return base64.b64decode(pri[comma_idx + 1:])
+                except Exception:
+                    pass
+        elif len(pri) > 60 and not (pri.endswith(".jpg") or pri.endswith(".png") or "/" in pri or "\\" in pri):
             # Raw base64 string
             try:
                 return base64.b64decode(pri)

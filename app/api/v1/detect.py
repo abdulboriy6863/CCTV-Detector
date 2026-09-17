@@ -114,8 +114,8 @@ async def detect_upload(
     }
 
     # Include plate region base64 for immediate UI display
-    if result.plate_crop_bytes:
-        response_data["plate_region_base64"] = base64.b64encode(result.plate_crop_bytes).decode("utf-8")
+    if result.plate_crop_bytes or result.plate_region_base64 or getattr(result, 'plate_crop_base64', None):
+        response_data["plate_region_base64"] = result.get_data_url()
 
     return {
         "success": True,

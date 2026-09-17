@@ -897,14 +897,35 @@
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              class="relative max-w-4xl w-full bg-slate-900/95 rounded-2xl border border-slate-700/80 p-3.5 shadow-2xl overflow-hidden flex flex-col">
-            <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs text-slate-300 font-bold px-1">
-                <span class="flex items-center space-x-2">
-                    <i class="fa-solid fa-camera text-blue-400"></i>
-                    <span x-text="t('view_image')"></span>
-                </span>
-                <button @click="previewImage.open = false" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
-                    <i class="fa-solid fa-xmark text-sm"></i>
-                </button>
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800 text-xs text-slate-300 font-bold px-1">
+                <div class="flex items-center space-x-2.5 flex-wrap gap-y-1">
+                    <span class="flex items-center space-x-1.5 text-blue-400">
+                        <i class="fa-solid fa-camera"></i>
+                        <span x-text="t('view_image')"></span>
+                    </span>
+                    <template x-if="previewImage.metadata?.plate_number">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 rounded-lg bg-sky-950/80 border border-sky-700/60 font-mono font-extrabold text-sky-300 text-xs flex items-center space-x-1">
+                                <span x-show="previewImage.metadata?.is_ev">⚡</span>
+                                <span x-text="previewImage.metadata?.plate_number"></span>
+                            </span>
+                            <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[11px] font-mono" x-show="previewImage.metadata?.camera_name" x-text="previewImage.metadata?.camera_name"></span>
+                            <span class="text-[11px] text-slate-500 font-mono" x-text="formatDate(previewImage.metadata?.created_at)"></span>
+                        </div>
+                    </template>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <button x-show="previewImage.metadata?.plate_number" 
+                            @click="navigator.clipboard.writeText(previewImage.metadata?.plate_number)" 
+                            class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center space-x-1 transition"
+                            title="Copy Plate Number">
+                        <i class="fa-regular fa-copy text-[10px]"></i>
+                        <span x-text="currentLang === 'ko' ? '복사' : 'Nusxa'"></span>
+                    </button>
+                    <button @click="previewImage.open = false" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
             </div>
             
             <div class="relative min-h-[260px] max-h-[75vh] flex items-center justify-center bg-black/50 rounded-xl overflow-hidden">

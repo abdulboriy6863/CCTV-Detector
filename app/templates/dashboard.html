@@ -1392,6 +1392,14 @@
             }
         };
 
+        function getTodayDateString() {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
         function appData() {
             return {
                 isDark: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
@@ -1413,8 +1421,8 @@
                 pageSize: 6,
                 filters: {
                     type: '',
-                    startDate: new Date().toISOString().slice(0, 10),
-                    endDate: new Date().toISOString().slice(0, 10)
+                    startDate: getTodayDateString(),
+                    endDate: getTodayDateString()
                 },
                 
                 addCamModal: false,

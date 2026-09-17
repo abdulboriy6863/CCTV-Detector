@@ -16,12 +16,17 @@ An intelligent, on-premise CCTV surveillance system designed for EV charging sta
 - **⚡ 100% Local / On-Premise AI Execution:**
   - Zero external API dependency (No OpenAI / Google Cloud API keys or recurring costs required).
   - High privacy and security compliant with Korean data privacy regulations.
+- **🔌 Multi-Layer Parking Session & Cable Occlusion Engine:**
+  - **Hardware Ground-Truth:** CSMS charger integration (`TINF_CP_CONNECTOR_STATUS` & `TINF_CURRENT_TX`) locks parking sessions while vehicle is physically plugged in.
+  - **Anchor Plate Lock-in:** Preserves pristine initial license plate recognition against vertical charging cable shadows (`47호6633` vs `47오3633`).
+  - **Visual Vehicle Presence:** Dual verification with YOLO vehicle bounding box ensures zero premature exit events.
+  - **24h+ Accurate Duration:** Calculates continuous multi-day parking time accurately (`1일 3시간`) without duplicate log spam.
 - **🔍 Angle-Tolerant & Distant LPR Pipeline:**
   - Automated **minAreaRect deskewing** for diagonal/angled vehicle positions (up to 45° tilt).
   - Multi-scale **Lanczos super-resolution zoom** for distant or small CCTV plates.
   - Collinear pairwise text box merging for fragmented OCR outputs.
 - **🎨 Multi-Spectral EV Plate Classifier:**
-  - Dual HSV + RGB differential analysis targeting Korean sky-blue (`하늘색`) EV plates.
+  - Dual HSV + RGB + CIE-LAB differential analysis targeting Korean sky-blue (`하늘색`) EV plates.
   - Inner core region inspection avoiding vehicle bumper and asphalt color dilution.
 - **🛡️ Strict Korean Legal Plate Validator:**
   - Whitelisted against official 40 Korean Hangul license plate characters (`가~하`).
@@ -30,7 +35,8 @@ An intelligent, on-premise CCTV surveillance system designed for EV charging sta
   - Bilingual interface: **🇺🇿 Uzbek** & **🇰🇷 Korean** with instant language switching.
   - Dark / Light Mode with seamless theme toggling.
   - Real-time drag-and-drop image detection and live CCTV camera stream snapshot testing.
-  - Snapshot history viewer, filter by EV status, and direct database search.
+  - Snapshot history viewer, filter by EV status, live charging badge, and graceful image fallback.
+
 
 ---
 

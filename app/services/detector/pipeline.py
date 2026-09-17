@@ -29,11 +29,22 @@ class DetectionResult:
         self.raw_ocr_text: Optional[str] = None
         self.plate_crop: Optional[np.ndarray] = None
         self.plate_crop_bytes: Optional[bytes] = None
+        self.plate_crop_base64: Optional[str] = None
         self.processing_time_ms: float = 0.0
         self.error_message: Optional[str] = None
         self.vehicle_present: bool = False
         self.vehicle_box: Optional[List[int]] = None
         self.detected_vehicle_type: Optional[str] = None
+
+    def get_data_url(self) -> Optional[str]:
+        """Returns standard data URL scheme for direct HTML/API rendering."""
+        if self.plate_crop_base64:
+            return f"data:image/jpeg;base64,{self.plate_crop_base64}"
+        if self.plate_crop_bytes:
+            b64 = base64.b64encode(self.plate_crop_bytes).decode("utf-8")
+            self.plate_crop_base64 = b64
+            return f"data:image/jpeg;base64,{b64}"
+        return None
 
     def to_dict(self) -> dict:
         result = {
@@ -49,10 +60,8 @@ class DetectionResult:
             "vehicle_present": self.vehicle_present,
             "vehicle_box": self.vehicle_box,
             "detected_vehicle_type": self.detected_vehicle_type,
+            "plate_region_base64": self.get_data_url(),
         }
-
-        if self.plate_crop_bytes:
-            result["plate_region_base64"] = base64.b64encode(self.plate_crop_bytes).decode("utf-8")
         return result
 
 

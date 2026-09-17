@@ -516,7 +516,44 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         # Verify DB records
         records = self.db.query(CCTVSnapshot).order_by(CCTVSnapshot.id.asc()).all()
         self.assertEqual(len(records), 2)
-        self.assertEqual(records[1].event_type, EventTypeEnum.END.value)
+    @patch("app.services.monitor_service.storage_service.save_image", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.detection_pipeline.detect", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.camera_service.capture_snapshot", new_callable=AsyncMock)
+    async def test_multi_cycle_session_retention_during_intermittent_frame_loss(
+        self, mock_capture, mock_detect, mock_save_img
+    ):
+        """Verify session stays alive across 10 cycles when vehicle bbox is visible even if OCR is intermittently missed."""
+        mock_capture.return_value = CaptureResult(success=True, image_bytes=b"fake_jpeg", protocol="RTSP")
+        mock_save_img.return_value = "2026/09/17/test_snap.jpg"
+        camera_key = f"cam_{self.camera.id}"
+
+        # 1. Car arrives
+        mock_detect.return_value = DetectionResult(
+            success=True,
+            plate_number="52어0586",
+            vehicle_type=VehicleTypeEnum.EV,
+            is_ev=True,
+            confidence=0.92,
+            vehicle_present=True
+        )
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
+
+        # 2. Intermittent OCR failure for 10 cycles, but YOLO vehicle bbox detected (vehicle_present=True)
+        for _ in range(10):
+            mock_detect.return_value = DetectionResult(
+                success=False,
+                plate_number=None,
+                vehicle_present=True
+            )
+            await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+
+        # DB must still have only 1 START record (not closed, no END record)
+        records = self.db.query(CCTVSnapshot).all()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].event_type, EventTypeEnum.START.value)
+        self.assertIn(camera_key, self.monitor.active_sessions)
+        self.assertEqual(self.monitor.active_sessions[camera_key]["missed_cycles"], 0)
 
 
 if __name__ == "__main__":

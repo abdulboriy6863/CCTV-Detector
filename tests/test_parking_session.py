@@ -458,6 +458,32 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(records[0].session_id, records[1].session_id)
         self.assertTrue("1일" in records[1].notes or "24시간" in records[1].notes)
 
+    @patch("app.services.monitor_service.storage_service.save_image", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.detection_pipeline.detect", new_callable=AsyncMock)
+    @patch("app.services.monitor_service.camera_service.capture_snapshot", new_callable=AsyncMock)
+    async def test_start_event_persists_base64_plate_crop(self, mock_capture, mock_detect, mock_save_img):
+        """Verify that START event saves the lightweight base64 plate crop to plate_region_image."""
+        mock_capture.return_value = CaptureResult(success=True, image_bytes=b"fake_jpeg", protocol="RTSP")
+        mock_save_img.return_value = "2026/09/17/test_snap.jpg"
+        camera_key = "CS_TEST_01_CP01"
+
+        b64_crop = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ_SAMPLE_PLATE_CROP"
+        mock_detect.return_value = DetectionResult(
+            success=True,
+            plate_number="81머2072",
+            vehicle_type=VehicleTypeEnum.EV,
+            is_ev=True,
+            confidence=0.96,
+            plate_crop_base64=b64_crop
+        )
+
+        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+
+        records = self.db.query(CCTVSnapshot).all()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].event_type, EventTypeEnum.START.value)
+        self.assertEqual(records[0].plate_region_image, b64_crop)
+        self.assertEqual(records[0].plate_number, "81머2072")
 
 
 if __name__ == "__main__":

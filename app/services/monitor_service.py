@@ -344,9 +344,15 @@ class AutoMonitorService:
 
         # Generate base64 data URL for instant database persistence
         plate_base64 = None
-        if hasattr(det_result, 'get_data_url'):
+        if hasattr(det_result, 'get_data_url') and callable(getattr(det_result, 'get_data_url')):
             plate_base64 = det_result.get_data_url()
-        elif plate_crop_bytes:
+        if not plate_base64 and getattr(det_result, 'plate_region_base64', None):
+            b64_val = str(det_result.plate_region_base64).strip()
+            plate_base64 = b64_val if b64_val.startswith("data:image") else f"data:image/jpeg;base64,{b64_val}"
+        if not plate_base64 and getattr(det_result, 'plate_crop_base64', None):
+            b64_val = str(det_result.plate_crop_base64).strip()
+            plate_base64 = b64_val if b64_val.startswith("data:image") else f"data:image/jpeg;base64,{b64_val}"
+        if not plate_base64 and plate_crop_bytes:
             b64_str = base64.b64encode(plate_crop_bytes).decode("utf-8")
             plate_base64 = f"data:image/jpeg;base64,{b64_str}"
 

@@ -44,13 +44,15 @@ class DetectionResult(BaseModel):
     processing_time_ms: float = 0.0
     error_message: Optional[str] = None
     plate_region_base64: Optional[str] = None  # For API response
+    plate_crop_base64: Optional[str] = None
     plate_crop_bytes: Optional[bytes] = None
 
     def get_data_url(self) -> Optional[str]:
         """Returns normalized data URL format for frontend display."""
-        if not self.plate_region_base64:
+        raw = self.plate_region_base64 or self.plate_crop_base64
+        if not raw:
             return None
-        b64 = self.plate_region_base64.strip()
+        b64 = str(raw).strip()
         return b64 if b64.startswith("data:image") else f"data:image/jpeg;base64,{b64}"
 
 

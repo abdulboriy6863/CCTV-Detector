@@ -36,15 +36,19 @@ class DetectionResult:
         self.vehicle_box: Optional[List[int]] = None
         self.detected_vehicle_type: Optional[str] = None
 
+    def get_raw_base64(self) -> Optional[str]:
+        """Returns clean base64 string without data scheme header."""
+        if self.plate_crop_base64:
+            return self.plate_crop_base64
+        if self.plate_crop_bytes:
+            self.plate_crop_base64 = base64.b64encode(self.plate_crop_bytes).decode("utf-8")
+            return self.plate_crop_base64
+        return None
+
     def get_data_url(self) -> Optional[str]:
         """Returns standard data URL scheme for direct HTML/API rendering."""
-        if self.plate_crop_base64:
-            return f"data:image/jpeg;base64,{self.plate_crop_base64}"
-        if self.plate_crop_bytes:
-            b64 = base64.b64encode(self.plate_crop_bytes).decode("utf-8")
-            self.plate_crop_base64 = b64
-            return f"data:image/jpeg;base64,{b64}"
-        return None
+        b64 = self.get_raw_base64()
+        return f"data:image/jpeg;base64,{b64}" if b64 else None
 
     def to_dict(self) -> dict:
         result = {

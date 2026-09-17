@@ -48,7 +48,7 @@ class CCTVSnapshot(Base):
         comment="How was this detected"
     )
     raw_ocr_text = Column(String(100), nullable=True, comment="Raw OCR output text")
-    plate_region_image = Column(String(255), nullable=True, comment="Path to cropped plate image")
+    plate_region_image = Column(Text, nullable=True, comment="Path or base64 to cropped plate image")
 
     __table_args__ = (
         Index("idx_cs_cp_created", "cs_id", "cp_id", "created_at"),

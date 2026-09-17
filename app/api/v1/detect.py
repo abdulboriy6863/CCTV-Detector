@@ -85,7 +85,7 @@ async def detect_upload(
             alert_type="NON_EV_WARNING" if is_non_ev else None,
             detection_source="MANUAL_UPLOAD",
             raw_ocr_text=result.raw_ocr_text,
-            plate_region_image=result.get_data_url() or plate_region_path,
+            plate_region_image=plate_region_path or result.get_data_url(),
             created_at=get_kst_now()
         )
         db.add(snapshot)

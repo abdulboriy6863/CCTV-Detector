@@ -391,7 +391,7 @@ class AutoMonitorService:
             alert_type="NON_EV_WARNING" if is_non_ev else None,
             detection_source="CCTV_AUTO",
             raw_ocr_text=det_result.raw_ocr_text,
-            plate_region_image=plate_base64 or plate_region_path,
+            plate_region_image=plate_region_path or plate_base64,
             created_at=now
         )
         db.add(entry_snapshot)
@@ -474,7 +474,7 @@ class AutoMonitorService:
             alert_type=None,
             detection_source="CCTV_AUTO",
             raw_ocr_text=state.get("raw_ocr_text"),
-            plate_region_image=state.get("plate_base64") or state.get("plate_region_path"),
+            plate_region_image=state.get("plate_region_path") or state.get("plate_base64"),
             created_at=now
         )
         db.add(exit_snapshot)

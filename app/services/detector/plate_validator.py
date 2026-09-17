@@ -209,6 +209,119 @@ class KoreanPlateValidator:
         return None
 
     @classmethod
+    def parse_plate_components(cls, plate_str: str) -> Optional[Tuple[str, str, str]]:
+        """
+        Decomposes a Korean license plate into (prefix_numbers, hangul, suffix_numbers).
+        Example: '47호6633' -> ('47', '호', '6633'), '123가4567' -> ('123', '가', '4567')
+        """
+        if not plate_str:
+            return None
+        clean = re.sub(r"[^가-힣0-9]", "", plate_str.strip())
+        m = re.match(r"^([가-힣]{0,2}\d{2,3})([가-힣])(\d{4})$", clean)
+        if m:
+            return m.group(1), m.group(2), m.group(3)
+        m2 = re.match(r"^(\d{2,3})([가-힣])(\d{3,4})$", clean)
+        if m2:
+            return m2.group(1), m2.group(2), m2.group(3)
+        return None
+
+    @classmethod
+    def is_cable_occlusion_match(cls, anchor_plate: Optional[str], candidate_plate: Optional[str]) -> bool:
+        """
+        Robustly determines whether candidate_plate is the same vehicle as anchor_plate
+        under charging cable occlusion, shadow jitter, or character distortion.
+        Handles variations like:
+          '47호6633' <-> '47오3633', '47오8633', '47오9633', '47호3633'
+          '312버6132' <-> '312버1321', '312버8132'
+          '52어0586' <-> '52머0586', '52어8586'
+        """
+        if not anchor_plate or not candidate_plate:
+            return False
+
+        clean_a = re.sub(r"[^가-힣0-9]", "", anchor_plate.strip().upper())
+        clean_c = re.sub(r"[^가-힣0-9]", "", candidate_plate.strip().upper())
+
+        # 1. Exact match
+        if clean_a == clean_c:
+            return True
+
+        # 2. General Levenshtein distance <= 1
+        def _lev(s1: str, s2: str) -> int:
+            if len(s1) < len(s2):
+                return _lev(s2, s1)
+            if len(s2) == 0:
+                return len(s1)
+            prev = range(len(s2) + 1)
+            for i, c1 in enumerate(s1):
+                cur = [i + 1]
+                for j, c2 in enumerate(s2):
+                    cur.append(min(prev[j + 1] + 1, cur[j] + 1, prev[j] + (c1 != c2)))
+                prev = cur
+            return prev[-1]
+
+        if len(clean_a) >= 6 and len(clean_c) >= 6:
+            if abs(len(clean_a) - len(clean_c)) <= 1 and _lev(clean_a, clean_c) <= 1:
+                return True
+
+        # 3. Component decomposition (Prefix digits + Hangul + Suffix digits)
+        comp_a = cls.parse_plate_components(clean_a)
+        comp_c = cls.parse_plate_components(clean_c)
+
+        if comp_a and comp_c:
+            pfx_a, hangul_a, sfx_a = comp_a
+            pfx_c, hangul_c, sfx_c = comp_c
+
+            # Prefix must match (e.g. '47' == '47' or '312' == '312')
+            if pfx_a != pfx_c:
+                # Allow minor 1-char prefix difference only if suffix matches 100%
+                if sfx_a == sfx_c and _lev(pfx_a, pfx_c) <= 1:
+                    return True
+                return False
+
+            # Hangul compatibility map (letters frequently confused by vertical cable line)
+            HANGUL_CONFUSION_PAIRS = {
+                frozenset(["호", "오"]), frozenset(["호", "하"]), frozenset(["호", "후"]),
+                frozenset(["오", "어"]), frozenset(["하", "아"]), frozenset(["허", "어"]),
+                frozenset(["머", "모"]), frozenset(["버", "보"]), frozenset(["수", "주"]),
+                frozenset(["거", "고"]), frozenset(["구", "고"]), frozenset(["더", "도"]),
+                frozenset(["러", "로"]), frozenset(["라", "러"]), frozenset(["마", "모"]),
+                frozenset(["바", "보"]), frozenset(["서", "소"]), frozenset(["자", "조"]),
+            }
+            hangul_match = (
+                (hangul_a == hangul_c) or
+                (frozenset([hangul_a, hangul_c]) in HANGUL_CONFUSION_PAIRS)
+            )
+
+            if not hangul_match:
+                # If Hangul differs and isn't in confusion set, require exact suffix match
+                if sfx_a != sfx_c:
+                    return False
+
+            # Suffix digit comparison with cable vertical stroke confusion
+            # Digits easily deformed by vertical cable shadow: {3, 6, 8, 9, 0, 5}
+            CABLE_DIGIT_CONFUSION = {"3", "6", "8", "9", "0", "5"}
+
+            if sfx_a == sfx_c:
+                return True
+
+            if len(sfx_a) == 4 and len(sfx_c) == 4:
+                # Count matching digit positions
+                diff_indices = [idx for idx in range(4) if sfx_a[idx] != sfx_c[idx]]
+                if len(diff_indices) == 1:
+                    # Exactly 1 digit differs (e.g. 6633 vs 3633, 8633, 9633)
+                    idx = diff_indices[0]
+                    d1, d2 = sfx_a[idx], sfx_c[idx]
+                    if (d1 in CABLE_DIGIT_CONFUSION and d2 in CABLE_DIGIT_CONFUSION) or hangul_match:
+                        return True
+
+                if len(diff_indices) == 2:
+                    # 2 digits differ, but both belong to cable confusion and last 2 digits match (e.g. 6633 vs 3833)
+                    if sfx_a[-2:] == sfx_c[-2:] and all(sfx_a[i] in CABLE_DIGIT_CONFUSION and sfx_c[i] in CABLE_DIGIT_CONFUSION for i in diff_indices):
+                        return True
+
+        return False
+
+    @classmethod
     def format_display(cls, plate_number: str) -> str:
         """
         Raqamni chiroyli probel bilan formatlash: e.g. 81머2072 -> 81머 2072
@@ -216,3 +329,4 @@ class KoreanPlateValidator:
         if not plate_number or len(plate_number) < 7:
             return plate_number or ""
         return f"{plate_number[:-4]} {plate_number[-4:]}"
+

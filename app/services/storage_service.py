@@ -34,8 +34,16 @@ class StorageService:
         filename = f"{clean_cs}_{clean_cp}_{clean_plate}_{timestamp_str}_{short_id}.{extension}"
         return f"{date_folder}/{filename}"
 
+    def generate_thumbnail_path(
+        self, cs_id: str, cp_id: str,
+        plate_number: Optional[str] = None, extension: str = "jpg"
+    ) -> str:
+        base_rel = self.generate_relative_path(cs_id, cp_id, plate_number, extension)
+        return f"thumbs/{base_rel}"
+
     def get_absolute_path(self, relative_path: str) -> Path:
-        return (self.base_dir / relative_path).resolve()
+        clean_rel = os.path.normpath(str(relative_path).lstrip("/"))
+        return (self.base_dir / clean_rel).resolve()
 
     async def save_image(self, image_bytes: bytes, relative_path: str) -> str:
         abs_path = self.get_absolute_path(relative_path)

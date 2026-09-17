@@ -11,9 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.core.database import Base, get_db
-from app.models.snapshot import CCTVSnapshot
-from app.models.camera import CCTVCamera
-from app.models.alert import NonEVAlert
+from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.services.monitor_service import auto_monitor_service
 
 
@@ -45,7 +43,6 @@ class TestAdminAPI(unittest.TestCase):
 
     def setUp(self):
         db = self.TestingSessionLocal()
-        db.query(NonEVAlert).delete()
         db.query(CCTVSnapshot).delete()
         db.query(CCTVCamera).delete()
 
@@ -64,6 +61,7 @@ class TestAdminAPI(unittest.TestCase):
             cp_id="BNS00000",
             plate_number="81머2072",
             event_type="START",
+            image_path="test_snap.jpg",
             is_ev=True,
             vehicle_type="EV",
             created_at=datetime.utcnow()

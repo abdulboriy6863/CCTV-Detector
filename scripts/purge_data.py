@@ -19,9 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db.session import SessionLocal, engine
-from app.models.snapshot import CCTVSnapshot
-from app.models.camera import CCTVCamera
-from app.models.alert import NonEVAlert
+from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.core.config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -30,10 +28,9 @@ logger = logging.getLogger("PurgeUtility")
 
 def purge_snapshots(db):
     """Deletes all vehicle snapshot records and alerts from DB."""
-    count_alerts = db.query(NonEVAlert).delete()
     count_snaps = db.query(CCTVSnapshot).delete()
     db.commit()
-    logger.info(f"✅ O'chirildi: {count_snaps} ta CCTVSnapshot va {count_alerts} ta NonEVAlert yozuvlari.")
+    logger.info(f"✅ O'chirildi: {count_snaps} ta CCTVSnapshot yozuvlari.")
 
 
 def purge_cameras(db):

@@ -26,8 +26,13 @@ from app.services.monitor_service import (
 class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        # In-memory SQLite for testing
-        self.engine = create_engine("sqlite:///:memory:")
+        from sqlalchemy.pool import StaticPool
+        # In-memory SQLite for testing with StaticPool
+        self.engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool
+        )
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(bind=self.engine)
         self.db = self.SessionLocal()
@@ -49,6 +54,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             exit_threshold_cycles=3,
             transition_threshold_cycles=2
         )
+        self.monitor.active_sessions.clear()
 
     def tearDown(self):
         self.db.close()

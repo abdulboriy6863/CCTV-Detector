@@ -43,6 +43,7 @@ class DetectionResult(BaseModel):
     raw_ocr_text: Optional[str] = None
     processing_time_ms: float = 0.0
     error_message: Optional[str] = None
+    vehicle_present: bool = False
     plate_region_base64: Optional[str] = None  # For API response
     plate_crop_base64: Optional[str] = None
     plate_crop_bytes: Optional[bytes] = None

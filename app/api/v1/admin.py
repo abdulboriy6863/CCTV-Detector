@@ -13,9 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.models.snapshot import CCTVSnapshot
-from app.models.camera import CCTVCamera
-from app.models.alert import NonEVAlert
+from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.services.monitor_service import auto_monitor_service
 from app.services.storage_service import storage_service
 
@@ -61,15 +59,13 @@ async def purge_system_data(req: PurgeRequest, db: Session = Depends(get_db)):
             auto_monitor_service.camera_health.clear()
             logger.info(f"Admin reset: Cleared {sessions_cleared} active monitor sessions.")
 
-        # 2. Purge Alerts
-        if req.purge_alerts:
-            deleted_alerts = db.query(NonEVAlert).delete()
-
-        # 3. Purge Snapshots
+        # 2. Purge Snapshots and Alerts
         if req.purge_snapshots:
             deleted_snaps = db.query(CCTVSnapshot).delete()
+        elif req.purge_alerts:
+            deleted_alerts = db.query(CCTVSnapshot).filter(CCTVSnapshot.alert_sent.is_(True)).delete()
 
-        # 4. Purge Cameras if requested
+        # 3. Purge Cameras if requested
         if req.purge_cameras:
             deleted_cams = db.query(CCTVCamera).delete()
 

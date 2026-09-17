@@ -275,13 +275,46 @@ def export_vehicles_csv(
         "주차 시간 및 비고"
     ])
 
+    # Pre-fetch session records to compute exact durations for export
+    session_ids = [s.session_id for s in items if s.session_id]
+    session_start_map = {}
+    session_end_map = {}
+    if session_ids:
+        related_snaps = db.query(CCTVSnapshot).filter(CCTVSnapshot.session_id.in_(set(session_ids))).all()
+        for rs in related_snaps:
+            if rs.event_type == "START" and rs.session_id not in session_start_map:
+                session_start_map[rs.session_id] = rs
+            elif rs.event_type == "END" and rs.session_id not in session_end_map:
+                session_end_map[rs.session_id] = rs
+
+    now_kst = get_kst_now()
+
     for item in items:
         event_label = "입차" if item.event_type == "START" else ("출차" if item.event_type == "END" else item.event_type)
         type_label = "전기차 (EV)" if item.is_ev else ("일반차" if item.vehicle_type == "REGULAR" else item.vehicle_type)
         ev_label = "전기차" if item.is_ev else "일반차"
         conf_str = f"{(item.ai_confidence * 100):.0f}%" if item.ai_confidence is not None else "-"
         time_str = item.created_at.strftime("%Y-%m-%d %H:%M:%S") if item.created_at else ""
-        notes_ko = _format_korean_notes(item.notes, item.event_type)
+
+        # Exact duration string
+        if item.session_id and item.session_id in session_end_map:
+            end_snap = session_end_map[item.session_id]
+            start_snap = session_start_map.get(item.session_id, item)
+            dur_sec = max(0, int((end_snap.created_at - start_snap.created_at).total_seconds()))
+            dur_text = f"총 {format_duration_kr(dur_sec)} 주차"
+        elif item.event_type == "START":
+            ongoing_sec = max(0, int((now_kst - item.created_at).total_seconds()))
+            dur_text = f"주차 진행 중 ({format_duration_kr(ongoing_sec)})"
+        elif item.event_type == "END":
+            start_snap = session_start_map.get(item.session_id)
+            if start_snap:
+                dur_sec = max(0, int((item.created_at - start_snap.created_at).total_seconds()))
+                dur_text = f"총 {format_duration_kr(dur_sec)} 주차"
+            else:
+                dur_text = _format_korean_notes(item.notes, item.event_type)
+        else:
+            dur_text = _format_korean_notes(item.notes, item.event_type)
+
         cam_key = (item.cs_id, item.cp_id or "BNS00000")
         cctv_name = cam_name_map.get(cam_key, f"CCTV ({item.cp_id or '1'})")
 
@@ -304,7 +337,7 @@ def export_vehicles_csv(
             conf_str,
             viol_label,
             act_label,
-            notes_ko
+            dur_text
         ])
 
     csv_data = output.getvalue().encode("utf-8-sig")

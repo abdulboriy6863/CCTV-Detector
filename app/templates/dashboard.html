@@ -858,14 +858,47 @@
     </div>
 
     <!-- MODAL 3: Image Fullscreen Preview -->
-    <div x-show="previewImage.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-        <div class="relative max-w-4xl w-full">
-            <button @click="previewImage.open = false" class="absolute -top-10 right-0 text-white text-2xl hover:text-slate-300">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <img :src="previewImage.url" class="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10" alt="Full Image Preview">
+    <div x-show="previewImage.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" @click.self="previewImage.open = false">
+        <div class="relative max-w-4xl w-full bg-slate-900/95 rounded-2xl border border-slate-700/80 p-3.5 shadow-2xl overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs text-slate-300 font-bold px-1">
+                <span class="flex items-center space-x-2">
+                    <i class="fa-solid fa-camera text-blue-400"></i>
+                    <span x-text="t('view_image')"></span>
+                </span>
+                <button @click="previewImage.open = false" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            
+            <div class="relative min-h-[260px] max-h-[75vh] flex items-center justify-center bg-black/50 rounded-xl overflow-hidden">
+                <!-- Loading Spinner -->
+                <div x-show="previewImage.loading" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 space-y-2">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500"></i>
+                    <span class="text-xs font-medium" x-text="t('loading_msg')"></span>
+                </div>
+
+                <!-- Image with onload and onerror handlers -->
+                <img :src="previewImage.url" 
+                     x-show="!previewImage.error"
+                     @load="previewImage.loading = false; previewImage.error = false" 
+                     @error="previewImage.loading = false; previewImage.error = true"
+                     class="w-full h-auto max-h-[75vh] object-contain rounded-xl" 
+                     alt="Vehicle Snapshot Preview">
+
+                <!-- Error Fallback Message -->
+                <div x-show="previewImage.error" class="p-8 text-center text-slate-400 space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-800/90 border border-slate-700 mx-auto flex items-center justify-center text-rose-400 text-2xl shadow-inner">
+                        <i class="fa-solid fa-image-slash"></i>
+                    </div>
+                    <div>
+                        <p class="font-bold text-sm text-slate-200" x-text="t('image_not_found')"></p>
+                        <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto" x-text="t('image_not_found_desc')"></p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
 
     <!-- MODAL 4: TV WALL / MULTI-VIEW FULLSCREEN MONITORING -->
     <div x-show="tvWallModal" 
@@ -1152,9 +1185,13 @@
                 btn_tv_wall: "보기 (TV Wall)",
                 tv_wall_title: "CCTV Jonli Multi-View TV Monitoring",
                 btn_fullscreen: "To'liq Ekran (F11)",
-                btn_exit_tv: "Chiqish (ESC)"
+                btn_exit_tv: "Chiqish (ESC)",
+                image_not_found: "Rasm serverda topilmadi",
+                image_not_found_desc: "Ushbu yozuv uchun fizik snapshot fayli server diskida mavjud emas yoki o'chirilgan.",
+                loading_msg: "Yuklanmoqda..."
             },
             ko: {
+
                 app_subtitle: "전기차 충전구역 스마트 다중 CCTV 모니터링 시스템",
                 cameras_connected: "개 카메라 연결됨",
                 theme_light: "라이트 모드로 전환",
@@ -1270,7 +1307,10 @@
                 btn_tv_wall: "보기 (TV 모니터)",
                 tv_wall_title: "전체 CCTV 종합 관제 TV 월 (Live Multi-View)",
                 btn_fullscreen: "전체화면 (F11)",
-                btn_exit_tv: "나가기 (ESC)"
+                btn_exit_tv: "나가기 (ESC)",
+                image_not_found: "이미지 파일을 찾을 수 없습니다",
+                image_not_found_desc: "해당 감지 기록의 스냅샷 원본 파일이 서버 스토리지에 존재하지 않거나 삭제되었습니다.",
+                loading_msg: "로딩 중..."
             }
         };
 
@@ -1318,9 +1358,10 @@
                 },
 
                 liveModal: { open: false, slot: null, aiLoading: false, aiResult: null, aiError: null },
-                previewImage: { open: false, url: '' },
+                previewImage: { open: false, url: '', loading: false, error: false },
                 isSavingCam: false,
                 lastFrameTimestamp: Date.now(),
+
                 
                 tvWallModal: false,
                 tvClock: '',
@@ -1771,8 +1812,9 @@
 
                 openImageModal(url) {
                     if (!url) return;
-                    this.previewImage = { open: true, url: url };
+                    this.previewImage = { open: true, url: url, loading: true, error: false };
                 },
+
                 
                 formatDate(dateStr) {
                     if (!dateStr) return '';

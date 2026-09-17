@@ -123,6 +123,21 @@ def list_vehicles(
         cam_key = (snap.cs_id, snap.cp_id or "BNS00000")
         item.camera_name = cam_name_map.get(cam_key, f"CCTV ({snap.cp_id or '1'})")
 
+        now_kst = get_kst_now()
+        # Active session correlation
+        # Look for matching active session by camera_key or session_id
+        matched_active = None
+        for cam_key_str, s_dict in auto_monitor_service.active_sessions.items():
+            if s_dict.get("session_id") == snap.session_id:
+                matched_active = s_dict
+                break
+
+        if matched_active and snap.event_type == "START":
+            entry_time = matched_active.get("entry_at", snap.created_at)
+            ongoing_sec = max(0, int((now_kst - entry_time).total_seconds()))
+            dur_str = format_duration_kr(ongoing_sec)
+            item.notes = f"입차 (주차 진행 중: {dur_str})"
+
         # Determine violation & action labels
         if not snap.is_ev:
             item.violation_type = "NON_EV_PARKED"
@@ -132,12 +147,9 @@ def list_vehicles(
             item.action_required_uz = "Darhol joyni bo'shating" if snap.event_type != "END" else "Chiqib ketgan"
             item.action_required = item.action_required_kr
         else:
-            # Active session correlation
-            session_key = f"{snap.cs_id}_{snap.cp_id or 'BNS00000'}"
-            active_s = auto_monitor_service.active_sessions.get(session_key)
-            if active_s and active_s.get("session_id") == snap.session_id and snap.event_type != "END":
+            if matched_active and snap.event_type != "END":
                 chg_status = charger_service.get_charger_realtime_status(
-                    cs_id=snap.cs_id, cp_id=snap.cp_id, db=db, session_info=active_s
+                    cs_id=snap.cs_id, cp_id=snap.cp_id, db=db, session_info=matched_active
                 )
                 item.battery_soc = chg_status.get("battery_soc")
                 item.charge_power_kw = chg_status.get("charge_power_kw")
@@ -153,6 +165,7 @@ def list_vehicles(
                 item.action_required_kr = "출차 완료" if snap.event_type == "END" else "—"
                 item.action_required_uz = "Chiqib ketgan" if snap.event_type == "END" else "—"
             item.action_required = item.action_required_kr
+
 
         results.append(item)
 

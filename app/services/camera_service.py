@@ -883,11 +883,43 @@ class CameraService:
     _ip_locks: Dict[str, asyncio.Lock] = {}
     _ip_locks_guard = threading.Lock()
 
+    def _get_cache_key(
+        self,
+        camera_type: CameraTypeEnum,
+        stream_url: str,
+        ip_address: Optional[str] = None,
+        port: Optional[int] = None
+    ) -> str:
+        clean_url = (stream_url or "").strip()
+        if "@" in clean_url:
+            parts = clean_url.split("@", 1)
+            prefix = parts[0].split("://")[0] + "://"
+            clean_url = prefix + parts[1]
+        host = (ip_address or "").strip()
+        if not host and clean_url:
+            try:
+                host = clean_url.split("://")[-1].split("/")[0].split(":")[0]
+            except Exception:
+                host = "unknown"
+        eff_port = port or (80 if camera_type == CameraTypeEnum.HTTP_SNAPSHOT else 554)
+        return f"{camera_type.value}_{host}_{eff_port}_{clean_url}"
+
     def _get_ip_lock(self, ip: str) -> asyncio.Lock:
         with self._ip_locks_guard:
             if ip not in self._ip_locks:
                 self._ip_locks[ip] = asyncio.Lock()
             return self._ip_locks[ip]
+
+    @staticmethod
+    def generate_standby_frame(camera_title: str = "CCTV Camera") -> bytes:
+        """Generates a high-quality CCTV standby placeholder when connecting."""
+        import numpy as np
+        img = np.zeros((720, 1280, 3), dtype=np.uint8)
+        img[:] = (22, 27, 34) # Dark CCTV theme
+        cv2.putText(img, f"CCTV: {camera_title}", (60, 330), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (120, 200, 255), 2, cv2.LINE_AA)
+        cv2.putText(img, "Live stream connecting...", (60, 390), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (160, 160, 160), 2, cv2.LINE_AA)
+        _, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        return buf.tobytes()
 
     async def capture_snapshot(
         self,
@@ -905,10 +937,10 @@ class CameraService:
         """
         Captures a live frame using the specified camera protocol.
         - Serializes requests per IP to protect camera RTSP socket limits.
-        - Caches successful frames for 2.5 seconds.
-        - Provides graceful last-known-good frame fallback (up to 60s) to prevent offline flickering.
+        - Caches successful frames for 4.0 seconds for smooth UI polling.
+        - Provides robust last-known-good frame fallback (up to 300s) to completely prevent black screens/flickering.
         """
-        cache_key = f"{camera_type.value}_{stream_url}_{ip_address}_{port}"
+        cache_key = self._get_cache_key(camera_type, stream_url, ip_address, port)
         target_ip = (ip_address or stream_url).split("://")[-1].split("@")[-1].split("/")[0].split(":")[0]
         now_ts = time.time()
 
@@ -916,7 +948,7 @@ class CameraService:
             with self._cache_lock:
                 if cache_key in self._snapshot_cache:
                     cached_time, cached_res = self._snapshot_cache[cache_key]
-                    if (now_ts - cached_time) < 2.5 and cached_res.success and cached_res.image_bytes:
+                    if (now_ts - cached_time) < 4.0 and cached_res.success and cached_res.image_bytes:
                         return cached_res
 
         # Acquire lock for this physical camera IP
@@ -927,7 +959,7 @@ class CameraService:
                 with self._cache_lock:
                     if cache_key in self._snapshot_cache:
                         cached_time, cached_res = self._snapshot_cache[cache_key]
-                        if (now_ts - cached_time) < 2.5 and cached_res.success and cached_res.image_bytes:
+                        if (now_ts - cached_time) < 4.0 and cached_res.success and cached_res.image_bytes:
                             return cached_res
 
             adapter = self.adapters.get(camera_type, self.adapters[CameraTypeEnum.RTSP])
@@ -961,11 +993,11 @@ class CameraService:
                     self._last_known_good[cache_key] = (now_ts, result)
                 return result
 
-            # If live capture failed momentarily, use last known good frame (up to 60s)
+            # If live capture failed momentarily, serve last known good frame (up to 300s) to prevent black screen
             with self._cache_lock:
                 if cache_key in self._last_known_good:
                     last_ts, last_res = self._last_known_good[cache_key]
-                    if (now_ts - last_ts) < 60.0 and last_res.image_bytes:
+                    if (now_ts - last_ts) < 300.0 and last_res.image_bytes:
                         logger.debug(f"Serving graceful fallback frame for {target_ip} (age: {now_ts - last_ts:.1f}s)")
                         return last_res
 

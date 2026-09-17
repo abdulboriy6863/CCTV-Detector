@@ -454,6 +454,8 @@ class HTTPSnapshotCameraAdapter(BaseCameraAdapter):
     ) -> str:
         raw_url = (stream_url or "").strip()
         eff_port = port or 80
+        if eff_port == 554:
+            eff_port = 80
 
         if not raw_url and ip_address:
             scheme = "https" if eff_port == 443 else "http"
@@ -473,6 +475,8 @@ class HTTPSnapshotCameraAdapter(BaseCameraAdapter):
         parsed = urlparse(raw_url)
         host = parsed.hostname or (ip_address.strip() if ip_address else "127.0.0.1")
         target_port = parsed.port or eff_port
+        if target_port == 554:
+            target_port = 80
 
         port_str = f":{target_port}" if target_port not in [80, 443] else ""
         netloc = f"{host}{port_str}"

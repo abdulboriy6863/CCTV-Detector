@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     DB_USER: str = "blue_networks"
     DB_PASSWORD: str = "blue_networks"
     DB_NAME: str = "blue_networks"
-    DB_POOL_SIZE: int = 10
-    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_SIZE: int = 30
+    DB_MAX_OVERFLOW: int = 50
     DB_ECHO: bool = False
 
     # Storage Settings

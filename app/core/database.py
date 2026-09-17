@@ -14,8 +14,9 @@ engine = create_engine(
     settings.database_url,
     pool_size=settings.DB_POOL_SIZE,
     max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=15,
     pool_pre_ping=True,
-    pool_recycle=3600,
+    pool_recycle=1800,
     connect_args=connect_args,
     echo=settings.DB_ECHO,
 )
@@ -32,8 +33,9 @@ try:
         settings.csms_database_url,
         pool_size=settings.DB_POOL_SIZE,
         max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_timeout=15,
         pool_pre_ping=True,
-        pool_recycle=3600,
+        pool_recycle=1800,
         connect_args=csms_connect_args,
         echo=False,
     )

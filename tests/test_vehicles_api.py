@@ -104,6 +104,28 @@ class TestVehiclesAPI(unittest.TestCase):
         self.assertNotIn("Stansiya", content)
         self.assertNotIn("Kirish", content)
 
+    def test_vehicle_stay_duration_calculation(self):
+        # Retrieve snapshots for 2026-09-14 (has paired START and END session with 30 min duration)
+        res = self.client.get("/api/v1/vehicles?start_date=2026-09-14&end_date=2026-09-14")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["items"]), 2)
+        # Check both START and END items
+        for item in data["items"]:
+            self.assertIn("stay_duration_seconds", item)
+            self.assertIn("stay_duration_formatted", item)
+            self.assertIn("is_ongoing", item)
+
+    def test_ongoing_session_flag(self):
+        # Filter for 2026-09-10 (snap3 is START only with no matching END)
+        res = self.client.get("/api/v1/vehicles?start_date=2026-09-10&end_date=2026-09-10")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        item = data["items"][0]
+        self.assertTrue(item["is_ongoing"])
+        self.assertGreater(item["stay_duration_seconds"], 0)
+        self.assertIsNotNone(item["stay_duration_formatted"])
+
 
 if __name__ == "__main__":
     unittest.main()

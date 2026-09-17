@@ -501,22 +501,28 @@ class AutoMonitorService:
         # ----------------------------------------------------
         if not det_result.success or not det_result.plate_number or det_result.confidence < 0.45:
             if active:
+                vehicle_is_visible = getattr(det_result, 'vehicle_present', False)
                 # If charger is actively plugged or YOLO sees a car in the slot, KEEP SESSION ALIVE!
-                if is_plugged or getattr(det_result, 'vehicle_present', False):
+                if is_plugged or vehicle_is_visible:
                     active["last_seen_at"] = now
                     active["missed_cycles"] = 0
                     active["pending_new_plate"] = None
                     active["pending_cycles"] = 0
+                    if vehicle_is_visible and not is_plugged:
+                        logger.debug(f"🚗 [{camera_key}] Plate not recognized, but vehicle bbox is still visible. Keeping session alive for {active.get('plate')}.")
                     return
 
                 active["missed_cycles"] = active.get("missed_cycles", 0) + 1
                 active["pending_new_plate"] = None
                 active["pending_cycles"] = 0
                 if active["missed_cycles"] >= self.exit_threshold_cycles:
+                    logger.info(f"🚪 [{camera_key}] Slot confirmed empty (no vehicle & unplugged for {self.exit_threshold_cycles} cycles). Closing session for {active.get('plate')}.")
                     # Vehicle has officially departed (unplugged + no car in frame) -> Close session
-                    await self._close_session(camera, camera_key, active, db)
-                    del self.active_sessions[camera_key]
+                    closed = await self._close_session(camera, camera_key, active, db)
+                    if closed is not False:
+                        del self.active_sessions[camera_key]
             return
+
 
         detected_plate = det_result.plate_number.strip().upper()
 

@@ -159,6 +159,48 @@ class TestVehiclesAPI(unittest.TestCase):
         self.assertEqual(res_plate.headers["content-type"], "image/jpeg")
         self.assertGreater(len(res_plate.content), 10)
 
+    def test_exit_event_serves_entry_session_image(self):
+        # Create a START event with base64 image and paired END event with no image
+        db = self.TestingSessionLocal()
+        session_uid = "PARK_SESSION_TEST_12345"
+        b64_data = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+        
+        start_event = CCTVSnapshot(
+            cs_id="bluenetwrks",
+            cp_id="BNS00000",
+            session_id=session_uid,
+            plate_number="81머2072",
+            event_type="START",
+            image_path="start_snap.jpg",
+            plate_region_image=b64_data,
+            is_ev=True,
+            vehicle_type="EV",
+            created_at=datetime(2026, 9, 17, 8, 0, 0)
+        )
+        end_event = CCTVSnapshot(
+            cs_id="bluenetwrks",
+            cp_id="BNS00000",
+            session_id=session_uid,
+            plate_number="81머2072",
+            event_type="END",
+            image_path="start_snap.jpg",
+            plate_region_image=None,
+            is_ev=True,
+            vehicle_type="EV",
+            created_at=datetime(2026, 9, 17, 8, 45, 0)
+        )
+        db.add_all([start_event, end_event])
+        db.commit()
+        db.refresh(end_event)
+        end_id = end_event.id
+        db.close()
+
+        # Requesting image for the END event should correlate and serve entry image
+        res = self.client.get(f"/api/v1/vehicles/{end_id}/image")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers["content-type"], "image/jpeg")
+        self.assertGreater(len(res.content), 10)
+
 
 if __name__ == "__main__":
     unittest.main()

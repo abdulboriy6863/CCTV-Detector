@@ -364,15 +364,66 @@ def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     return item
 
 
-@router.get("/{vehicle_id}/image", summary="View vehicle image")
+def _resolve_snapshot_image_bytes(snap: CCTVSnapshot, db: Session) -> Optional[bytes]:
+    """Helper to resolve image bytes from disk file, base64 field, or paired START session."""
+    # 1. Try disk full image file
+    if snap.image_path:
+        abs_path = storage_service.get_absolute_path(snap.image_path)
+        if abs_path.exists():
+            try:
+                with open(abs_path, "rb") as f:
+                    return f.read()
+            except Exception:
+                pass
+
+    # 2. Check if plate_region_image contains Base64 data URL
+    if snap.plate_region_image:
+        pri = snap.plate_region_image.strip()
+        if pri.startswith("data:image"):
+            try:
+                b64_part = pri.split(",", 1)[1]
+                return base64.b64decode(b64_part)
+            except Exception:
+                pass
+        elif len(pri) > 100 and not pri.endswith(".jpg") and not pri.endswith(".png"):
+            # Raw base64 string
+            try:
+                return base64.b64decode(pri)
+            except Exception:
+                pass
+        else:
+            # File path on disk
+            crop_path = storage_service.get_absolute_path(pri)
+            if crop_path.exists():
+                try:
+                    with open(crop_path, "rb") as f:
+                        return f.read()
+                except Exception:
+                    pass
+
+    # 3. If this is an END event, fall back to the session's START event image
+    if snap.event_type == "END" and snap.session_id:
+        start_snap = db.query(CCTVSnapshot).filter(
+            CCTVSnapshot.session_id == snap.session_id,
+            CCTVSnapshot.event_type == "START"
+        ).first()
+        if start_snap and start_snap.id != snap.id:
+            return _resolve_snapshot_image_bytes(start_snap, db)
+
+    return None
+
+
+@router.get("/{vehicle_id}/image", summary="View vehicle image with base64 and session fallback")
 def view_vehicle_image(vehicle_id: int, db: Session = Depends(get_db)):
     snap = db.query(CCTVSnapshot).filter(CCTVSnapshot.id == vehicle_id).first()
     if not snap:
-        raise HTTPException(status_code=404, detail="Not found")
-    abs_path = storage_service.get_absolute_path(snap.image_path)
-    if not abs_path.exists():
-        raise HTTPException(status_code=404, detail="Image file not found")
-    return FileResponse(path=str(abs_path), media_type="image/jpeg")
+        raise HTTPException(status_code=404, detail="Vehicle record not found")
+    
+    img_bytes = _resolve_snapshot_image_bytes(snap, db)
+    if img_bytes:
+        return Response(content=img_bytes, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+    
+    raise HTTPException(status_code=404, detail="Image file not found")
 
 
 @router.get("/{vehicle_id}/plate-image", summary="View cropped plate image")

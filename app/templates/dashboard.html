@@ -1937,8 +1937,11 @@
                     let metadata = {};
                     if (typeof itemOrUrl === 'object') {
                         url = itemOrUrl.image_url || '';
-                        if (itemOrUrl.plate_region_image && itemOrUrl.plate_region_image.startsWith('data:image')) {
-                            fallbackBase64 = itemOrUrl.plate_region_image;
+                        if (itemOrUrl.plate_region_image) {
+                            let b64 = itemOrUrl.plate_region_image.trim();
+                            if (b64.length > 50) {
+                                fallbackBase64 = b64.startsWith('data:image') ? b64 : ('data:image/jpeg;base64,' + b64);
+                            }
                         }
                         metadata = {
                             plate_number: itemOrUrl.plate_number,
@@ -1952,7 +1955,7 @@
                     }
                     this.previewImage = {
                         open: true,
-                        url: url,
+                        url: url || fallbackBase64 || '',
                         fallbackBase64: fallbackBase64,
                         loading: true,
                         error: false,

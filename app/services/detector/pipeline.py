@@ -31,6 +31,9 @@ class DetectionResult:
         self.plate_crop_bytes: Optional[bytes] = None
         self.processing_time_ms: float = 0.0
         self.error_message: Optional[str] = None
+        self.vehicle_present: bool = False
+        self.vehicle_box: Optional[List[int]] = None
+        self.detected_vehicle_type: Optional[str] = None
 
     def to_dict(self) -> dict:
         result = {
@@ -43,7 +46,11 @@ class DetectionResult:
             "raw_ocr_text": self.raw_ocr_text,
             "processing_time_ms": round(self.processing_time_ms, 1),
             "error_message": self.error_message,
+            "vehicle_present": self.vehicle_present,
+            "vehicle_box": self.vehicle_box,
+            "detected_vehicle_type": self.detected_vehicle_type,
         }
+
         if self.plate_crop_bytes:
             result["plate_region_base64"] = base64.b64encode(self.plate_crop_bytes).decode("utf-8")
         return result
@@ -344,8 +351,12 @@ class DetectionPipeline:
             vehicles.sort(key=lambda x: x[0], reverse=True)
 
             if vehicles:
+                result.vehicle_present = True
+                result.vehicle_box = vehicles[0][1]
+                result.detected_vehicle_type = vehicles[0][2]
                 # Add Bumper ROI (lower 45% of primary vehicle) - FIRST priority
                 area, (x1, y1, x2, y2), cls_name = vehicles[0]
+
                 vh = y2 - y1
                 vw = x2 - x1
                 by1 = max(0, y1 + int(vh * 0.40))

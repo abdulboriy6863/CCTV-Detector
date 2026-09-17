@@ -195,8 +195,13 @@ class AutoMonitorService:
                 .all()
             )
 
+            # Clear existing active sessions before reloading from DB
+            self.active_sessions.clear()
+            
             restored_count = 0
             seen_camera_keys = set()
+            now_kst = get_kst_now()
+
             for snap in start_snapshots:
                 # Match camera_key: check if session_id has _CAM{id}_
                 matched_cam_id = None
@@ -220,6 +225,11 @@ class AutoMonitorService:
                 if camera_key in seen_camera_keys:
                     continue
                 seen_camera_keys.add(camera_key)
+
+                # Ignore abandoned sessions older than 7 days to avoid lingering ghosts
+                if snap.created_at and (now_kst - snap.created_at).total_seconds() > (7 * 86400):
+                    logger.debug(f"Skipping stale abandoned session {snap.session_id} (created: {snap.created_at})")
+                    continue
 
                 # Only restore if this session was never closed
                 if snap.session_id not in ended_session_ids:

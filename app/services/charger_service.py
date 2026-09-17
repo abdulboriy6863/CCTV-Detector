@@ -72,6 +72,23 @@ class ChargerService:
         "PREPARING", "CHARGING", "SUSPENDEDEV", "SUSPENDEDEVSE", "FINISHING", "RESERVED"
     }
 
+    def __init__(self):
+        self._cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._cache_ttl_seconds: float = 3.0  # 3s cache to prevent query storming
+
+    def get_cached_status(self, key: str) -> Optional[Dict[str, Any]]:
+        import time
+        if key in self._cache:
+            cached_time, val = self._cache[key]
+            if time.time() - cached_time < self._cache_ttl_seconds:
+                return val
+        return None
+
+    def set_cached_status(self, key: str, val: Dict[str, Any]):
+        import time
+        self._cache[key] = (time.time(), val)
+
+
     def is_physically_plugged(
         self,
         cs_id: str,
@@ -345,7 +362,7 @@ class ChargerService:
                 action_required_kr = "—"
                 action_required_uz = "—"
 
-        return {
+        result = {
             "cs_id": cs_id,
             "cp_id": effective_cp_id,
             "connector_status": connector_status,
@@ -367,6 +384,10 @@ class ChargerService:
             "action_required_kr": action_required_kr,
             "action_required_uz": action_required_uz,
         }
+        cache_key = f"{cs_id}_{effective_cp_id}"
+        self.set_cached_status(cache_key, result)
+        return result
+
 
 
 charger_service = ChargerService()

@@ -258,11 +258,20 @@
                                             <template x-if="slot.is_occupied">
                                                 <div class="space-y-1">
                                                     <div class="flex items-center justify-between">
-                                                        <span class="font-mono font-bold px-1.5 py-0.5 rounded text-[11px] shadow"
-                                                            :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'"
-                                                            x-text="(slot.is_ev ? '⚡ ' : '🚗 ') + slot.current_plate"></span>
-                                                        <span class="font-mono text-[10px] text-slate-300" x-text="'🅿️ ' + formatDurationDisplay(slot.duration_formatted)"></span>
+                                                        <div class="flex items-center space-x-1">
+                                                            <span class="font-mono font-bold px-1.5 py-0.5 rounded text-[11px] shadow"
+                                                                :class="slot.is_ev ? 'bg-sky-500 text-white' : 'bg-amber-500 text-slate-950'"
+                                                                x-text="(slot.is_ev ? '⚡ ' : '🚗 ') + slot.current_plate"></span>
+                                                            <template x-if="slot.is_charging || slot.connector_status === 'CHARGING' || slot.connector_status === 'PREPARING' || slot.connector_status === 'SUSPENDEDEV'">
+                                                                <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/90 text-white flex items-center space-x-0.5 shadow">
+                                                                    <i class="fa-solid fa-plug text-[8px]"></i>
+                                                                    <span x-text="slot.connector_status === 'SUSPENDEDEV' ? '100%' : 'PLUGGED'"></span>
+                                                                </span>
+                                                            </template>
+                                                        </div>
+                                                        <span class="font-mono text-[10px] text-slate-300 font-semibold" x-text="'🅿️ ' + formatDurationDisplay(slot.duration_formatted)"></span>
                                                     </div>
+
 
                                                     <!-- Battery SoC (DC) -->
                                                     <template x-if="slot.battery_soc !== null && slot.battery_soc !== undefined && slot.battery_soc > 0">

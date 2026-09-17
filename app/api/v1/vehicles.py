@@ -118,6 +118,19 @@ def list_vehicles(
         cam_name = cam.camera_name or f"CCTV {idx}"
         cam_name_map[cam_key] = cam_name
 
+    # Pre-fetch session records to compute exact durations
+    session_ids = [s.session_id for s in items if s.session_id]
+    session_start_map = {}
+    session_end_map = {}
+    if session_ids:
+        related_snaps = db.query(CCTVSnapshot).filter(CCTVSnapshot.session_id.in_(set(session_ids))).all()
+        for rs in related_snaps:
+            if rs.event_type == "START" and rs.session_id not in session_start_map:
+                session_start_map[rs.session_id] = rs
+            elif rs.event_type == "END" and rs.session_id not in session_end_map:
+                session_end_map[rs.session_id] = rs
+
+    now_kst = get_kst_now()
     results = []
     for snap in items:
         item = SnapshotResponse.model_validate(snap)
@@ -128,20 +141,43 @@ def list_vehicles(
         cam_key = (snap.cs_id, snap.cp_id or "BNS00000")
         item.camera_name = cam_name_map.get(cam_key, f"CCTV ({snap.cp_id or '1'})")
 
-        now_kst = get_kst_now()
-        # Active session correlation
-        # Look for matching active session by camera_key or session_id
+        # Active session correlation from memory
         matched_active = None
         for cam_key_str, s_dict in auto_monitor_service.active_sessions.items():
             if s_dict.get("session_id") == snap.session_id:
                 matched_active = s_dict
                 break
 
-        if matched_active and snap.event_type == "START":
-            entry_time = matched_active.get("entry_at", snap.created_at)
+        # Calculate stay duration
+        if snap.session_id and snap.session_id in session_end_map:
+            # Session has completed (has END event)
+            end_snap = session_end_map[snap.session_id]
+            start_snap = session_start_map.get(snap.session_id, snap)
+            dur_sec = max(0, int((end_snap.created_at - start_snap.created_at).total_seconds()))
+            item.is_ongoing = False
+            item.stay_duration_seconds = dur_sec
+            item.stay_duration_formatted = format_duration_kr(dur_sec)
+        elif snap.event_type == "START":
+            # Session is ongoing
+            item.is_ongoing = True
+            entry_time = matched_active.get("entry_at", snap.created_at) if matched_active else snap.created_at
             ongoing_sec = max(0, int((now_kst - entry_time).total_seconds()))
-            dur_str = format_duration_kr(ongoing_sec)
-            item.notes = f"입차 (주차 진행 중: {dur_str})"
+            item.stay_duration_seconds = ongoing_sec
+            item.stay_duration_formatted = format_duration_kr(ongoing_sec)
+            item.notes = f"입차 (주차 진행 중: {item.stay_duration_formatted})"
+        elif snap.event_type == "END":
+            item.is_ongoing = False
+            start_snap = session_start_map.get(snap.session_id)
+            if start_snap:
+                dur_sec = max(0, int((snap.created_at - start_snap.created_at).total_seconds()))
+            else:
+                dur_sec = 0
+            item.stay_duration_seconds = dur_sec
+            item.stay_duration_formatted = format_duration_kr(dur_sec)
+        else:
+            item.is_ongoing = False
+            item.stay_duration_seconds = 0
+            item.stay_duration_formatted = "—"
 
         # Determine violation & action labels
         if not snap.is_ev:
@@ -170,7 +206,6 @@ def list_vehicles(
                 item.action_required_kr = "출차 완료" if snap.event_type == "END" else "—"
                 item.action_required_uz = "Chiqib ketgan" if snap.event_type == "END" else "—"
             item.action_required = item.action_required_kr
-
 
         results.append(item)
 

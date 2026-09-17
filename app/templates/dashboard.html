@@ -544,7 +544,7 @@
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="inline-flex items-center space-x-2">
                                         <div class="group px-2.5 py-1 rounded-xl border font-mono font-extrabold tracking-wider text-xs shadow-sm inline-flex items-center space-x-1.5 cursor-pointer hover:ring-2 hover:ring-blue-400/50 transition"
-                                             @click="openImageModal(item.image_url)"
+                                             @click="openImageModal(item)"
                                              :title="t('view_image')"
                                              :class="item.is_ev ? 'bg-sky-50 dark:bg-sky-950/50 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100'">
                                             <span x-show="item.is_ev" class="text-sky-500 text-xs">⚡</span>
@@ -905,7 +905,7 @@
                 <img :src="previewImage.url" 
                      x-show="!previewImage.error"
                      @load="previewImage.loading = false; previewImage.error = false" 
-                     @error="previewImage.loading = false; previewImage.error = true"
+                     @error="handleImageError()"
                      class="w-full h-auto max-h-[75vh] object-contain rounded-xl" 
                      alt="Vehicle Snapshot Preview">
 
@@ -1896,9 +1896,45 @@
                     }
                 },
 
-                openImageModal(url) {
-                    if (!url) return;
-                    this.previewImage = { open: true, url: url, loading: true, error: false };
+                openImageModal(itemOrUrl) {
+                    if (!itemOrUrl) return;
+                    let url = '';
+                    let fallbackBase64 = null;
+                    let metadata = {};
+                    if (typeof itemOrUrl === 'object') {
+                        url = itemOrUrl.image_url || '';
+                        if (itemOrUrl.plate_region_image && itemOrUrl.plate_region_image.startsWith('data:image')) {
+                            fallbackBase64 = itemOrUrl.plate_region_image;
+                        }
+                        metadata = {
+                            plate_number: itemOrUrl.plate_number,
+                            camera_name: itemOrUrl.camera_name,
+                            created_at: itemOrUrl.created_at,
+                            is_ev: itemOrUrl.is_ev,
+                            vehicle_type: itemOrUrl.vehicle_type
+                        };
+                    } else {
+                        url = itemOrUrl;
+                    }
+                    this.previewImage = {
+                        open: true,
+                        url: url,
+                        fallbackBase64: fallbackBase64,
+                        loading: true,
+                        error: false,
+                        metadata: metadata
+                    };
+                },
+
+                handleImageError() {
+                    if (this.previewImage.fallbackBase64 && this.previewImage.url !== this.previewImage.fallbackBase64) {
+                        this.previewImage.url = this.previewImage.fallbackBase64;
+                        this.previewImage.loading = false;
+                        this.previewImage.error = false;
+                    } else {
+                        this.previewImage.loading = false;
+                        this.previewImage.error = true;
+                    }
                 },
 
                 

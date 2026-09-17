@@ -68,6 +68,26 @@ class ChargerService:
 
     NOT_CHARGING_GRACE_SECONDS = 5 * 60  # 5 minutes
     OVERSTAY_GRACE_SECONDS = 5 * 60      # 5 minutes after 100% or completion
+    PLUGGED_CONNECTOR_STATUSES = {
+        "PREPARING", "CHARGING", "SUSPENDEDEV", "SUSPENDEDEVSE", "FINISHING", "RESERVED"
+    }
+
+    def is_physically_plugged(
+        self,
+        cs_id: str,
+        cp_id: Optional[str],
+        db: Session
+    ) -> bool:
+        """
+        Returns True if the charging cable is physically connected/locked to the vehicle.
+        Whenever status is PREPARING, CHARGING, SUSPENDEDEV, FINISHING, etc.,
+        the car cannot physically depart without disconnecting the cable.
+        """
+        status_info = self.get_charger_realtime_status(cs_id=cs_id, cp_id=cp_id, db=db)
+        raw_status = (status_info.get("connector_status") or "").upper().strip()
+        is_charging = status_info.get("is_charging", False)
+        return is_charging or (raw_status in self.PLUGGED_CONNECTOR_STATUSES)
+
 
     def validate_station_and_charger(
         self,

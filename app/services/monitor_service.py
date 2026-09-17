@@ -553,14 +553,23 @@ class AutoMonitorService:
 
 
             # Subcase 2B: Different plate detected -> Debounce transition
+            # Require solid confidence to begin candidate transition evaluation
+            if det_result.confidence < 0.55:
+                # Weak candidate, treat as temporary OCR glitch and keep current session
+                active["last_seen_at"] = now
+                active["missed_cycles"] = 0
+                return
+
             pending_plate = active.get("pending_new_plate")
             if pending_plate and is_same_plate(pending_plate, detected_plate):
                 active["pending_cycles"] = active.get("pending_cycles", 0) + 1
                 if active["pending_cycles"] >= self.transition_threshold_cycles:
+                    logger.info(f"🔄 [{camera_key}] Transition confirmed: Old {anchor_or_curr} -> New {detected_plate} after {self.transition_threshold_cycles} cycles.")
                     # CONFIRMED TRANSITION:
                     # 1. Close old vehicle session with departure_time = now
-                    await self._close_session(camera, camera_key, active, db, departure_time=now)
-                    del self.active_sessions[camera_key]
+                    closed = await self._close_session(camera, camera_key, active, db, departure_time=now)
+                    if closed is not False:
+                        del self.active_sessions[camera_key]
 
                     # 2. Open new vehicle session
                     await self._record_start_event(
@@ -568,13 +577,15 @@ class AutoMonitorService:
                     )
                     return
                 else:
-                    # Waiting for second confirmation cycle
+                    # Waiting for transition confirmation cycles
+                    logger.debug(f"⏳ [{camera_key}] Pending transition {pending_plate} ({active['pending_cycles']}/{self.transition_threshold_cycles})")
                     return
             else:
                 # First time seeing this different plate candidate
                 active["pending_new_plate"] = detected_plate
                 active["pending_cycles"] = 1
                 return
+
 
         # ----------------------------------------------------
         # SCENARIO 3: Slot was EMPTY -> New vehicle arrives

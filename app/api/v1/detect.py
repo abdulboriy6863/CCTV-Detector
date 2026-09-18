@@ -9,9 +9,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+import json
 from app.core.config import get_kst_now
 from app.core.database import get_db
-from app.models.snapshot import CCTVSnapshot
+from app.models.snapshot import CCTVSnapshot, CCTVCamera
 from app.schemas.snapshot import SnapshotResponse, EventTypeEnum
 from app.services.detector.pipeline import detection_pipeline
 from app.services.storage_service import storage_service
@@ -24,11 +25,12 @@ async def detect_upload(
     file: UploadFile = File(...),
     cs_id: str = Form("bluenetwrks"),
     cp_id: str = Form("BNS00000"),
+    roi: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """
     Upload a vehicle image to:
-    1. Detect license plate (YOLOv8)
+    1. Detect license plate (YOLOv8) with Target Bay ROI
     2. Read plate text (PaddleOCR)
     3. Classify EV or Regular (HSV color)
     4. Save to database
@@ -37,8 +39,22 @@ async def detect_upload(
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Empty file uploaded")
 
+    roi_dict = None
+    if roi:
+        try:
+            roi_dict = json.loads(roi)
+        except Exception:
+            pass
+    elif cs_id and cp_id:
+        try:
+            cam = db.query(CCTVCamera).filter(CCTVCamera.cs_id == cs_id, CCTVCamera.cp_id == cp_id).first()
+            if cam and cam.roi_settings:
+                roi_dict = json.loads(cam.roi_settings) if isinstance(cam.roi_settings, str) else cam.roi_settings
+        except Exception:
+            pass
+
     # Run detection pipeline
-    result = await detection_pipeline.detect(image_bytes)
+    result = await detection_pipeline.detect(image_bytes, roi=roi_dict)
 
     if not result.success or not result.plate_number:
         # Still return detection info even if no plate found

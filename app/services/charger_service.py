@@ -119,6 +119,12 @@ class ChargerService:
     def __init__(self):
         self._cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self._cache_ttl_seconds: float = 3.0  # 3s cache to prevent query storming
+        self._csms_offline_until: float = 0.0  # Circuit breaker: skip CSMS DB for 30s upon connection failure
+
+    def clear_cache(self):
+        """Clears hardware status cache and resets circuit breaker."""
+        self._cache.clear()
+        self._csms_offline_until = 0.0
 
     def get_cached_status(self, key: str) -> Optional[Dict[str, Any]]:
         import time
@@ -208,6 +214,9 @@ class ChargerService:
         """
         now = get_kst_now()
         effective_cp_id = cp_id or "BNS00000"
+        
+        cache_key = f"hw_{cs_id}_{effective_cp_id}"
+        cached_hw = self.get_cached_status(cache_key)
 
         # Defaults
         connector_status = "AVAILABLE"
@@ -227,103 +236,142 @@ class ChargerService:
         action_required_kr = "—"
         action_required_uz = "—"
 
-        # Check in CSMS Production DB
-        csms_session = None
-        try:
-            csms_session = CSMSSessionLocal()
-        except Exception:
-            csms_session = db
+        if cached_hw is not None:
+            connector_status = cached_hw.get("connector_status", "AVAILABLE")
+            connector_status_kr = cached_hw.get("connector_status_kr", "사용 가능")
+            connector_status_uz = cached_hw.get("connector_status_uz", "Mavjud (Bo'sh)")
+            is_charging = cached_hw.get("is_charging", False)
+            battery_soc = cached_hw.get("battery_soc")
+            charge_power_kw = cached_hw.get("charge_power_kw", 0.0)
+            charged_energy_kwh = cached_hw.get("charged_energy_kwh", 0.0)
+            charging_start_time = cached_hw.get("charging_start_time")
+            charging_duration_seconds = cached_hw.get("charging_duration_seconds", 0)
+        else:
+            import time
+            now_t = time.time()
+            # If CSMS server recently failed, skip network attempt to avoid blocking event loop
+            if now_t < self._csms_offline_until:
+                csms_session = None
+            else:
+                # Check in CSMS Production DB
+                csms_session = None
+                try:
+                    csms_session = CSMSSessionLocal()
+                except Exception as ex:
+                    logger.debug(f"CSMS DB session open error (Circuit Breaker active for 30s): {ex}")
+                    self._csms_offline_until = now_t + 30.0
+                    csms_session = None
 
-        try:
-            # 1. Resolve numerical cp_pk and serial if available
-            cp_pk = None
-            cp_code = effective_cp_id
             try:
-                cp_lookup = csms_session.execute(
-                    text("SELECT id, cpId, chargePointModel, chargeBoxSerialNumber FROM TINF_CP WHERE cpId = :cp_id OR CAST(id AS CHAR) = :cp_id OR chargeBoxSerialNumber = :cp_id LIMIT 1"),
-                    {"cp_id": effective_cp_id}
-                ).mappings().fetchone()
-                if cp_lookup:
-                    cp_pk = cp_lookup.get("id")
-                    cp_code = cp_lookup.get("cpId") or cp_lookup.get("chargeBoxSerialNumber") or effective_cp_id
-            except Exception:
-                pass
+                # 1. Resolve numerical cp_pk and serial if available
+                cp_pk = None
+                cp_code = effective_cp_id
+                try:
+                    cp_lookup = csms_session.execute(
+                        text("SELECT id, cpId, chargePointModel, chargeBoxSerialNumber FROM TINF_CP WHERE cpId = :cp_id OR CAST(id AS CHAR) = :cp_id OR chargeBoxSerialNumber = :cp_id LIMIT 1"),
+                        {"cp_id": effective_cp_id}
+                    ).mappings().fetchone()
+                    if cp_lookup:
+                        cp_pk = cp_lookup.get("id")
+                        cp_code = cp_lookup.get("cpId") or cp_lookup.get("chargeBoxSerialNumber") or effective_cp_id
+                except Exception:
+                    pass
 
-            target_id = cp_pk if cp_pk is not None else effective_cp_id
+                target_id = cp_pk if cp_pk is not None else effective_cp_id
 
-            # 2. Query live connector status
-            try:
-                conn_query = text("""
-                    SELECT status, operating, ts 
-                    FROM TINF_CP_CONNECTOR_STATUS 
-                    WHERE cpId = :cp_id 
-                    ORDER BY ts DESC 
-                    LIMIT 1
-                """)
-                conn_row = csms_session.execute(conn_query, {"cp_id": target_id}).fetchone()
-                if conn_row and conn_row[0]:
-                    raw_stat = str(conn_row[0]).upper().strip()
-                    connector_status = raw_stat if raw_stat else "AVAILABLE"
-                    connector_status_kr = CONNECTOR_STATUS_KR.get(connector_status, connector_status)
-                    connector_status_uz = CONNECTOR_STATUS_UZ.get(connector_status, connector_status)
-                else:
+                # 2. Query live connector status
+                try:
+                    conn_query = text("""
+                        SELECT status, operating, ts 
+                        FROM TINF_CP_CONNECTOR_STATUS 
+                        WHERE cpId = :cp_id 
+                        ORDER BY ts DESC 
+                        LIMIT 1
+                    """)
+                    conn_row = csms_session.execute(conn_query, {"cp_id": target_id}).fetchone()
+                    if conn_row and conn_row[0]:
+                        raw_stat = str(conn_row[0]).upper().strip()
+                        connector_status = raw_stat if raw_stat else "AVAILABLE"
+                        connector_status_kr = CONNECTOR_STATUS_KR.get(connector_status, connector_status)
+                        connector_status_uz = CONNECTOR_STATUS_UZ.get(connector_status, connector_status)
+                    else:
+                        connector_status = "AVAILABLE"
+                        connector_status_kr = "사용 가능"
+                        connector_status_uz = "Mavjud (Bo'sh)"
+                except Exception:
                     connector_status = "AVAILABLE"
                     connector_status_kr = "사용 가능"
                     connector_status_uz = "Mavjud (Bo'sh)"
-            except Exception:
-                connector_status = "AVAILABLE"
-                connector_status_kr = "사용 가능"
-                connector_status_uz = "Mavjud (Bo'sh)"
 
-            # 3. Query active live transaction (TINF_CURRENT_TX)
-            try:
-                tx_query = text("""
-                    SELECT transactionId, startTimestamp, soc, chargePower, currentPower, currentA, sessionId, chargeBoxSerialNumber, meterValueTimestamp
-                    FROM TINF_CURRENT_TX
-                    WHERE cpId = :cp_id OR chargeBoxSerialNumber = :cp_code OR sessionId = :cp_code OR chargeBoxSerialNumber = :raw_cp_id
-                    ORDER BY startTimestamp DESC
-                    LIMIT 1
-                """)
-                tx_row = csms_session.execute(tx_query, {
-                    "cp_id": target_id,
-                    "cp_code": cp_code,
-                    "raw_cp_id": effective_cp_id
-                }).fetchone()
-                if tx_row:
-                    is_charging = True
-                    charging_start_time = tx_row[1]
-                    if tx_row[2] is not None:
-                        try:
-                            val = int(tx_row[2])
-                            battery_soc = val if val > 0 else None
-                        except (ValueError, TypeError):
-                            battery_soc = None
+                # 3. Query active live transaction (TINF_CURRENT_TX)
+                try:
+                    tx_query = text("""
+                        SELECT transactionId, startTimestamp, soc, chargePower, currentPower, currentA, sessionId, chargeBoxSerialNumber, meterValueTimestamp
+                        FROM TINF_CURRENT_TX
+                        WHERE cpId = :cp_id OR chargeBoxSerialNumber = :cp_code OR sessionId = :cp_code OR chargeBoxSerialNumber = :raw_cp_id
+                        ORDER BY startTimestamp DESC
+                        LIMIT 1
+                    """)
+                    tx_row = csms_session.execute(tx_query, {
+                        "cp_id": target_id,
+                        "cp_code": cp_code,
+                        "raw_cp_id": effective_cp_id
+                    }).fetchone()
+                    if tx_row:
+                        is_charging = True
+                        charging_start_time = tx_row[1]
+                        if tx_row[2] is not None:
+                            try:
+                                val = int(tx_row[2])
+                                battery_soc = val if val > 0 else None
+                            except (ValueError, TypeError):
+                                battery_soc = None
 
-                    # tx_row[3] is chargePower (active charging power in kW or W)
-                    raw_pwr = float(tx_row[3] or 0.0)
-                    charge_power_kw = raw_pwr / 1000.0 if raw_pwr > 100 else raw_pwr
+                        # tx_row[3] is chargePower (active charging power in kW or W)
+                        raw_pwr = float(tx_row[3] or 0.0)
+                        charge_power_kw = raw_pwr / 1000.0 if raw_pwr > 100 else raw_pwr
 
-                    # tx_row[4] is currentPower (accumulated energy in kWh or Wh)
-                    raw_energy = float(tx_row[4] or 0.0)
-                    charged_energy_kwh = raw_energy / 1000.0 if raw_energy > 500 else raw_energy
+                        # tx_row[4] is currentPower (accumulated energy in kWh or Wh)
+                        raw_energy = float(tx_row[4] or 0.0)
+                        charged_energy_kwh = raw_energy / 1000.0 if raw_energy > 500 else raw_energy
 
-                    if charging_start_time:
-                        charging_duration_seconds = max(0, int((now - charging_start_time).total_seconds()))
+                        if charging_start_time:
+                            charging_duration_seconds = max(0, int((now - charging_start_time).total_seconds()))
 
-                    connector_status = "CHARGING"
-                    connector_status_kr = "충전 중"
-                    connector_status_uz = "Zaryadlanmoqda"
-                elif connector_status == "CHARGING":
-                    is_charging = True
-                    connector_status_kr = "충전 중"
-                    connector_status_uz = "Zaryadlanmoqda"
+                        connector_status = "CHARGING"
+                        connector_status_kr = "충전 중"
+                        connector_status_uz = "Zaryadlanmoqda"
+                    elif connector_status == "CHARGING":
+                        is_charging = True
+                        connector_status_kr = "충전 중"
+                        connector_status_uz = "Zaryadlanmoqda"
+                except Exception as e:
+                    logger.debug(f"CSMS DB query error for {effective_cp_id}: {e}")
+                    if "connect" in str(e).lower() or "timeout" in str(e).lower() or "operationalerror" in str(e).lower():
+                        self._csms_offline_until = time.time() + 30.0
+
+                # Save raw hardware state into cache
+                self.set_cached_status(cache_key, {
+                    "connector_status": connector_status,
+                    "connector_status_kr": connector_status_kr,
+                    "connector_status_uz": connector_status_uz,
+                    "is_charging": is_charging,
+                    "battery_soc": battery_soc,
+                    "charge_power_kw": charge_power_kw,
+                    "charged_energy_kwh": charged_energy_kwh,
+                    "charging_start_time": charging_start_time,
+                    "charging_duration_seconds": charging_duration_seconds,
+                })
+
             except Exception as e:
-                logger.warning(f"Error querying TINF_CURRENT_TX for {effective_cp_id}: {e}")
-
-
-        finally:
-            if csms_session is not db:
-                csms_session.close()
+                logger.debug(f"CSMS DB overall error for {effective_cp_id}: {e}")
+                self._csms_offline_until = time.time() + 30.0
+            finally:
+                if csms_session is not None and csms_session is not db:
+                    try:
+                        csms_session.close()
+                    except Exception:
+                        pass
 
         # 4. Correlate with CCTV Parking Session
         is_occupied = session_info is not None
@@ -343,7 +391,16 @@ class ChargerService:
 
             # Violation Case 2: EV parked, but NOT charging after grace period
             elif not is_charging:
-                if parking_seconds > self.NOT_CHARGING_GRACE_SECONDS:
+                if connector_status != "AVAILABLE" and parking_seconds > (self.NOT_CHARGING_GRACE_SECONDS + self.OVERSTAY_GRACE_SECONDS):
+                    overstay_seconds = parking_seconds - (self.NOT_CHARGING_GRACE_SECONDS + self.OVERSTAY_GRACE_SECONDS)
+                    violation_type = "OVERSTAY"
+                    over_mins = max(1, overstay_seconds // 60)
+                    violation_label_kr = f"종료 후 초과 점유 ({over_mins}분)"
+                    violation_label_uz = f"Tugaganidan keyin oshiqcha ({over_mins} min)"
+                    violation_level = "danger"
+                    action_required_kr = "차량 이동 주차 필요"
+                    action_required_uz = "Mashinani oling"
+                elif parking_seconds > self.NOT_CHARGING_GRACE_SECONDS:
                     violation_type = "NOT_CHARGING"
                     idle_mins = parking_seconds // 60
                     violation_label_kr = f"미충전 점유 ({idle_mins}분)"

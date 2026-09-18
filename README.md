@@ -1,6 +1,8 @@
 # CCTV EV Detector — Korean License Plate & EV Classification System
 **한국 전기차 충전소 CCTV 번호판 인식 및 전기차/일반차량 자동 판별 시스템**
 
+👉 **[📖 개발자 인수인계 및 운영 기술 가이드 (한국어 README_KR.md 바로가기)](./README_KR.md)**
+
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-00FFFF.svg?style=flat)](https://ultralytics.com)

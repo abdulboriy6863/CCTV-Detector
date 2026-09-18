@@ -15,20 +15,24 @@ router = APIRouter()
 def get_stats(db: Session = Depends(get_db)):
     today_start = get_kst_now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    total = db.query(func.count(CCTVSnapshot.id)).scalar() or 0
-    ev_total = db.query(func.count(CCTVSnapshot.id)).filter(CCTVSnapshot.is_ev == True).scalar() or 0
-    regular_total = db.query(func.count(CCTVSnapshot.id)).filter(CCTVSnapshot.vehicle_type == "REGULAR").scalar() or 0
+    from sqlalchemy import case, and_
+    row = db.query(
+        func.count(CCTVSnapshot.id).label("total"),
+        func.sum(case((CCTVSnapshot.is_ev == True, 1), else_=0)).label("ev_total"),
+        func.sum(case((CCTVSnapshot.vehicle_type == "REGULAR", 1), else_=0)).label("regular_total"),
+        func.sum(case((CCTVSnapshot.created_at >= today_start, 1), else_=0)).label("today_total"),
+        func.sum(case((and_(CCTVSnapshot.created_at >= today_start, CCTVSnapshot.is_ev == True), 1), else_=0)).label("today_ev"),
+        func.sum(case((and_(CCTVSnapshot.created_at >= today_start, CCTVSnapshot.vehicle_type == "REGULAR"), 1), else_=0)).label("today_regular"),
+        func.sum(case((and_(CCTVSnapshot.created_at >= today_start, CCTVSnapshot.alert_sent == True), 1), else_=0)).label("today_alerts")
+    ).first()
 
-    today_total = db.query(func.count(CCTVSnapshot.id)).filter(CCTVSnapshot.created_at >= today_start).scalar() or 0
-    today_ev = db.query(func.count(CCTVSnapshot.id)).filter(
-        CCTVSnapshot.created_at >= today_start, CCTVSnapshot.is_ev == True
-    ).scalar() or 0
-    today_regular = db.query(func.count(CCTVSnapshot.id)).filter(
-        CCTVSnapshot.created_at >= today_start, CCTVSnapshot.vehicle_type == "REGULAR"
-    ).scalar() or 0
-    today_alerts = db.query(func.count(CCTVSnapshot.id)).filter(
-        CCTVSnapshot.created_at >= today_start, CCTVSnapshot.alert_sent == True
-    ).scalar() or 0
+    total = row.total or 0
+    ev_total = row.ev_total or 0
+    regular_total = row.regular_total or 0
+    today_total = row.today_total or 0
+    today_ev = row.today_ev or 0
+    today_regular = row.today_regular or 0
+    today_alerts = row.today_alerts or 0
 
     active_cameras = db.query(func.count(CCTVCamera.id)).filter(CCTVCamera.is_active == True).scalar() or 0
 

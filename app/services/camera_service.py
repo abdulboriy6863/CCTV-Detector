@@ -162,6 +162,7 @@ class RTSPStreamHub:
         cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
         target_width = 960
+        fail_count = 0
 
         try:
             while self.running:
@@ -173,8 +174,23 @@ class RTSPStreamHub:
 
                 ret, frame = cap.read()
                 if not ret or frame is None:
-                    time.sleep(0.02)
+                    fail_count += 1
+                    if fail_count > 50:  # ~1 second of failures
+                        logger.warning(f"RTSPStreamHub: {fail_count} consecutive read failures, reconnecting...")
+                        try:
+                            cap.release()
+                            time.sleep(1.0)
+                            cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+                            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                            fail_count = 0
+                        except Exception as e:
+                            logger.error(f"RTSPStreamHub reconnect failed: {e}")
+                            time.sleep(2.0)
+                    else:
+                        time.sleep(0.02)
                     continue
+
+                fail_count = 0
 
                 if frame.shape[1] > target_width:
                     scale = target_width / frame.shape[1]
@@ -188,6 +204,7 @@ class RTSPStreamHub:
         except Exception as e:
             logger.error(f"Error in RTSPStreamHub worker for {self.url}: {e}")
         finally:
+            self.running = False
             cap.release()
 
 
@@ -201,6 +218,7 @@ class CaptureResult:
     error_message: Optional[str] = None
     captured_at: datetime = field(default_factory=get_kst_now)
     protocol: Optional[str] = None
+    is_stale: bool = False
 
 
 class BaseCameraAdapter:
@@ -277,14 +295,14 @@ class RTSPCameraAdapter(BaseCameraAdapter):
         )
         return urlunparse(new_parsed)
 
-    def _sync_capture(self, url: str, timeout_seconds: float = 4.0, use_tcp: bool = True) -> CaptureResult:
-        """Synchronously connects to RTSP stream and captures the latest frame."""
+    def _sync_capture(self, url: str, timeout_seconds: float = 3.0, use_tcp: bool = True) -> CaptureResult:
+        """Synchronously connects to RTSP stream and captures the latest frame at maximum speed."""
         start_time = time.time()
         
         transport = "tcp" if use_tcp else "udp"
-        stimeout_us = max(1000000, int(timeout_seconds * 1_000_000))
+        stimeout_us = max(500000, int(timeout_seconds * 1_000_000))
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
-            f"rtsp_transport;{transport}|stimeout;{stimeout_us}|buffer_size;1024000|max_delay;500000"
+            f"rtsp_transport;{transport}|stimeout;{stimeout_us}|buffer_size;262144|max_delay;200000"
         )
 
         cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
@@ -296,14 +314,17 @@ class RTSPCameraAdapter(BaseCameraAdapter):
                     protocol="RTSP"
                 )
 
-            # Read decoded frame with retry for keyframe/stream synchronization (up to 8 attempts)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+            # Fast grab up to 6 frames with short delay
             ret = False
             frame = None
-            for _ in range(8):
+            for _ in range(6):
                 ret, frame = cap.read()
                 if ret and frame is not None and frame.size > 0:
-                    break
-                time.sleep(0.04)
+                    if np.mean(frame) >= 3.0:
+                        break
+                time.sleep(0.015)
 
             if not ret or frame is None:
                 return CaptureResult(
@@ -312,8 +333,16 @@ class RTSPCameraAdapter(BaseCameraAdapter):
                     protocol="RTSP"
                 )
 
-            # Encode frame to JPEG format (quality 92)
-            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 92]
+            height, width = frame.shape[:2]
+
+            # Optimize resolution for fast transmission and lightweight preview
+            if width > 1280:
+                scale = 1280.0 / width
+                frame = cv2.resize(frame, (1280, int(height * scale)), interpolation=cv2.INTER_LINEAR)
+                height, width = frame.shape[:2]
+
+            # Encode frame to optimal JPEG format (quality 80)
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
             success, buffer = cv2.imencode(".jpg", frame, encode_param)
             if not success:
                 return CaptureResult(
@@ -322,7 +351,6 @@ class RTSPCameraAdapter(BaseCameraAdapter):
                     protocol="RTSP"
                 )
 
-            height, width = frame.shape[:2]
             elapsed = time.time() - start_time
             logger.info(f"Successfully captured RTSP frame ({width}x{height}) in {elapsed:.2f}s from {url}")
 
@@ -525,7 +553,14 @@ class HTTPSnapshotCameraAdapter(BaseCameraAdapter):
                 img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
                 width, height = (None, None)
                 if img is not None:
-                    height, width = img.shape[:2]
+                    h, w = img.shape[:2]
+                    if w > 1280:
+                        scale = 1280.0 / w
+                        img = cv2.resize(img, (1280, int(h * scale)), interpolation=cv2.INTER_LINEAR)
+                        h, w = img.shape[:2]
+                        _, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                        image_bytes = buf.tobytes()
+                    width, height = w, h
 
                 elapsed = time.time() - start_time
                 logger.info(f"Successfully fetched HTTP snapshot ({width}x{height}) in {elapsed:.2f}s from {url}")
@@ -999,6 +1034,7 @@ class CameraService:
                     last_ts, last_res = self._last_known_good[cache_key]
                     if (now_ts - last_ts) < 300.0 and last_res.image_bytes:
                         logger.debug(f"Serving graceful fallback frame for {target_ip} (age: {now_ts - last_ts:.1f}s)")
+                        last_res.is_stale = True
                         return last_res
 
         if not result.success and self.enable_mock_fallback:

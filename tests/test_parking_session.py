@@ -37,6 +37,9 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.SessionLocal = sessionmaker(bind=self.engine)
         self.db = self.SessionLocal()
 
+        self.session_patcher = patch("app.services.monitor_service.SessionLocal", side_effect=self.SessionLocal)
+        self.session_patcher.start()
+
         self.camera = CCTVCamera(
             id=1,
             cs_id="CS_TEST_01",
@@ -57,6 +60,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.monitor.active_sessions.clear()
 
     def tearDown(self):
+        self.session_patcher.stop()
         self.db.close()
         Base.metadata.drop_all(self.engine)
 
@@ -99,7 +103,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         )
 
         camera_key = "CS_TEST_01_CP01"
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Check DB: Exactly 1 record (START)
         records = self.db.query(CCTVSnapshot).all()
@@ -114,8 +118,8 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.monitor.last_seen_state[camera_key]["missed_cycles"], 0)
 
         # 2. Cycles 2 & 3: Car is STILL PARKED (Same plate)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Check DB: Still only 1 record (No duplicates created!)
         records = self.db.query(CCTVSnapshot).all()
@@ -129,17 +133,17 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
 
         # 3. Cycle 4: Frame misses plate (temporary blur)
         mock_detect.return_value = DetectionResult(success=False, plate_number=None)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
         self.assertEqual(self.monitor.last_seen_state[camera_key]["missed_cycles"], 1)
         self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
 
         # 4. Cycle 5: Second missed frame
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
         self.assertEqual(self.monitor.last_seen_state[camera_key]["missed_cycles"], 2)
         self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
 
         # 5. Cycle 6: Third missed frame -> Vehicle has officially EXITED!
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Check DB: Now 2 records (1 START, 1 END)
         records = self.db.query(CCTVSnapshot).order_by(CCTVSnapshot.id.asc()).all()
@@ -167,14 +171,14 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="52어0580", vehicle_type=VehicleTypeEnum.REGULAR, is_ev=False, confidence=0.85
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
         self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
 
         # 2. Next cycle: OCR slightly shifts to 52어0586 (confidence 0.96)
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="52어0586", vehicle_type=VehicleTypeEnum.REGULAR, is_ev=False, confidence=0.96
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Should NOT create a second session! DB still has 1 record
         self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
@@ -191,7 +195,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="58버6091", vehicle_type=VehicleTypeEnum.REGULAR, is_ev=False, confidence=0.88
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         records = self.db.query(CCTVSnapshot).all()
         self.assertEqual(len(records), 1)
@@ -202,14 +206,14 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="81머2072", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.95
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # DB should STILL have only 1 record (Car A is not abruptly evicted on 1 cycle)
         records = self.db.query(CCTVSnapshot).all()
         self.assertEqual(len(records), 1)
 
         # 3. Car B detected for the 2nd cycle (transition confirmed!)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # DB should now have 3 records: Car A START, Car A END, Car B START
         records = self.db.query(CCTVSnapshot).order_by(CCTVSnapshot.id.asc()).all()
@@ -233,13 +237,13 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="81머2072", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.90
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         self.assertIn(camera_key, self.monitor.last_seen_state)
 
         # 2. Network error on camera snapshot
         mock_capture.return_value = CaptureResult(success=False, error_message="RTSP timeout", protocol="RTSP")
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Missed cycles should NOT increase due to camera connection glitch
         self.assertEqual(self.monitor.last_seen_state[camera_key]["missed_cycles"], 0)
@@ -281,7 +285,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="81머2072", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.96
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # DB should STILL have only 1 START record (no duplicate!)
         start_records = self.db.query(CCTVSnapshot).filter(
@@ -412,7 +416,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="47호6633", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.95
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         records = self.db.query(CCTVSnapshot).all()
         self.assertEqual(len(records), 1)
@@ -429,7 +433,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             mock_detect.return_value = DetectionResult(
                 success=True, plate_number=plate_candidate, vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.88
             )
-            await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+            await self.monitor._inspect_camera(self.camera, camera_key)
 
             # DB must STILL have only the single 1 START record!
             records = self.db.query(CCTVSnapshot).all()
@@ -438,7 +442,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         # 4. Simulate OCR complete failure (cable blocking plate)
         for _ in range(10):
             mock_detect.return_value = DetectionResult(success=False, plate_number=None, vehicle_present=True)
-            await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+            await self.monitor._inspect_camera(self.camera, camera_key)
             records = self.db.query(CCTVSnapshot).all()
             self.assertEqual(len(records), 1)
 
@@ -452,9 +456,9 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(success=False, plate_number=None, vehicle_present=False)
 
         # 3 cycles of empty slot -> officially exits
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
+        await self.monitor._inspect_camera(self.camera, camera_key)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Verify DB has exactly 2 records: 1 START and 1 END with 1 day (24 hours) duration
         records = self.db.query(CCTVSnapshot).order_by(CCTVSnapshot.id.asc()).all()
@@ -483,7 +487,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             plate_crop_base64=b64_crop
         )
 
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         records = self.db.query(CCTVSnapshot).all()
         self.assertEqual(len(records), 1)
@@ -504,7 +508,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
         mock_detect.return_value = DetectionResult(
             success=True, plate_number="81머2072", vehicle_type=VehicleTypeEnum.EV, is_ev=True, confidence=0.96
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
         self.assertEqual(mock_save_img.call_count, 1)
 
         # 2. Reset mock save count
@@ -512,9 +516,9 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
 
         # 3. 3 empty cycles -> car leaves (END)
         mock_detect.return_value = DetectionResult(success=False, plate_number=None, vehicle_present=False)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
+        await self.monitor._inspect_camera(self.camera, camera_key)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Verify: Zero image writes were performed on exit!
         self.assertEqual(mock_save_img.call_count, 0)
@@ -542,7 +546,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             confidence=0.92,
             vehicle_present=True
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
         self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
 
         # 2. Intermittent OCR failure for 10 cycles, but YOLO vehicle bbox detected (vehicle_present=True)
@@ -552,7 +556,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
                 plate_number=None,
                 vehicle_present=True
             )
-            await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+            await self.monitor._inspect_camera(self.camera, camera_key)
 
         # DB must still have only 1 START record (not closed, no END record)
         records = self.db.query(CCTVSnapshot).all()
@@ -581,7 +585,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             confidence=0.95,
             vehicle_present=True
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
         self.assertEqual(len(self.db.query(CCTVSnapshot).all()), 1)
 
         # 2. Noisy low-confidence random plate glitch (0.50 confidence)
@@ -593,7 +597,7 @@ class TestParkingSessionLifecycle(unittest.IsolatedAsyncioTestCase):
             confidence=0.50,
             vehicle_present=True
         )
-        await self.monitor._inspect_camera(self.camera, camera_key, self.db)
+        await self.monitor._inspect_camera(self.camera, camera_key)
 
         # Must NOT set pending transition or disrupt anchor plate
         active = self.monitor.active_sessions[camera_key]

@@ -123,6 +123,7 @@ class CameraBase(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     brand: Optional[str] = None
+    roi_settings: Optional[str] = None
     is_active: bool = True
 
 
@@ -139,12 +140,14 @@ class CameraUpdate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     brand: Optional[str] = None
+    roi_settings: Optional[str] = None
     is_active: Optional[bool] = None
     force_save: Optional[bool] = False
 
 
 class CameraResponse(CameraBase):
     id: int
+    roi_settings: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

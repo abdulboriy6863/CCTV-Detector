@@ -17,6 +17,7 @@ from app.services.charger_service import charger_service, format_duration_kr
 class TestChargerService(unittest.TestCase):
 
     def setUp(self):
+        charger_service.clear_cache()
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(bind=self.engine)

@@ -1,5 +1,6 @@
 """Background CCTV monitor — periodic plate detection and parking session management."""
 import asyncio
+import base64
 import logging
 import uuid
 from typing import Dict, Optional
@@ -302,35 +303,67 @@ class AutoMonitorService:
             await asyncio.sleep(self.interval_seconds)
 
     async def check_all_cameras(self):
-        db: Session = SessionLocal()
-        try:
-            cameras = db.query(CCTVCamera).filter(CCTVCamera.is_active.is_(True)).order_by(CCTVCamera.id.asc()).all()
-            if not cameras:
+        with SessionLocal() as db:
+            try:
+                cameras = db.query(CCTVCamera).filter(CCTVCamera.is_active.is_(True)).order_by(CCTVCamera.id.asc()).all()
+                if not cameras:
+                    return
+                for cam in cameras:
+                    db.expunge(cam)
+            except Exception as e:
+                logger.error(f"Error querying active cameras: {e}")
                 return
 
-            for cam in cameras:
+        semaphore = asyncio.Semaphore(3)
+
+        async def inspect_with_sem(cam):
+            async with semaphore:
                 try:
-                    await self._inspect_camera_safe(cam, db)
+                    await self._inspect_camera_safe(cam)
                 except Exception as cam_err:
                     logger.error(f"Error inspecting camera {cam.id} ({cam.cs_id}/{cam.cp_id}): {cam_err}")
-                await asyncio.sleep(0.3)
 
-        except Exception as e:
-            logger.error(f"Error querying active cameras: {e}")
-        finally:
-            try:
-                db.close()
-            except Exception:
-                pass
-            import gc
-            gc.collect()
+        await asyncio.gather(*[inspect_with_sem(cam) for cam in cameras])
 
-    async def _inspect_camera_safe(self, camera: CCTVCamera, db: Session):
+        # Cross-Camera Global Conflict Resolver
+        await self._resolve_cross_camera_conflicts()
+
+        import gc
+        gc.collect()
+
+    async def _resolve_cross_camera_conflicts(self):
+        """
+        Global Cross-Camera Conflict Resolver:
+        If the same vehicle plate is claimed by multiple cameras concurrently:
+        1. Assign exclusive ownership to the primary camera (highest confidence & proximity).
+        2. Release adjacent/ghost session from the secondary camera.
+        """
+        plate_to_cams = {}
+        for cam_key, sess in list(self.active_sessions.items()):
+            plate = sess.get("plate")
+            if not plate:
+                continue
+            norm_plate = plate.replace(" ", "").upper()
+            plate_to_cams.setdefault(norm_plate, []).append((cam_key, sess))
+
+        for norm_plate, cam_list in plate_to_cams.items():
+            if len(cam_list) > 1:
+                cam_list.sort(key=lambda x: x[1].get("confidence", 0.0), reverse=True)
+                winner_key, winner_sess = cam_list[0]
+                for loser_key, loser_sess in cam_list[1:]:
+                    logger.warning(
+                        f"⚠️ Cross-camera conflict resolved for {norm_plate}: "
+                        f"Kept on {winner_key} (Conf: {winner_sess.get('confidence', 0):.2f}), "
+                        f"discarded ghost on {loser_key} (Conf: {loser_sess.get('confidence', 0):.2f})"
+                    )
+                    self.active_sessions.pop(loser_key, None)
+
+    async def _inspect_camera_safe(self, camera: CCTVCamera):
         """Wrapper that acquires per-camera lock before inspection."""
         camera_key = f"cam_{camera.id}"
         lock = self._get_lock(camera_key)
         async with lock:
-            await self._inspect_camera(camera, camera_key, db)
+            await self._inspect_camera(camera, camera_key)
 
     async def _record_start_event(
         self,
@@ -430,10 +463,6 @@ class AutoMonitorService:
         departure_time: Optional[datetime] = None
     ):
         """Record ONE END event when a vehicle departs."""
-        if charger_service.is_physically_plugged(camera.cs_id, camera.cp_id, db):
-            logger.info(f"🔌 [{camera_key}] Cannot close session for {state.get('plate')}: Charger is still plugged in.")
-            return False
-
         now = get_kst_now()
         entry_at = state.get("entry_at", now)
 
@@ -482,8 +511,8 @@ class AutoMonitorService:
 
         logger.info(f"🚗💨 [{camera_key}] Chiqib ketdi: {plate} (To'xtab turish: {duration_text})")
 
-    async def _inspect_camera(self, camera: CCTVCamera, camera_key: str, db: Session):
-        # 1. Capture frame
+    async def _inspect_camera(self, camera: CCTVCamera, camera_key: str):
+        # 1. Capture fresh frame for AI inspection
         capture_result = await camera_service.capture_snapshot(
             camera_type=CameraTypeEnum(camera.camera_type),
             stream_url=camera.stream_url,
@@ -492,11 +521,12 @@ class AutoMonitorService:
             username=camera.username,
             password=camera.password,
             ip_address=camera.ip_address,
-            port=camera.port
+            port=camera.port,
+            force_fresh=True
         )
 
         current_health = self.camera_health.get(camera_key, {"is_online": True, "failed_count": 0})
-        if not capture_result.success or not capture_result.image_bytes:
+        if not capture_result.success or not capture_result.image_bytes or capture_result.is_stale:
             failed_count = current_health.get("failed_count", 0) + 1
             # Mark offline only after 3 consecutive failures (approx 45s of total failure)
             is_offline = failed_count >= 3
@@ -516,42 +546,57 @@ class AutoMonitorService:
             "last_checked_at": get_kst_now()
         }
 
-        # 2. Run detection pipeline
-        det_result = await detection_pipeline.detect(capture_result.image_bytes)
+        # Parse ROI settings if configured
+        roi_dict = None
+        if getattr(camera, "roi_settings", None):
+            try:
+                import json
+                if isinstance(camera.roi_settings, str):
+                    roi_dict = json.loads(camera.roi_settings)
+                elif isinstance(camera.roi_settings, dict):
+                    roi_dict = camera.roi_settings
+            except Exception as e:
+                logger.warning(f"Failed to parse roi_settings for {camera_key}: {e}")
+
+        # 2. Run detection pipeline with Target Parking Bay ROI
+        det_result = await detection_pipeline.detect(capture_result.image_bytes, roi=roi_dict)
 
         now = get_kst_now()
         active = self.active_sessions.get(camera_key)
 
         # 3. Check hardware ground truth from CSMS Charger status
-        is_plugged = charger_service.is_physically_plugged(
-            cs_id=camera.cs_id,
-            cp_id=camera.cp_id,
-            db=db
-        )
+        with SessionLocal() as db:
+            is_plugged = charger_service.is_physically_plugged(
+                cs_id=camera.cs_id,
+                cp_id=camera.cp_id,
+                db=db
+            )
 
         # ----------------------------------------------------
-        # SCENARIO 1: No plate recognized in this frame (or confidence too low)
+        # SCENARIO 1: No plate recognized in this frame OR vehicle not visible in slot
         # ----------------------------------------------------
-        if not det_result.success or not det_result.plate_number or det_result.confidence < 0.45:
+        vehicle_is_visible = getattr(det_result, 'vehicle_present', False)
+
+        if not det_result.success or not det_result.plate_number or (not vehicle_is_visible and det_result.confidence < 0.60):
             if active:
-                vehicle_is_visible = getattr(det_result, 'vehicle_present', False)
-                # If charger is actively plugged or YOLO sees a car in the slot, KEEP SESSION ALIVE!
-                if is_plugged or vehicle_is_visible:
+                # If charger is physically plugged in (hardware ground-truth), keep session alive against cable occlusion
+                if is_plugged and vehicle_is_visible:
                     active["last_seen_at"] = now
                     active["missed_cycles"] = 0
                     active["pending_new_plate"] = None
                     active["pending_cycles"] = 0
-                    if vehicle_is_visible and not is_plugged:
-                        logger.debug(f"🚗 [{camera_key}] Plate not recognized, but vehicle bbox is still visible. Keeping session alive for {active.get('plate')}.")
+                    logger.debug(f"🔌 [{camera_key}] Charger is plugged in & vehicle visible. Keeping session alive for {active.get('plate')}.")
                     return
 
+                # If charger is NOT plugged in (or vehicle departed), increment missed cycles debounce
                 active["missed_cycles"] = active.get("missed_cycles", 0) + 1
                 active["pending_new_plate"] = None
                 active["pending_cycles"] = 0
                 if active["missed_cycles"] >= self.exit_threshold_cycles:
-                    logger.info(f"🚪 [{camera_key}] Slot confirmed empty (no vehicle & unplugged for {self.exit_threshold_cycles} cycles). Closing session for {active.get('plate')}.")
-                    # Vehicle has officially departed (unplugged + no car in frame) -> Close session
-                    closed = await self._close_session(camera, camera_key, active, db)
+                    logger.info(f"🚪 [{camera_key}] Slot confirmed empty (no plate & not charging for {self.exit_threshold_cycles} cycles). Closing session for {active.get('plate')}.")
+                    # Vehicle has officially departed -> Close session
+                    with SessionLocal() as db:
+                        closed = await self._close_session(camera, camera_key, active, db)
                     if closed is not False:
                         del self.active_sessions[camera_key]
             return
@@ -575,13 +620,13 @@ class AutoMonitorService:
                     active["confidence"] = det_result.confidence
                 return
 
-            # If charger is plugged, do not allow false transition caused by OCR noise
-            if is_plugged:
+            # If charger is plugged, do not allow false transition caused by weak OCR noise
+            if is_plugged and det_result.confidence < 0.70:
                 active["last_seen_at"] = now
                 active["missed_cycles"] = 0
                 active["pending_new_plate"] = None
                 active["pending_cycles"] = 0
-                logger.info(f"🔌 [{camera_key}] Charger is plugged in. Retaining anchor session {anchor_or_curr} (ignored noisy candidate {detected_plate})")
+                logger.info(f"🔌 [{camera_key}] Charger is plugged in. Retaining anchor session {anchor_or_curr} (ignored low-confidence candidate {detected_plate} conf={det_result.confidence:.2f})")
                 return
 
 
@@ -601,14 +646,16 @@ class AutoMonitorService:
                     logger.info(f"🔄 [{camera_key}] Transition confirmed: Old {anchor_or_curr} -> New {detected_plate} after {self.transition_threshold_cycles} cycles.")
                     # CONFIRMED TRANSITION:
                     # 1. Close old vehicle session with departure_time = now
-                    closed = await self._close_session(camera, camera_key, active, db, departure_time=now)
+                    with SessionLocal() as db:
+                        closed = await self._close_session(camera, camera_key, active, db, departure_time=now)
                     if closed is not False:
                         del self.active_sessions[camera_key]
 
                     # 2. Open new vehicle session
-                    await self._record_start_event(
-                        camera, camera_key, detected_plate, det_result, capture_result.image_bytes, now, db
-                    )
+                    with SessionLocal() as db:
+                        await self._record_start_event(
+                            camera, camera_key, detected_plate, det_result, capture_result.image_bytes, now, db
+                        )
                     return
                 else:
                     # Waiting for transition confirmation cycles
@@ -624,13 +671,14 @@ class AutoMonitorService:
         # ----------------------------------------------------
         # SCENARIO 3: Slot was EMPTY -> New vehicle arrives
         # ----------------------------------------------------
-        await self._record_start_event(
-            camera, camera_key, detected_plate, det_result, capture_result.image_bytes, now, db
-        )
+        with SessionLocal() as db:
+            await self._record_start_event(
+                camera, camera_key, detected_plate, det_result, capture_result.image_bytes, now, db
+            )
 
 
 auto_monitor_service = AutoMonitorService(
     interval_seconds=settings.MONITOR_INTERVAL_SECONDS,
-    exit_threshold_cycles=8,
-    transition_threshold_cycles=3
+    exit_threshold_cycles=3,
+    transition_threshold_cycles=2
 )

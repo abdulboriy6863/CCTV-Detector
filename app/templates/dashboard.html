@@ -1563,6 +1563,7 @@
                 tvClock: '',
                 tvClockInterval: null,
                 isTvFullscreen: false,
+                isPollingLoop: false,
                 
                 init() {
                     this.$watch('isDark', val => localStorage.setItem('theme', val ? 'dark' : 'light'));
@@ -1579,19 +1580,23 @@
                         this.nowTimestamp = new Date();
                     }, 1000);
                     
-                    // Live polling every 3s for real-time slot, telemetry, and vehicle history updates
+                    // Live polling every 3s with overlap protection to guarantee non-blocking UI
                     setInterval(async () => {
-                        if (document.hidden) return;
+                        if (document.hidden || this.isPollingLoop) return;
+                        this.isPollingLoop = true;
                         this.isSyncing = true;
-                        this.lastFrameTimestamp = Date.now();
                         try {
-                            await Promise.all([
+                            await Promise.allSettled([
                                 this.fetchSlots(),
                                 this.fetchStats(),
                                 this.fetchVehicles(false)
                             ]);
+                            this.lastFrameTimestamp = Date.now();
+                        } catch (err) {
+                            console.debug("Polling cycle error:", err);
                         } finally {
-                            setTimeout(() => { this.isSyncing = false; }, 400);
+                            this.isPollingLoop = false;
+                            setTimeout(() => { this.isSyncing = false; }, 300);
                         }
                     }, 3000);
                 },

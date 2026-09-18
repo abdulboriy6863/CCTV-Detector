@@ -205,6 +205,38 @@ class DetectionPipeline:
                             "source": f"{crop_source}_merged"
                         })
 
+        if n >= 3:
+            for i in range(n):
+                for j in range(n):
+                    if j == i:
+                        continue
+                    for k in range(n):
+                        if k == i or k == j:
+                            continue
+                        boxes_sorted = sorted([(i, ocr_segments[i]), (j, ocr_segments[j]), (k, ocr_segments[k])], 
+                                               key=lambda x: min(p[0] for p in x[1][2]))
+                        
+                        y_centers = [sum(p[1] for p in b[1][2]) / len(b[1][2]) for _, b in boxes_sorted]
+                        if max(y_centers) - min(y_centers) > max(max(p[1] for p in b[1][2]) - min(p[1] for p in b[1][2]) for _, b in boxes_sorted) * 1.5:
+                            continue  # Not collinear
+                        
+                        merged_raw = f"{boxes_sorted[0][1][0]}{boxes_sorted[1][1][0]}{boxes_sorted[2][1][0]}"
+                        avg_conf = (boxes_sorted[0][1][1] + boxes_sorted[1][1][1] + boxes_sorted[2][1][1]) / 3.0
+                        validated = KoreanPlateValidator.validate_and_normalize(merged_raw)
+                        if validated:
+                            plate_str, val_score = validated
+                            pts_all = np.vstack((boxes_sorted[0][1][2], boxes_sorted[1][1][2], boxes_sorted[2][1][2]))
+                            combined_bbox = [np.min(pts_all, axis=0).tolist(), np.max(pts_all, axis=0).tolist()]
+                            candidates.append({
+                                "plate_str": plate_str,
+                                "raw_text": merged_raw,
+                                "confidence": avg_conf,
+                                "val_score": val_score,
+                                "bbox": combined_bbox,
+                                "weight": weight * 1.05,
+                                "source": f"{crop_source}_merged_3box"
+                            })
+
         # 3. Fallback: If no candidate found in raw crop, run on CLAHE contrast-enhanced crop
         if not candidates and crop_img.shape[0] >= 20 and crop_img.shape[1] >= 40:
             enhanced_img = plate_reader._preprocess_plate(crop_img)
@@ -267,13 +299,21 @@ class DetectionPipeline:
             angle += 90
         return rw, rh, angle
 
-    def _extract_deskewed_proposals(self, image: np.ndarray) -> List[Tuple[np.ndarray, str, float]]:
+    def _extract_deskewed_proposals(
+        self, image: np.ndarray, roi: Optional[Dict[str, float]] = None
+    ) -> List[Tuple[np.ndarray, str, float]]:
         """
         Extracts candidate plate regions (Blue EV + White plates + Yellow commercial)
-        and deskews them by their minAreaRect angle with [-45, +45] normalization.
+        inside Target Parking Bay and deskews them by their minAreaRect angle with [-45, +45] normalization.
         """
         h, w = image.shape[:2]
         proposals = []
+
+        roi_cfg = roi if (isinstance(roi, dict) and roi) else {"x_min": 0.52, "y_min": 0.10, "x_max": 0.85, "y_max": 0.98}
+        roi_xmin = float(roi_cfg.get("x_min", 0.52))
+        roi_ymin = float(roi_cfg.get("y_min", 0.10))
+        roi_xmax = float(roi_cfg.get("x_max", 0.85))
+        roi_ymax = float(roi_cfg.get("y_max", 0.98))
 
         try:
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -300,6 +340,13 @@ class DetectionPipeline:
                     if 300 < area < (h * w * 0.20):
                         rect = cv2.minAreaRect(cnt)
                         (cx, cy), (rw, rh), angle = rect
+
+                        # Spatial filter: Must lie within Target Bay ROI (exclude neighboring parking bays)
+                        cx_norm = cx / float(w)
+                        cy_norm = cy / float(h)
+                        if cx_norm < roi_xmin or cx_norm > roi_xmax or cy_norm < roi_ymin or cy_norm > roi_ymax:
+                            continue
+
                         rw, rh, angle = self._normalize_angle(rw, rh, angle)
                         aspect = rw / max(rh, 1.0)
                         if 1.8 <= aspect <= 7.0 and rw > 25:
@@ -325,10 +372,24 @@ class DetectionPipeline:
 
         return proposals
 
-    def _sync_detect(self, image_bytes: bytes) -> DetectionResult:
-        """Synchronous multi-scale detection pipeline with Fast Early-Exit."""
+    def _sync_detect(self, image_bytes: bytes, roi: Optional[Dict[str, float]] = None) -> DetectionResult:
+        """
+        Synchronous multi-scale detection pipeline with Target Parking Bay ROI filtering and Fast Early-Exit.
+        
+        Args:
+            image_bytes: Raw captured camera image bytes
+            roi: Optional dict specifying normalized Target Bay bounding box:
+                 {"x_min": 0.20, "y_min": 0.10, "x_max": 0.80, "y_max": 0.98}
+        """
         result = DetectionResult()
         start_time = time.time()
+
+        roi_cfg = roi if (isinstance(roi, dict) and roi) else {"x_min": 0.52, "y_min": 0.10, "x_max": 0.85, "y_max": 0.98}
+        roi_xmin = float(roi_cfg.get("x_min", 0.52))
+        roi_ymin = float(roi_cfg.get("y_min", 0.10))
+        roi_xmax = float(roi_cfg.get("x_max", 0.85))
+        roi_ymax = float(roi_cfg.get("y_max", 0.98))
+        bay_center_x = (roi_xmin + roi_xmax) / 2.0
 
         try:
             # 1. Decode image bytes
@@ -339,25 +400,39 @@ class DetectionPipeline:
                 return result
 
             # Smart resize to optimize speed (960px is optimal for both vehicle detection and OCR)
-            image, _ = self._smart_resize(raw_image, max_dim=960)
+            image, img_scale = self._smart_resize(raw_image, max_dim=960)
             h_img, w_img = image.shape[:2]
 
             crops_to_test: List[Tuple[np.ndarray, str, float]] = []
 
-            # 2. Detect vehicles with YOLOv8 and prioritize primary foreground vehicle
+            # 2. Detect vehicles with YOLOv8 and prioritize primary vehicle in Target Bay ROI
             yolo = self._get_yolo()
             vehicles = []
             if yolo is not None:
                 try:
-                    yolo_res = yolo(image, conf=0.12, verbose=False)
+                    yolo_res = yolo(image, conf=0.20, verbose=False)
                     for r in yolo_res:
                         for box in r.boxes:
                             cls_id = int(box.cls[0])
                             cls_name = r.names.get(cls_id, "")
+                            box_conf = float(box.conf[0])
                             if cls_name in ["car", "truck", "bus"]:
                                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                                 area = (x2 - x1) * (y2 - y1)
-                                vehicles.append((area, [x1, y1, x2, y2], cls_name))
+                                cx_norm = ((x1 + x2) / 2.0) / float(w_img)
+                                cy_bottom_norm = float(y2) / float(h_img)
+                                
+                                # Target Parking Bay ROI filtering:
+                                # Vehicle must be horizontally centered in the target charging slot
+                                if roi_xmin <= cx_norm <= roi_xmax and cy_bottom_norm >= (roi_ymin * 0.5):
+                                    dist_to_center = abs(cx_norm - bay_center_x)
+                                    prox_weight = max(0.2, 1.0 - 1.8 * dist_to_center)
+                                    score = area * prox_weight * (box_conf + 0.5)
+                                    vehicles.append((score, [x1, y1, x2, y2], cls_name, area, box_conf))
+                                else:
+                                    logger.debug(
+                                        f"Bypassing neighboring vehicle at cx={cx_norm:.2f} (Target Bay: [{roi_xmin:.2f}, {roi_xmax:.2f}])"
+                                    )
                 except Exception as e:
                     logger.error(f"YOLO error: {e}")
 
@@ -367,32 +442,41 @@ class DetectionPipeline:
                 result.vehicle_present = True
                 result.vehicle_box = vehicles[0][1]
                 result.detected_vehicle_type = vehicles[0][2]
-                # Add Bumper ROI (lower 45% of primary vehicle) - FIRST priority
-                area, (x1, y1, x2, y2), cls_name = vehicles[0]
+                
+                # Test bumper of the top target bay vehicles (primary + potential backup in slot)
+                for v_score, (x1, y1, x2, y2), cls_name, _, _ in vehicles[:2]:
+                    vh = y2 - y1
+                    vw = x2 - x1
+                    by1 = max(0, y1 + int(vh * 0.35))
+                    by2 = min(h_img, y2 + int(vh * 0.10))
+                    bx1 = max(0, x1 - int(vw * 0.05))
+                    bx2 = min(w_img, x2 + int(vw * 0.05))
+                    
+                    inv_scale = 1.0 / img_scale
+                    r_by1, r_by2 = int(by1 * inv_scale), int(by2 * inv_scale)
+                    r_bx1, r_bx2 = int(bx1 * inv_scale), int(bx2 * inv_scale)
+                    
+                    bumper_crop = raw_image[r_by1:r_by2, r_bx1:r_bx2]
+                    if bumper_crop.size > 0 and (r_by2 - r_by1) > 20 and (r_bx2 - r_bx1) > 40:
+                        crops_to_test.append((bumper_crop, f"{cls_name}_bumper_roi", 1.5))
 
-                vh = y2 - y1
-                vw = x2 - x1
-                by1 = max(0, y1 + int(vh * 0.40))
-                by2 = min(h_img, y2 + int(vh * 0.05))
-                bx1 = max(0, x1 - int(vw * 0.05))
-                bx2 = min(w_img, x2 + int(vw * 0.05))
-                bumper_crop = image[by1:by2, bx1:bx2]
-                if bumper_crop.size > 0 and (by2 - by1) > 20 and (bx2 - bx1) > 40:
-                    crops_to_test.append((bumper_crop, f"{cls_name}_bumper_roi", 1.5))
-
-                # Add deskewed color proposals
-                deskewed_props = self._extract_deskewed_proposals(image)
+                # Add deskewed color proposals inside Target Bay
+                deskewed_props = self._extract_deskewed_proposals(image, roi=roi_cfg)
                 crops_to_test.extend(deskewed_props[:3])
             else:
-                # No vehicle detected by YOLO -> check deskewed proposals + Lower Parking Bay ROI
-                deskewed_props = self._extract_deskewed_proposals(image)
+                # No vehicle detected in target bay -> check deskewed proposals + Target Bay crop
+                deskewed_props = self._extract_deskewed_proposals(image, roi=roi_cfg)
                 if deskewed_props:
                     crops_to_test.extend(deskewed_props[:3])
 
-                # Add lower parking slot region (lower 65% of entire frame)
-                lower_bay = image[int(h_img * 0.35):h_img, 0:w_img]
-                if lower_bay.size > 0:
-                    crops_to_test.append((lower_bay, "lower_parking_bay_roi", 1.1))
+                # Add Target Parking Slot region (strictly within horizontal and vertical bay bounds)
+                by1_crop = max(0, int(h_img * roi_ymin))
+                by2_crop = min(h_img, int(h_img * roi_ymax))
+                bx1_crop = max(0, int(w_img * roi_xmin))
+                bx2_crop = min(w_img, int(w_img * roi_xmax))
+                target_bay_crop = image[by1_crop:by2_crop, bx1_crop:bx2_crop]
+                if target_bay_crop.size > 0:
+                    crops_to_test.append((target_bay_crop, "target_parking_bay_roi", 1.1))
 
             # Add full image fallback if no crops available
             if not crops_to_test:
@@ -442,6 +526,7 @@ class DetectionPipeline:
                         best_candidate = {
                             "plate_number": plate_str,
                             "confidence": ocr_conf,
+                            "val_score": val_score,
                             "raw_text": cand["raw_text"],
                             "ev_result": ev_result,
                             "plate_crop": tight_crop,
@@ -449,12 +534,17 @@ class DetectionPipeline:
                         }
 
                 # Early Exit: If valid legal plate found with strong score on bumper/crop, stop immediately!
-                if best_candidate and best_score >= 0.45:
+                if best_candidate and (
+                    (best_candidate["confidence"] >= 0.35 and best_score >= 0.40) or
+                    (best_candidate.get("val_score", 0) >= 1.0 and best_candidate["confidence"] >= 0.16 and best_score >= 0.20)
+                ):
                     break
 
             # 4. Build Final Result with Calibrated Threshold
-            MIN_CONFIDENCE_THRESHOLD = 0.38
-            MIN_TOTAL_SCORE = 0.30
+            # Perfect standard plate regex format (val_score == 1.0) accepts calibrated low-res OCR confidences
+            is_perfect_plate = best_candidate and best_candidate.get("val_score", 0) >= 1.0
+            MIN_CONFIDENCE_THRESHOLD = 0.16 if is_perfect_plate else 0.38
+            MIN_TOTAL_SCORE = 0.20 if is_perfect_plate else 0.30
 
             if best_candidate and best_candidate["confidence"] >= MIN_CONFIDENCE_THRESHOLD and best_score >= MIN_TOTAL_SCORE:
                 result.success = True
@@ -515,7 +605,7 @@ class DetectionPipeline:
         crop_x2 = min(w, x2 + pad_x)
         crop_y2 = min(h, y2 + pad_y)
         
-        crop = image[crop_y1:crop_y2, crop_x1:crop_x2]
+        crop = image[crop_y1:crop_y2, crop_x1:crop_y2]
         if crop.size == 0:
             return None
             
@@ -530,9 +620,9 @@ class DetectionPipeline:
         raw_b64 = base64.b64encode(buffer.tobytes()).decode("utf-8")
         return f"data:image/jpeg;base64,{raw_b64}"
 
-    async def detect(self, image_bytes: bytes) -> DetectionResult:
-        """Async wrapper — runs detection in thread pool."""
-        return await asyncio.to_thread(self._sync_detect, image_bytes)
+    async def detect(self, image_bytes: bytes, roi: Optional[Dict[str, float]] = None) -> DetectionResult:
+        """Async wrapper — runs detection in thread pool with Target Bay ROI support."""
+        return await asyncio.to_thread(self._sync_detect, image_bytes, roi)
 
 
 # Class Aliases & Singleton

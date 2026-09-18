@@ -93,12 +93,6 @@ class KoreanPlateValidator:
     # 4. Angled / Tilted Qiya holatdagi oraliq artifactlar (e.g. 312버61321 -> 312버6132)
     PATTERN_SEARCH_ROBUST = re.compile(r"(\d{2,3})([가-힣])\D*?(\d{4})")
 
-    # 5. Uzoq masofadagi harfi xira 8-xonali (e.g. 12304567)
-    PATTERN_DISTANT_8 = re.compile(r"^(\d{3})([A-Za-z0-9])(\d{4})$")
-
-    # 6. Uzoq masofadagi harfi xira 7-xonali (e.g. 8102017)
-    PATTERN_DISTANT_7 = re.compile(r"^(\d{2})([A-Za-z0-9])(\d{4})$")
-
     # Anti-patterns (Customer service numbers, charging station IDs, phone prefixes)
     REJECT_PREFIXES = ("1522", "1588", "1600", "1899", "080", "1544", "1644", "1688", "070", "050")
 
@@ -173,38 +167,13 @@ class KoreanPlateValidator:
                 d2, legal_h = cls.HANGUL_MERGED_MAP[h]
                 return f"{d1}{d2}{legal_h}{suffix}", 0.85
 
-        # 6. Uzoq masofali 8-xonali xira harf (Faqat qat'iy harf xaritasidan)
-        m = cls.PATTERN_DISTANT_8.match(cleaned)
-        if m:
-            prefix, mid, suffix = m.groups()
-            map_key = mid if mid in cls.OCR_HANGUL_MAP else mid.upper()
-            if map_key in cls.OCR_HANGUL_MAP:
-                return f"{prefix}{cls.OCR_HANGUL_MAP[map_key]}{suffix}", 0.78
-
-        # 7. Uzoq masofali 7-xonali xira harf (Faqat qat'iy harf xaritasidan)
-        m = cls.PATTERN_DISTANT_7.match(cleaned)
-        if m:
-            prefix, mid, suffix = m.groups()
-            map_key = mid if mid in cls.OCR_HANGUL_MAP else mid.upper()
-            if map_key in cls.OCR_HANGUL_MAP:
-                return f"{prefix}{cls.OCR_HANGUL_MAP[map_key]}{suffix}", 0.78
-
-        # 8. O'rtadagi harfi kabel yoki soya ostida qolgan holatlar (e.g. 47 6634 -> 476634, 147 6634 -> 1476634)
-        m_missing = re.match(r"^(\d{2,3})(\d{4})$", cleaned)
-        if m_missing:
-            prefix, suffix = m_missing.groups()
-            # EV Registry yoki tasdiqlangan bazadan mos keluvchi raqamni topish
-            try:
-                from app.services.detector.ev_classifier import ev_classifier
-                with ev_classifier._lock:
-                    for known_plate in ev_classifier._confirmed_ev_plates:
-                        clean_known = re.sub(r"[^가-힣0-9]", "", known_plate)
-                        if clean_known.startswith(prefix) and clean_known.endswith(suffix):
-                            return known_plate, 0.90
-            except Exception:
-                pass
-            # Default fallback for separated digits
-            return f"{prefix}호{suffix}", 0.72
+        # 6. OCR xatosi: O'rtadagi harf raqam yoki lotin harfi bo'lib o'qilgan holat (e.g. 5841638 -> 58머1638, 52o0586 -> 52어0586)
+        m_ocr = re.match(r"^(\d{2,3})([A-Za-z0-9])(\d{4})$", cleaned)
+        if m_ocr:
+            prefix, mid_char, suffix = m_ocr.groups()
+            if mid_char in cls.OCR_HANGUL_MAP:
+                recovered_h = cls.OCR_HANGUL_MAP[mid_char]
+                return f"{prefix}{recovered_h}{suffix}", 0.90
 
         return None
 
@@ -259,10 +228,6 @@ class KoreanPlateValidator:
                 prev = cur
             return prev[-1]
 
-        if len(clean_a) >= 6 and len(clean_c) >= 6:
-            if abs(len(clean_a) - len(clean_c)) <= 1 and _lev(clean_a, clean_c) <= 1:
-                return True
-
         # 3. Component decomposition (Prefix digits + Hangul + Suffix digits)
         comp_a = cls.parse_plate_components(clean_a)
         comp_c = cls.parse_plate_components(clean_c)
@@ -273,9 +238,6 @@ class KoreanPlateValidator:
 
             # Prefix must match (e.g. '47' == '47' or '312' == '312')
             if pfx_a != pfx_c:
-                # Allow minor 1-char prefix difference only if suffix matches 100%
-                if sfx_a == sfx_c and _lev(pfx_a, pfx_c) <= 1:
-                    return True
                 return False
 
             # Hangul compatibility map (letters frequently confused by vertical cable line)
@@ -298,8 +260,8 @@ class KoreanPlateValidator:
                     return False
 
             # Suffix digit comparison with cable vertical stroke confusion
-            # Digits easily deformed by vertical cable shadow: {3, 6, 8, 9, 0, 5}
-            CABLE_DIGIT_CONFUSION = {"3", "6", "8", "9", "0", "5"}
+            # Digits easily deformed by vertical cable shadow or OCR jitter: {0, 1, 2, 3, 5, 6, 7, 8, 9}
+            CABLE_DIGIT_CONFUSION = {"0", "1", "2", "3", "5", "6", "7", "8", "9"}
 
             if sfx_a == sfx_c:
                 return True
@@ -308,10 +270,8 @@ class KoreanPlateValidator:
                 # Count matching digit positions
                 diff_indices = [idx for idx in range(4) if sfx_a[idx] != sfx_c[idx]]
                 if len(diff_indices) == 1:
-                    # Exactly 1 digit differs (e.g. 6633 vs 3633, 8633, 9633)
-                    idx = diff_indices[0]
-                    d1, d2 = sfx_a[idx], sfx_c[idx]
-                    if (d1 in CABLE_DIGIT_CONFUSION and d2 in CABLE_DIGIT_CONFUSION) or hangul_match:
+                    # Exactly 1 digit differs (e.g. 6633 vs 3633, 8633, 9633, 2072 vs 2078)
+                    if hangul_match:
                         return True
 
                 if len(diff_indices) == 2:

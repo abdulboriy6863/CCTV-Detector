@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.config import get_kst_now
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.snapshot import CCTVCamera
 from app.schemas.snapshot import CameraCreate, CameraUpdate, CameraResponse, CameraTypeEnum, SlotStatusResponse, CameraProbeRequest, CameraProbeResponse
 from app.services.camera_service import camera_service
@@ -14,6 +14,7 @@ from app.services.charger_service import charger_service
 import logging
 import base64
 import time
+import asyncio
 
 logger = logging.getLogger("cctv_cameras")
 router = APIRouter()
@@ -41,6 +42,7 @@ def get_cached_camera_meta(camera_id: int, db: Session):
         "password": cam.password,
         "ip_address": cam.ip_address,
         "port": cam.port,
+        "roi_settings": cam.roi_settings,
         "is_active": cam.is_active
     }
     _camera_meta_cache[camera_id] = meta
@@ -176,6 +178,7 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
         port=final_port,
         username=camera_in.username,
         password=camera_in.password,
+        roi_settings=camera_in.roi_settings,
         is_active=camera_in.is_active,
         created_at=get_kst_now(),
         updated_at=get_kst_now()
@@ -239,7 +242,8 @@ async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = D
             update_data['camera_type'] = detected_type.value
 
     if 'camera_type' in update_data and update_data['camera_type']:
-        update_data['camera_type'] = update_data['camera_type'].value
+        val = update_data['camera_type']
+        update_data['camera_type'] = val.value if hasattr(val, 'value') else str(val)
     for key, value in update_data.items():
         setattr(cam, key, value)
     cam.updated_at = get_kst_now()
@@ -319,6 +323,23 @@ async def get_camera_frame(camera_id: int, db: Session = Depends(get_db)):
     if not meta:
         raise HTTPException(status_code=404, detail="Camera not found")
 
+    # 1. Ultra-fast path: Serve cached frame immediately (0.001s latency)
+    cache_key = camera_service._get_cache_key(
+        camera_type=CameraTypeEnum(meta["camera_type"]),
+        stream_url=meta["stream_url"],
+        ip_address=meta["ip_address"],
+        port=meta["port"]
+    )
+    with camera_service._cache_lock:
+        if cache_key in camera_service._snapshot_cache:
+            ts, res = camera_service._snapshot_cache[cache_key]
+            if (time.time() - ts) < 2.5 and res.success and res.image_bytes:
+                return Response(
+                    content=res.image_bytes,
+                    media_type="image/jpeg",
+                    headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+                )
+
     result = await camera_service.capture_snapshot(
         camera_type=CameraTypeEnum(meta["camera_type"]),
         stream_url=meta["stream_url"],
@@ -366,7 +387,7 @@ async def get_camera_frame(camera_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{camera_id}/stream", summary="Live continuous MJPEG video stream")
 @router.get("/{camera_id}/live", summary="Live continuous MJPEG video stream alias")
-async def stream_camera(camera_id: int, db: Session = Depends(get_db)):
+async def stream_camera(camera_id: int):
     """
     Streams continuous live video (MJPEG) from CCTV RTSP/HTTP camera.
     Compatible with standard <img> tags in any browser.
@@ -375,17 +396,19 @@ async def stream_camera(camera_id: int, db: Session = Depends(get_db)):
     from app.services.camera_service import camera_service
     from app.schemas.snapshot import CameraTypeEnum
 
-    cam = db.query(CCTVCamera).filter(CCTVCamera.id == camera_id).first()
-    if not cam:
+    with SessionLocal() as db:
+        meta = get_cached_camera_meta(camera_id, db)
+    
+    if not meta:
         raise HTTPException(status_code=404, detail="Camera not found")
 
     stream_generator = camera_service.get_live_stream(
-        camera_type=CameraTypeEnum(cam.camera_type),
-        stream_url=cam.stream_url,
-        username=cam.username,
-        password=cam.password,
-        ip_address=cam.ip_address,
-        port=cam.port
+        camera_type=CameraTypeEnum(meta["camera_type"]),
+        stream_url=meta["stream_url"],
+        username=meta["username"],
+        password=meta["password"],
+        ip_address=meta["ip_address"],
+        port=meta["port"]
     )
     return StreamingResponse(
         stream_generator,

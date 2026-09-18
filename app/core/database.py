@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 connect_args = {}
 if "mysql" in settings.database_url:
-    connect_args = {"connect_timeout": 3}
+    connect_args = {"connect_timeout": 3, "read_timeout": 10, "write_timeout": 10}
 
 engine = create_engine(
     settings.database_url,
@@ -28,7 +28,7 @@ Base = declarative_base()
 try:
     csms_connect_args = {}
     if "mysql" in settings.csms_database_url:
-        csms_connect_args = {"connect_timeout": 2}
+        csms_connect_args = {"connect_timeout": 3, "read_timeout": 10, "write_timeout": 10}
     csms_engine = create_engine(
         settings.csms_database_url,
         pool_size=settings.DB_POOL_SIZE,

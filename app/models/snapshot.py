@@ -55,6 +55,11 @@ class CCTVSnapshot(Base):
         Index("idx_plate_created", "plate_number", "created_at"),
         Index("idx_vehicle_type", "vehicle_type"),
         Index("idx_is_ev", "is_ev"),
+        Index('idx_event_source_created', 'event_type', 'detection_source', 'created_at'),
+        Index('idx_session_event', 'session_id', 'event_type'),
+        Index('idx_ev_created', 'is_ev', 'created_at'),
+        Index('idx_vtype_created', 'vehicle_type', 'created_at'),
+        Index('idx_created_at', 'created_at'),
         {"extend_existing": True}
     )
 
@@ -83,6 +88,7 @@ class CCTVCamera(Base):
     username = Column(String(100), nullable=True)
     password = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    roi_settings = Column(String(255), nullable=True, comment="JSON Target Bay ROI boundaries {x_min, y_min, x_max, y_max}")
     created_at = Column(DateTime, default=get_kst_now, nullable=False)
     updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now, nullable=False)
 

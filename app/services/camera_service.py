@@ -940,8 +940,10 @@ class CameraService:
                 host = clean_url.split("://")[-1].split("/")[0].split(":")[0]
             except Exception:
                 host = "unknown"
-        eff_port = port or (80 if camera_type == CameraTypeEnum.HTTP_SNAPSHOT else 554)
-        return f"{camera_type.value}_{host}_{eff_port}_{clean_url}"
+        eff_type = camera_type.value if hasattr(camera_type, "value") else str(camera_type)
+        eff_port = port or (80 if eff_type == "HTTP_SNAPSHOT" else 554)
+        return f"{eff_type}_{host}_{eff_port}_{clean_url}"
+
 
     def _get_ip_lock(self, ip: str) -> asyncio.Lock:
         with self._ip_locks_guard:

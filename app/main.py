@@ -47,8 +47,26 @@ async def lifespan(app: FastAPI):
                 if r[0]:
                     ev_classifier.register_ev_plate(r[0])
             logger.info(f"Loaded {len(ev_snaps)} verified EV license plates into EV registry.")
+
+            # Pre-warm RTSP streams for zero-latency live viewing
+            from app.models.snapshot import CCTVCamera
+            from app.services.camera_service import camera_service, RTSPStreamHub
+            from app.schemas.snapshot import CameraTypeEnum
+            rtsp_cams = db.query(CCTVCamera).filter(CCTVCamera.is_active.is_(True), CCTVCamera.camera_type == "RTSP").all()
+            for cam in rtsp_cams:
+                url = camera_service.adapters[CameraTypeEnum.RTSP].format_rtsp_url(
+                    stream_url=cam.stream_url,
+                    username=cam.username,
+                    password=cam.password,
+                    ip_address=cam.ip_address,
+                    port=cam.port
+                )
+                hub = RTSPStreamHub.get_stream(url)
+                hub.start()
+            logger.info(f"Pre-warmed {len(rtsp_cams)} RTSP live stream workers.")
     except Exception as e:
         logger.warning(f"Database setup / EV preload issue: {e}")
+
 
     # Start background monitor
     await auto_monitor_service.start()

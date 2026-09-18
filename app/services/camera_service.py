@@ -118,9 +118,9 @@ VENDOR_HTTP_SNAPSHOT_PRESETS = {
 
 class RTSPStreamHub:
     """
-    Zero-latency RTSP Live Stream Hub with self-healing reconnection.
+    Zero-latency RTSP Live Stream Hub with self-healing background reconnection.
     Maintains a dedicated background worker thread per camera URL that constantly
-    drains the OpenCV/FFmpeg socket buffer at full camera frame rate and caches only the latest JPEG.
+    drains the OpenCV/FFmpeg socket buffer at full camera frame rate and caches only the latest JPEG in memory.
     """
     _instances: Dict[str, "RTSPStreamHub"] = {}
     _lock = threading.Lock()
@@ -140,49 +140,56 @@ class RTSPStreamHub:
                 cls._instances[url] = RTSPStreamHub(url)
             return cls._instances[url]
 
-    def add_subscriber(self):
+    def start(self):
         with self._lock:
-            self.subscribers += 1
-            if not self.running:
+            if not self.running or self.thread is None or not self.thread.is_alive():
                 self.running = True
                 self.thread = threading.Thread(target=self._reader_worker, daemon=True)
                 self.thread.start()
 
+    def get_latest_frame(self, max_age_seconds: float = 4.0) -> Optional[bytes]:
+        self.start()
+        if self.latest_jpeg and (time.time() - self.last_frame_time) <= max_age_seconds:
+            return self.latest_jpeg
+        return None
+
+    def add_subscriber(self):
+        with self._lock:
+            self.subscribers += 1
+            self.start()
+
     def remove_subscriber(self):
         with self._lock:
             self.subscribers = max(0, self.subscribers - 1)
-            if self.subscribers == 0:
-                self.running = False
 
     def _reader_worker(self):
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;3000000|buffer_size;1024000|max_delay;500000"
-        cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
-        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
-        target_width = 960
+        cap = cv2.VideoCapture(self.url)
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+        target_width = 1280
         fail_count = 0
 
         try:
             while self.running:
                 if not cap.isOpened():
-                    cap.open(self.url, cv2.CAP_FFMPEG)
+                    cap.open(self.url)
                     if not cap.isOpened():
                         time.sleep(1.0)
                         continue
 
                 ret, frame = cap.read()
-                if not ret or frame is None:
+                if not ret or frame is None or frame.size == 0:
                     fail_count += 1
-                    if fail_count > 50:  # ~1 second of failures
-                        logger.warning(f"RTSPStreamHub: {fail_count} consecutive read failures, reconnecting...")
+                    if fail_count > 25:  # ~1 second of consecutive failures
                         try:
                             cap.release()
-                            time.sleep(1.0)
-                            cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+                            time.sleep(0.5)
+                            cap = cv2.VideoCapture(self.url)
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             fail_count = 0
                         except Exception as e:
-                            logger.error(f"RTSPStreamHub reconnect failed: {e}")
-                            time.sleep(2.0)
+                            logger.error(f"RTSPStreamHub reconnect failed for {self.url}: {e}")
+                            time.sleep(1.0)
                     else:
                         time.sleep(0.02)
                     continue
@@ -198,11 +205,17 @@ class RTSPStreamHub:
                 if success:
                     self.latest_jpeg = buffer.tobytes()
                     self.last_frame_time = time.time()
+                
+                time.sleep(0.03)  # Smooth ~30fps frame pacing
         except Exception as e:
             logger.error(f"Error in RTSPStreamHub worker for {self.url}: {e}")
         finally:
             self.running = False
-            cap.release()
+            try:
+                cap.release()
+            except Exception:
+                pass
+
 
 
 @dataclass
@@ -388,8 +401,20 @@ class RTSPCameraAdapter(BaseCameraAdapter):
             ip_address=ip_address,
             port=port
         )
+        # 1. Zero-latency path: Check RTSPStreamHub in-memory frame buffer
+        hub = RTSPStreamHub.get_stream(formatted_url)
+        cached_jpeg = hub.get_latest_frame(max_age_seconds=4.0)
+        if cached_jpeg:
+            return CaptureResult(
+                success=True,
+                image_bytes=cached_jpeg,
+                width=1280,
+                height=720,
+                protocol="RTSP"
+            )
+
         try:
-            # 1. Try TCP transport first
+            # 2. Try TCP transport first
             res = await asyncio.wait_for(
                 asyncio.to_thread(self._sync_capture, formatted_url, eff_timeout, True),
                 timeout=eff_timeout
@@ -397,7 +422,7 @@ class RTSPCameraAdapter(BaseCameraAdapter):
             if res.success:
                 return res
 
-            # 2. Fallback to UDP if TCP failed
+            # 3. Fallback to UDP if TCP failed
             logger.debug(f"TCP capture failed for {formatted_url}, trying UDP transport...")
             return await asyncio.wait_for(
                 asyncio.to_thread(self._sync_capture, formatted_url, eff_timeout * 0.8, False),
@@ -411,6 +436,7 @@ class RTSPCameraAdapter(BaseCameraAdapter):
                 error_message=f"RTSP capture timed out after {eff_timeout}s",
                 protocol="RTSP"
             )
+
 
     async def stream_frames(
         self,

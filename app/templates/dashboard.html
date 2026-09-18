@@ -2209,9 +2209,14 @@
                 openTvWall() {
                     this.tvWallModal = true;
                     this.updateTvClock();
+                    this.lastFrameTimestamp = Date.now();
                     if (this.tvClockInterval) clearInterval(this.tvClockInterval);
-                    this.tvClockInterval = setInterval(() => this.updateTvClock(), 1000);
+                    this.tvClockInterval = setInterval(() => {
+                        this.updateTvClock();
+                        this.lastFrameTimestamp = Date.now();
+                    }, 1000);
                 },
+
 
                 closeTvWall() {
                     this.tvWallModal = false;

@@ -343,7 +343,25 @@ async def get_camera_frame(camera_id: int, db: Session = Depends(get_db)):
     if not meta:
         raise HTTPException(status_code=404, detail="Camera not found")
 
-    # 1. Ultra-fast path: Serve cached frame immediately (0.001s latency)
+    # 1. Instant RTSP in-memory buffer check (0.0005s latency)
+    if meta.get("camera_type") == "RTSP":
+        formatted_url = camera_service.adapters[CameraTypeEnum.RTSP].format_rtsp_url(
+            stream_url=meta["stream_url"],
+            username=meta["username"],
+            password=meta["password"],
+            ip_address=meta["ip_address"],
+            port=meta["port"]
+        )
+        hub = RTSPStreamHub.get_stream(formatted_url)
+        jpeg = hub.get_latest_frame(max_age_seconds=4.0)
+        if jpeg:
+            return Response(
+                content=jpeg,
+                media_type="image/jpeg",
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+            )
+
+    # 2. Fast path: Serve cached frame immediately (0.001s latency)
     cache_key = camera_service._get_cache_key(
         camera_type=CameraTypeEnum(meta["camera_type"]),
         stream_url=meta["stream_url"],
@@ -353,12 +371,13 @@ async def get_camera_frame(camera_id: int, db: Session = Depends(get_db)):
     with camera_service._cache_lock:
         if cache_key in camera_service._snapshot_cache:
             ts, res = camera_service._snapshot_cache[cache_key]
-            if (time.time() - ts) < 2.5 and res.success and res.image_bytes:
+            if (time.time() - ts) < 3.0 and res.success and res.image_bytes:
                 return Response(
                     content=res.image_bytes,
                     media_type="image/jpeg",
                     headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
                 )
+
 
     result = await camera_service.capture_snapshot(
         camera_type=CameraTypeEnum(meta["camera_type"]),

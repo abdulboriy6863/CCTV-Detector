@@ -216,8 +216,8 @@ class DetectionPipeline:
                         boxes_sorted = sorted([(i, ocr_segments[i]), (j, ocr_segments[j]), (k, ocr_segments[k])], 
                                                key=lambda x: min(p[0] for p in x[1][2]))
                         
-                        y_centers = [sum(p[1] for p in b[1][2]) / len(b[1][2]) for _, b in boxes_sorted]
-                        if max(y_centers) - min(y_centers) > max(max(p[1] for p in b[1][2]) - min(p[1] for p in b[1][2]) for _, b in boxes_sorted) * 1.5:
+                        y_centers = [sum(p[1] for p in b[2]) / len(b[2]) for _, b in boxes_sorted]
+                        if max(y_centers) - min(y_centers) > max(max(p[1] for p in b[2]) - min(p[1] for p in b[2]) for _, b in boxes_sorted) * 1.5:
                             continue  # Not collinear
                         
                         merged_raw = f"{boxes_sorted[0][1][0]}{boxes_sorted[1][1][0]}{boxes_sorted[2][1][0]}"
@@ -309,11 +309,11 @@ class DetectionPipeline:
         h, w = image.shape[:2]
         proposals = []
 
-        roi_cfg = roi if (isinstance(roi, dict) and roi) else {"x_min": 0.52, "y_min": 0.10, "x_max": 0.85, "y_max": 0.98}
-        roi_xmin = float(roi_cfg.get("x_min", 0.52))
-        roi_ymin = float(roi_cfg.get("y_min", 0.10))
-        roi_xmax = float(roi_cfg.get("x_max", 0.85))
-        roi_ymax = float(roi_cfg.get("y_max", 0.98))
+        roi_cfg = roi if (isinstance(roi, dict) and roi) else {"x_min": 0.0, "y_min": 0.0, "x_max": 1.0, "y_max": 1.0}
+        roi_xmin = float(roi_cfg.get("x_min", 0.0))
+        roi_ymin = float(roi_cfg.get("y_min", 0.0))
+        roi_xmax = float(roi_cfg.get("x_max", 1.0))
+        roi_ymax = float(roi_cfg.get("y_max", 1.0))
 
         try:
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -384,11 +384,11 @@ class DetectionPipeline:
         result = DetectionResult()
         start_time = time.time()
 
-        roi_cfg = roi if (isinstance(roi, dict) and roi) else {"x_min": 0.52, "y_min": 0.10, "x_max": 0.85, "y_max": 0.98}
-        roi_xmin = float(roi_cfg.get("x_min", 0.52))
-        roi_ymin = float(roi_cfg.get("y_min", 0.10))
-        roi_xmax = float(roi_cfg.get("x_max", 0.85))
-        roi_ymax = float(roi_cfg.get("y_max", 0.98))
+        roi_cfg = roi if (isinstance(roi, dict) and roi) else {"x_min": 0.0, "y_min": 0.0, "x_max": 1.0, "y_max": 1.0}
+        roi_xmin = float(roi_cfg.get("x_min", 0.0))
+        roi_ymin = float(roi_cfg.get("y_min", 0.0))
+        roi_xmax = float(roi_cfg.get("x_max", 1.0))
+        roi_ymax = float(roi_cfg.get("y_max", 1.0))
         bay_center_x = (roi_xmin + roi_xmax) / 2.0
 
         try:

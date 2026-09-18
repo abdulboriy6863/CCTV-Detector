@@ -28,9 +28,9 @@ class EVClassifier:
     """
 
     def __init__(self):
-        # Adaptive HSV ranges
-        self.BLUE_HSV_LOWER = np.array([80, 20, 40])
-        self.BLUE_HSV_UPPER = np.array([140, 255, 255])
+        # Adaptive HSV ranges (Korean Sky-Blue EV plates: H=85..135, S>=45, V>=50)
+        self.BLUE_HSV_LOWER = np.array([85, 45, 50])
+        self.BLUE_HSV_UPPER = np.array([135, 255, 255])
 
         # Yellow (Commercial Taxi/Bus)
         self.YELLOW_LOWER = np.array([15, 60, 80])
@@ -90,27 +90,32 @@ class EVClassifier:
                     plate_color="unknown", blue_ratio=0.0, confidence=0.0
                 )
 
+            # Focus on inner plate region (excludes outer bumper and frame margins)
+            inner_crop = plate_crop[int(h*0.08):int(h*0.92), int(w*0.04):int(w*0.96)]
+            if inner_crop.size == 0:
+                inner_crop = plate_crop
+
             # 2. Text Masking (Otsu threshold to exclude dark text pixels)
-            gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(inner_crop, cv2.COLOR_BGR2GRAY)
             _, text_mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             bg_pixels = max(1, cv2.countNonZero(text_mask))
 
             # 3. CIE-LAB Color Space Analysis (Perceptual Blue Chrominance b* channel)
-            lab = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2LAB)
+            lab = cv2.cvtColor(inner_crop, cv2.COLOR_BGR2LAB)
             l_chan, a_chan, b_lab = cv2.split(lab)
-            # In OpenCV LAB, b channel represents Yellow-Blue (values < 124 represent negative b*, i.e. blue)
-            lab_blue_mask = (b_lab < 122).astype(np.uint8) * 255
+            # In OpenCV LAB, b channel <= 118 represents true blue spectrum
+            lab_blue_mask = (b_lab <= 118).astype(np.uint8) * 255
             lab_blue_bg = cv2.bitwise_and(lab_blue_mask, text_mask)
             lab_blue_ratio = cv2.countNonZero(lab_blue_bg) / float(bg_pixels)
 
             # 4. Adaptive HSV Mask
-            hsv = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2HSV)
+            hsv = cv2.cvtColor(inner_crop, cv2.COLOR_BGR2HSV)
             blue_mask_hsv = cv2.inRange(hsv, self.BLUE_HSV_LOWER, self.BLUE_HSV_UPPER)
             hsv_blue_bg = cv2.bitwise_and(blue_mask_hsv, text_mask)
             hsv_blue_ratio = cv2.countNonZero(hsv_blue_bg) / float(bg_pixels)
 
             # 5. Normalized RGB Chromaticity (Blue Dominance)
-            b, g, r = cv2.split(plate_crop)
+            b, g, r = cv2.split(inner_crop)
             b_f = b.astype(np.float32)
             g_f = g.astype(np.float32)
             r_f = r.astype(np.float32)
@@ -118,43 +123,48 @@ class EVClassifier:
             b_norm = b_f / rgb_sum
             br_diff = b_f - r_f
 
-            rgb_blue_mask = ((b_norm > 0.355) & (br_diff > 8.0) & (b_f > 40)).astype(np.uint8) * 255
+            rgb_blue_mask = ((b_norm > 0.365) & (br_diff >= 12.0) & (b_f > 40)).astype(np.uint8) * 255
             rgb_blue_bg = cv2.bitwise_and(rgb_blue_mask, text_mask)
             rgb_blue_ratio = cv2.countNonZero(rgb_blue_bg) / float(bg_pixels)
 
             # Combined Effective Blue Score across representations
             effective_blue = max(lab_blue_ratio, hsv_blue_ratio, rgb_blue_ratio)
-            mean_b_norm = float(np.mean(b_norm))
-            mean_br_diff = float(np.mean(br_diff))
-            mean_b_lab = float(np.mean(b_lab))
+
+            # Measure saturation & B-R on detected blue background pixels
+            combined_blue_mask = cv2.bitwise_or(hsv_blue_bg, cv2.bitwise_or(lab_blue_bg, rgb_blue_bg))
+            blue_pts = combined_blue_mask > 0
+            if np.any(blue_pts):
+                blue_s_mean = float(np.mean(hsv[:, :, 1][blue_pts]))
+                blue_br_mean = float(np.mean(br_diff[blue_pts]))
+            else:
+                blue_s_mean = 0.0
+                blue_br_mean = 0.0
 
             # Yellow / Commercial Mask
             yellow_mask = cv2.inRange(hsv, self.YELLOW_LOWER, self.YELLOW_UPPER)
-            yellow_ratio = cv2.countNonZero(yellow_mask) / float(total_pixels)
+            yellow_ratio = cv2.countNonZero(yellow_mask) / float(inner_crop.shape[0] * inner_crop.shape[1])
 
             # Green Mask
             green_mask = cv2.inRange(hsv, self.GREEN_LOWER, self.GREEN_UPPER)
-            green_ratio = cv2.countNonZero(green_mask) / float(total_pixels)
+            green_ratio = cv2.countNonZero(green_mask) / float(inner_crop.shape[0] * inner_crop.shape[1])
 
             logger.info(
                 f"Color Analysis: Effective Blue={effective_blue:.2%} (LAB={lab_blue_ratio:.2%}, "
-                f"HSV={hsv_blue_ratio:.2%}, RGB={rgb_blue_ratio:.2%}, mean_b*={mean_b_lab:.1f}, "
-                f"B-R={mean_br_diff:.1f}), Yellow={yellow_ratio:.2%}"
+                f"HSV={hsv_blue_ratio:.2%}, RGB={rgb_blue_ratio:.2%}, Blue-S={blue_s_mean:.1f}, "
+                f"Blue-(B-R)={blue_br_mean:.1f}), Yellow={yellow_ratio:.2%}"
             )
 
-            # 6. Robust Decision Logic
-            # Korean EV plate criteria:
-            # - Effective Blue >= 15% OR
-            # - LAB blue ratio >= 12% & B-R diff >= 8.0 OR
-            # - Mean normalized blue >= 0.360 & B-R diff >= 10.0
+            # 6. Robust Decision Logic (Korean Sky-Blue EV plate criteria)
+            # Real Korean EV plates have S >= 50.0 on blue pixels and B-R >= 12.0.
+            # Shadowed white plates have S < 45.0 (grayish desaturated).
             is_ev = (
-                (effective_blue >= 0.15) or
-                (lab_blue_ratio >= 0.12 and mean_br_diff >= 8.0) or
-                (mean_b_norm >= 0.360 and mean_br_diff >= 10.0 and mean_b_lab < 125.0)
+                (effective_blue >= 0.15 and blue_s_mean >= 50.0 and blue_br_mean >= 12.0) or
+                (lab_blue_ratio >= 0.18 and blue_s_mean >= 48.0 and blue_br_mean >= 10.0) or
+                (effective_blue >= 0.30 and blue_s_mean >= 48.0)
             )
 
             if is_ev:
-                logger.info(f"⚡ [EV Confirmed] Blue plate ratio: {effective_blue:.2%}")
+                logger.info(f"⚡ [EV Confirmed] Blue plate ratio: {effective_blue:.2%}, Blue-S: {blue_s_mean:.1f}")
                 if plate_number:
                     self.register_ev_plate(plate_number)
                 return EVClassification(
@@ -162,7 +172,7 @@ class EVClassifier:
                     vehicle_type="EV",
                     plate_color="blue",
                     blue_ratio=round(effective_blue, 3),
-                    confidence=min(0.65 + effective_blue * 0.8, 0.99)
+                    confidence=min(0.70 + effective_blue * 0.5, 0.99)
                 )
 
             elif yellow_ratio > 0.20:

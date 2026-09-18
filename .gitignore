@@ -29,10 +29,17 @@ models/easyocr/*
 *.weights
 
 # Local Storage & Snapshots
+storage/*
+!storage/.gitkeep
+!storage/snapshots/
 storage/snapshots/*
+storage/snapshots/**/*
 !storage/snapshots/.gitkeep
-storage/temp/*
+!storage/temp/
 !storage/temp/.gitkeep
+nohup.out
+
+
 
 # Logs & Databases
 *.log

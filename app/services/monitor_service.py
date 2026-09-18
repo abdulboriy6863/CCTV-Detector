@@ -335,8 +335,9 @@ class AutoMonitorService:
         """
         Global Cross-Camera Conflict Resolver:
         If the same vehicle plate is claimed by multiple cameras concurrently:
-        1. Assign exclusive ownership to the primary camera (highest confidence & proximity).
-        2. Release adjacent/ghost session from the secondary camera.
+        1. If vehicle moved from Cam A to Cam B: Formally close Cam A session with END event.
+        2. If adjacent camera caught peripheral ghost: Remove ghost snapshot and session.
+        3. Never leave winner camera wiped from memory, preventing repetitive START spam.
         """
         plate_to_cams = {}
         for cam_key, sess in list(self.active_sessions.items()):
@@ -348,15 +349,43 @@ class AutoMonitorService:
 
         for norm_plate, cam_list in plate_to_cams.items():
             if len(cam_list) > 1:
-                cam_list.sort(key=lambda x: x[1].get("confidence", 0.0), reverse=True)
-                winner_key, winner_sess = cam_list[0]
-                for loser_key, loser_sess in cam_list[1:]:
-                    logger.warning(
-                        f"⚠️ Cross-camera conflict resolved for {norm_plate}: "
-                        f"Kept on {winner_key} (Conf: {winner_sess.get('confidence', 0):.2f}), "
-                        f"discarded ghost on {loser_key} (Conf: {loser_sess.get('confidence', 0):.2f})"
-                    )
-                    self.active_sessions.pop(loser_key, None)
+                with SessionLocal() as db:
+                    cameras_by_key = {f"cam_{c.id}": c for c in db.query(CCTVCamera).all()}
+                    
+                    # Sort by entry time descending (newest first)
+                    cam_list.sort(key=lambda x: x[1].get("entry_at", datetime.min), reverse=True)
+                    newest_key, newest_sess = cam_list[0]
+                    older_key, older_sess = cam_list[1]
+                    
+                    time_diff = abs((newest_sess.get("entry_at", datetime.min) - older_sess.get("entry_at", datetime.min)).total_seconds())
+                    
+                    if time_diff >= 15.0:
+                        # True Vehicle Movement: Moved to newest_key -> Close older_key session
+                        older_cam = cameras_by_key.get(older_key)
+                        if older_cam:
+                            logger.info(
+                                f"🔄 [Cross-Camera Movement] Vehicle {norm_plate} moved to {newest_key}. "
+                                f"Closing previous session on {older_key}."
+                            )
+                            await self._close_session(older_cam, older_key, older_sess, db, departure_time=newest_sess.get("entry_at"))
+                        self.active_sessions.pop(older_key, None)
+                    else:
+                        # Peripheral Overlap / Ghost: pick highest confidence
+                        cam_list.sort(key=lambda x: x[1].get("confidence", 0.0), reverse=True)
+                        winner_key, winner_sess = cam_list[0]
+                        for loser_key, loser_sess in cam_list[1:]:
+                            loser_sid = loser_sess.get("session_id")
+                            logger.warning(
+                                f"⚠️ [Cross-Camera Ghost] Removing peripheral duplicate for {norm_plate} from {loser_key} "
+                                f"(Kept {winner_key} Conf: {winner_sess.get('confidence', 0):.2f})"
+                            )
+                            if loser_sid:
+                                try:
+                                    db.query(CCTVSnapshot).filter(CCTVSnapshot.session_id == loser_sid).delete()
+                                    db.commit()
+                                except Exception as e:
+                                    logger.error(f"Failed to delete ghost snapshot {loser_sid}: {e}")
+                            self.active_sessions.pop(loser_key, None)
 
     async def _inspect_camera_safe(self, camera: CCTVCamera):
         """Wrapper that acquires per-camera lock before inspection."""
@@ -616,8 +645,26 @@ class AutoMonitorService:
                 active["pending_new_plate"] = None
                 active["pending_cycles"] = 0
                 if det_result.confidence > active.get("confidence", 0.0):
+                    old_plate = active.get("plate")
                     active["plate"] = detected_plate
+                    active["anchor_plate"] = detected_plate
                     active["confidence"] = det_result.confidence
+                    # If plate reading refined with higher confidence, sync the initial START snapshot in DB
+                    if active.get("session_id") and detected_plate != old_plate:
+                        try:
+                            with SessionLocal() as db:
+                                db.query(CCTVSnapshot).filter(
+                                    CCTVSnapshot.session_id == active.get("session_id"),
+                                    CCTVSnapshot.event_type == EventTypeEnum.START.value
+                                ).update({
+                                    "plate_number": detected_plate,
+                                    "ai_confidence": det_result.confidence,
+                                    "raw_ocr_text": det_result.raw_ocr_text,
+                                })
+                                db.commit()
+                                logger.info(f"✨ [{camera_key}] Synchronized START snapshot in DB from '{old_plate}' to '{detected_plate}' (conf={det_result.confidence:.2f})")
+                        except Exception as e:
+                            logger.error(f"❌ [{camera_key}] Failed to sync START snapshot in DB: {e}")
                 return
 
             # If charger is plugged, do not allow false transition caused by weak OCR noise

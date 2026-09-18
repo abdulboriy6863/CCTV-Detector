@@ -157,16 +157,38 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
         timeout_seconds=5.0
     )
 
-    # If unreachable and force_save is not enabled, return detailed message
-    if not is_reachable and not camera_in.force_save and not camera_in.stream_url:
-        raise HTTPException(
-            status_code=400,
-            detail=f"카메라 연결 실패: {reachability_msg}"
+    if not is_reachable:
+        logger.warning(
+            f"Camera probe note for {camera_in.ip_address or camera_in.stream_url}: {reachability_msg}. "
+            f"Saving configuration with default stream parameters."
         )
 
     final_type = detected_type.value if (is_reachable and detected_type) else camera_in.camera_type.value
-    final_url = (working_url if is_reachable else None) or normalized_url or camera_in.stream_url
+    final_url = (working_url if is_reachable else None) or normalized_url or camera_in.stream_url or f"rtsp://{camera_in.ip_address}:554/stream1"
     final_port = camera_in.port or (554 if final_type == "RTSP" else 80)
+
+    # Check if a camera for this (cs_id, cp_id) already exists to avoid unique constraint violations
+    existing_cam = db.query(CCTVCamera).filter(
+        CCTVCamera.cs_id == camera_in.cs_id,
+        CCTVCamera.cp_id == camera_in.cp_id
+    ).first()
+
+    if existing_cam:
+        existing_cam.camera_name = camera_in.camera_name or existing_cam.camera_name
+        existing_cam.camera_type = final_type
+        existing_cam.stream_url = final_url
+        existing_cam.ip_address = camera_in.ip_address
+        existing_cam.port = final_port
+        existing_cam.username = camera_in.username
+        existing_cam.password = camera_in.password
+        existing_cam.roi_settings = camera_in.roi_settings or existing_cam.roi_settings
+        existing_cam.is_active = camera_in.is_active
+        existing_cam.updated_at = get_kst_now()
+        db.commit()
+        db.refresh(existing_cam)
+        invalidate_camera_meta_cache(existing_cam.id)
+        logger.info(f"Updated existing camera configuration for slot {existing_cam.cs_id}/{existing_cam.cp_id} (ID: {existing_cam.id})")
+        return existing_cam
 
     cam = CCTVCamera(
         cs_id=camera_in.cs_id,
@@ -187,7 +209,9 @@ async def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(cam)
     invalidate_camera_meta_cache()
+    logger.info(f"Successfully registered new camera {cam.camera_name} (ID: {cam.id}) for slot {cam.cs_id}/{cam.cp_id}")
     return cam
+
 
 
 @router.put("/{camera_id}", response_model=CameraResponse, summary="Update camera")
@@ -231,15 +255,11 @@ async def update_camera(camera_id: int, camera_in: CameraUpdate, db: Session = D
             port=test_port,
             timeout_seconds=4.0
         )
-        if not is_reachable:
-            raise HTTPException(
-                status_code=400,
-                detail=f"카메라 연결 실패: {reachability_msg}"
-            )
         if working_url:
             update_data['stream_url'] = working_url
         if detected_type:
             update_data['camera_type'] = detected_type.value
+
 
     if 'camera_type' in update_data and update_data['camera_type']:
         val = update_data['camera_type']

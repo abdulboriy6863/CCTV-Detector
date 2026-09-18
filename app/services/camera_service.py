@@ -22,6 +22,19 @@ logger = logging.getLogger(__name__)
 # CCTV Brand Definitions & Stream Path Presets
 # =====================================================================
 VENDOR_RTSP_PRESETS = {
+    "generic": [
+        "/stream1",
+        "/stream2",
+        "/live/ch0",
+        "/live/ch1",
+        "/video1",
+        "/video2",
+        "/onvif1",
+    ],
+    "tplink": [
+        "/stream1",                              # TP-Link Tapo / Vigi Main
+        "/stream2",                              # TP-Link Tapo / Vigi Sub
+    ],
     "hikvision": [
         "/Streaming/Channels/101",               # Hikvision Main Stream (HD)
         "/Streaming/Channels/102",               # Hikvision Sub Stream
@@ -53,10 +66,6 @@ VENDOR_RTSP_PRESETS = {
         "/axis-media/media.3gp",
         "/onvif-media/media.amp",
     ],
-    "tplink": [
-        "/stream1",                              # TP-Link Tapo / Vigi Main
-        "/stream2",                              # TP-Link Tapo / Vigi Sub
-    ],
     "tiandy": [
         "/1/1",
         "/1/2",
@@ -70,20 +79,8 @@ VENDOR_RTSP_PRESETS = {
         "/live/ch0",
         "/live/ch1",
     ],
-    "generic": [
-        "/stream1",
-        "/stream2",
-        "/live/ch0",
-        "/live/ch1",
-        "/video1",
-        "/video2",
-        "/onvif1",
-        "/onvif2",
-        "/h264",
-        "/h265",
-        "/",
-    ]
 }
+
 
 VENDOR_HTTP_SNAPSHOT_PRESETS = {
     "hikvision": [
@@ -744,7 +741,7 @@ class CameraService:
         """
         import socket
 
-        # 1. If explicit stream_url provided, test it first
+        # 1. If explicit stream_url provided, test it first with adequate timeout
         if stream_url and "://" in stream_url:
             parsed = urlparse(stream_url)
             detected_type = camera_type or (
@@ -761,7 +758,7 @@ class CameraService:
                     password=password,
                     ip_address=target_ip,
                     port=target_port,
-                    timeout_seconds=2.5
+                    timeout_seconds=4.5
                 )
                 if res.success:
                     return True, "카메라 연결 성공", stream_url, detected_type, res
@@ -805,21 +802,27 @@ class CameraService:
 
         # 3. Build prioritized list of RTSP candidate paths
         rtsp_paths = []
-        if brand and brand.lower() in VENDOR_RTSP_PRESETS:
-            rtsp_paths.extend(VENDOR_RTSP_PRESETS[brand.lower()])
+        if stream_url and "://" in stream_url:
+            custom_path = urlparse(stream_url).path
+            if custom_path:
+                rtsp_paths.append(custom_path)
 
-        # Add Hanwha, Hikvision, Dahua, Uniview, TP-Link and Generic presets
-        for vendor_key in ["hanwha", "hikvision", "dahua", "uniview", "tplink", "generic"]:
+        # Standard default /stream1 is tested first
+        if "/stream1" not in rtsp_paths:
+            rtsp_paths.append("/stream1")
+
+        if brand and brand.lower() in VENDOR_RTSP_PRESETS:
+            for p in VENDOR_RTSP_PRESETS[brand.lower()]:
+                if p not in rtsp_paths:
+                    rtsp_paths.append(p)
+
+        # Add Generic, TP-Link, Hikvision, Dahua, Hanwha presets
+        for vendor_key in ["generic", "tplink", "hikvision", "dahua", "hanwha", "uniview"]:
             if brand and brand.lower() == vendor_key:
                 continue
             for p in VENDOR_RTSP_PRESETS.get(vendor_key, []):
                 if p not in rtsp_paths:
                     rtsp_paths.append(p)
-
-        if stream_url and "://" in stream_url:
-            custom_path = urlparse(stream_url).path
-            if custom_path and custom_path not in rtsp_paths:
-                rtsp_paths.insert(0, custom_path)
 
         # 4. Probe RTSP candidate paths
         rtsp_ports = [p for p in open_ports if p in [554, 8554, 5540, 37777, 8000] or (camera_type == CameraTypeEnum.RTSP and p == port)]
@@ -838,12 +841,13 @@ class CameraService:
                     password=password,
                     ip_address=target_ip,
                     port=rtsp_p,
-                    timeout_seconds=2.0
+                    timeout_seconds=3.5
                 )
                 if res.success:
                     return True, f"RTSP 연결 성공 ({path})", test_url, CameraTypeEnum.RTSP, res
             except Exception as e:
                 logger.debug(f"RTSP probe failed for {test_url}: {e}")
+
 
         # 5. Probe HTTP Snapshots if HTTP_SNAPSHOT requested or ports 80/443/8080 open
         http_ports = [p for p in open_ports if p in [80, 443, 8080]]
